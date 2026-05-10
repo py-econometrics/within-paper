@@ -1,0 +1,9 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# build output
+main.pdf
+
+# generated benchmark data
+data/*.parquet

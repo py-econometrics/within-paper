@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#6f777d"/>
+    </marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #6f777d; }
+      .axis { stroke: #9aa2a8; stroke-width: 1.5; fill: none; }
+      .iter { stroke: #4c78a8; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .acc { stroke: #3a9b45; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .target { stroke: #c84f4f; stroke-width: 1.8; stroke-dasharray: 5 5; }
+      .point { fill: #4c78a8; stroke: #ffffff; stroke-width: 1.6; }
+      .green { fill: #3a9b45; stroke: #ffffff; stroke-width: 1.6; }
+    </style>
+  </defs>
+  <rect width="760" height="270" fill="#ffffff"/>
+  <text x="190" y="32" text-anchor="middle" font-size="16" font-weight="700">Plain fixed-point iteration</text>
+  <text x="570" y="32" text-anchor="middle" font-size="16" font-weight="700">Irons-Tuck acceleration</text>
+  <text x="190" y="52" text-anchor="middle" font-size="12" class="muted">Many small steps near the limit</text>
+  <text x="570" y="52" text-anchor="middle" font-size="12" class="muted">Use recent steps to extrapolate toward the limit</text>
+
+  <line x1="50" y1="218" x2="330" y2="218" class="axis"/>
+  <line x1="50" y1="218" x2="50" y2="70" class="axis"/>
+  <line x1="50" y1="92" x2="330" y2="92" class="target"/>
+  <text x="335" y="96" font-size="12" fill="#c84f4f">x*</text>
+  <path d="M78 196 L124 160" class="iter"/>
+  <path d="M124 160 L168 136" class="iter"/>
+  <path d="M168 136 L210 120" class="iter"/>
+  <path d="M210 120 L250 109" class="iter"/>
+  <path d="M250 109 L286 101" class="iter"/>
+  <circle cx="78" cy="196" r="5" class="point"/>
+  <circle cx="124" cy="160" r="5" class="point"/>
+  <circle cx="168" cy="136" r="5" class="point"/>
+  <circle cx="210" cy="120" r="5" class="point"/>
+  <circle cx="250" cy="109" r="5" class="point"/>
+
+  <line x1="430" y1="218" x2="710" y2="218" class="axis"/>
+  <line x1="430" y1="218" x2="430" y2="70" class="axis"/>
+  <line x1="430" y1="92" x2="710" y2="92" class="target"/>
+  <text x="715" y="96" font-size="12" fill="#c84f4f">x*</text>
+  <path d="M458 196 L506 160" class="iter"/>
+  <path d="M506 160 L552 136" class="iter"/>
+  <path d="M552 136 L646 96" class="acc"/>
+  <circle cx="458" cy="196" r="5" class="point"/>
+  <circle cx="506" cy="160" r="5" class="point"/>
+  <circle cx="552" cy="136" r="5" class="point"/>
+  <circle cx="646" cy="96" r="6" class="green"/>
+  <text x="618" y="126" font-size="12" fill="#3a9b45">extrapolated iterate</text>
+  <text x="190" y="246" text-anchor="middle" font-size="12" class="muted">Iterations continue until the update becomes small.</text>
+  <text x="570" y="246" text-anchor="middle" font-size="12" class="muted">Acceleration is helpful when the local shrinkage pattern is stable.</text>
+</svg>
