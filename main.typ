@@ -637,12 +637,6 @@ the local system approximately, and $R_s'$ prolongates the weighted correction b
 the global space. Using identical weights on restriction and prolongation makes the
 additive preconditioner symmetric, so it can be paired with conjugate gradient (CG).
 
-The Gramian $G$ is symmetric positive semi-definite and singular: within each connected
-component of the factor-interaction graph, a constant can be shifted between the two
-factors without changing $D alpha$, leaving a one-dimensional null space per component.
-The right-hand side $D' W mu$ lies in the column space of $G$, so the system is
-consistent, and CG initialized at zero remains in that column space and converges to the
-minimum-norm solution required by FWL residualization.
 
 #align(center)[
   #block(
@@ -915,7 +909,7 @@ regression overhead is incurred on top of these figures.]
 The fixest DGPs exhibit the same tradeoff in its cleanest form. On the simple design,
 where the graph is dense and the worker-firm gap is large, `fixest` with Irons-Tuck
 acceleration is fastest at 0.93s while `within` is slowest at 10.53s; the preconditioner
-setup cost is not recouped MAP already converges rapidly. As the
+setup cost is not recouped: MAP already converges rapidly. As the
 caption indicates, roughly three quarters of `within`'s one-shot demeaning time on the
 simple design consists of reusable solver setup rather than the batch solve itself.
 
@@ -989,7 +983,7 @@ sorting generates cross-factor structure that one-factor updates only handle slo
 
 We next turn to real benchmark data from the Correia collection. Synthetic data sets
 match the overall shape of empirical co-occurrence graphs but smooth away the messy
-details that often drive runtime: a few units that show up far more often than the the others,
+details that often drive runtime: a few units that show up far more often than the others,
 thin connections between otherwise dense groups, lots of small disconnected pieces, and
 interactions between identifiers that go beyond a clean two-way pair. Real data carries
 these features by default, and therefore tests the solvers in conditions that controlled
@@ -1049,7 +1043,7 @@ multiplied by the number of IRLS iterations.
 The IRLS structure also enlarges the window over which a preconditioner setup cost can
 amortize. A factor-pair preconditioner depends on the fixed-effect structure, which is
 fixed across iterations, and on the IRLS weights, which change. If the IRLS weights do not 
-change too much, a "sligthly stale" preconditioner will still be effective. We exploit this by
+change too much, a "slightly stale" preconditioner will still be effective. We exploit this by
 constructing the preconditioner once and then reusing the ``stale'' preconditioner on
 subsequent IRLS iterations. Staleness slows the outer Krylov solver but does not bias its
 solution; the iteration still converges to the correct demeaned residuals. The
@@ -1330,7 +1324,8 @@ break the strict Laplacian property; when this occurs the implementation applies
 to all others in order to absorb the deficit and restore a valid Laplacian on the
 augmented system.
 
-The default local solver eliminates one side of the bipartite graph. If the eliminated
+The default local solver eliminates the larger side of the bipartite graph, so that the
+reduced system is formed on the smaller factor. If the eliminated
 side is $q$, the Schur complement takes the form
 
 $ S = N_r - C' N_q^(-1) C. $
