@@ -217,8 +217,8 @@ Equation @eq:fwl-normal is the linear system that pins down every
 residualization: whether of $y$ or of one column of $X$, the fit reduces to a system in
 $G$ with a new right-hand side. The solvers we compare divide along a basic line. MAP and
 its accelerated variants treat @eq:fwl-normal directly as a linear system in $G$, solving
-it by block Gauss-Seidel sweeps over its diagonal blocks. Krylov least-squares methods ---
-LSMR and the preconditioned solver developed in this paper --- instead solve the
+it by block Gauss-Seidel sweeps over its diagonal blocks. Krylov least-squares methods -
+LSMR and the preconditioned solver developed in this paper - instead solve the
 mathematically equivalent least-squares problem $arg min_alpha || D alpha - mu ||_W^2$ by
 iterating on the design $D$ directly, without ever forming $G$; equation @eq:fwl-normal is
 recovered only as its first-order condition. They differ along many further dimensions,
@@ -511,13 +511,13 @@ the precise statement.
 Section 5 attributed MAP's slow convergence to thin connections in the fixed-effect
 graph. The same sparsity makes the Gramian $G$ poorly conditioned, so any iterative
 method whose convergence is governed by the geometry of $G$ progresses slowly.
-Preconditioning is the standard remedy: rather than alter the least-squares fit, one
-supplies the Krylov iteration with an operator $M approx G$ so that it behaves as if
-applied to the better-conditioned operator
+Preconditioning is the standard remedy against slow convergence: rather than alter
+the least-squares fit, one supplies the Krylov iteration with an operator $M approx G$ 
+so that it behaves as if applied to the better-conditioned operator
 
 $ M^(-1) G $
 
-in place of $G$ --- for LSMR, by running the bidiagonalization in the $M$-weighted inner
+in place of $G$ - for LSMR, by running the bidiagonalization in the $M$-weighted inner
 product, which clusters the eigenvalues of $M^(-1) G$. The fitted values are unchanged;
 only the geometry presented to the iteration is altered.
 
