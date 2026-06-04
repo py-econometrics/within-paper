@@ -2,8 +2,11 @@
 .pixi/*
 !.pixi/config.toml
 
-# build output
-main.pdf
+# local OS / interpreter byproducts
+.DS_Store
+__pycache__/
+benchmarks/__pycache__/
+benchmarks/julia-env/
 
 # generated benchmark data
 data/*.parquet

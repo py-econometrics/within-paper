@@ -7,6 +7,10 @@ version = "0.1.0"
 
 [tasks]
 compile = "typst compile main.typ main.pdf"
+compile-friedrichs = "typst compile friedrichs_note.typ friedrichs_note.pdf"
+_julia-setup = { cmd = """julia -e 'using Pkg; Pkg.activate("benchmarks/julia-env"); Pkg.add([Pkg.PackageSpec(name="FixedEffectModels", url="https://github.com/FixedEffects/FixedEffectModels.jl"), Pkg.PackageSpec("JSON3"), Pkg.PackageSpec("DataFrames"), Pkg.PackageSpec("Parquet2"), Pkg.PackageSpec("StatsModels")]); Pkg.instantiate()'""", description = "Install Julia packages needed for agreement checks" }
+agreement = { cmd = "python benchmarks/bench_agreement_py.py", depends-on = ["_julia-setup"], description = "Run numerical agreement checks against PyFixest, R fixest, and FixedEffectModels.jl" }
+within-setup-cost = { cmd = "python benchmarks/bench_within_setup_cost.py", description = "Measure setup and solve time for the standalone within Python API" }
 
 [dependencies]
 typst = ">=0.14.2,<0.15"
@@ -14,6 +18,7 @@ r-base = ">=4.5.3,<4.6"
 r-fixest = ">=0.14.1,<0.15"
 r-arrow = ">=19.0.1,<20"
 r-jsonlite = ">=2.0.0,<3"
+juliaup = "*"
 python = ">=3.14.4,<3.15"
 
 [pypi-dependencies]
