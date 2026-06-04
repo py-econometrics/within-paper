@@ -763,10 +763,9 @@ diagonally-preconditioned Krylov solver. The benchmarked backends are:
 All reported CPU times are medians across three benchmark iterations run on an Apple M4
 Mac mini with 10 CPU cores and 16 GB of memory running macOS 15.3.1.
 
-We do not include `reghdfe` directly in the benchmark tables because Stata is not open
+We do not include `reghdfe` @reghdfe @correia2017 directly in the benchmark tables because Stata is not open
 source and we lack a license. `reghdfe` is a mature accelerated-MAP
-implementation with a conjugate-gradient option, singleton-observation pruning, and
-accelerated demeaning @reghdfe @correia2017; algorithmically, it belongs to the same
+implementation; algorithmically, it belongs to the same
 family as `fixest`'s accelerated MAP.
 
 == Runtime Benchmarks
