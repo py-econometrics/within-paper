@@ -137,9 +137,10 @@ such an approximation by exploiting the fact that, after a sign change, each fac
 block is a graph Laplacian, which admits cheap approximate inverses following ideas from
 the Laplacian-solver literature @spielman2014 @gao2025. The preconditioned system is
 then solved iteratively via a Krylov solver.#footnote[The seminal Julia implementation
-of fixed effects regression, `FixedEffectModels.jl` @fixedeffectmodels, also uses a
-Krylov solver (the LSMR @fong2011), but only with diagonal preconditioning, which
-ignores the off-diagonal co-occurrence structure entirely.] In a range of benchmarks
+of fixed effects regression, `FixedEffectModels.jl` @fixedeffectmodels, uses the same
+Krylov solver (LSMR @fong2011) as the method we propose, but only with diagonal
+preconditioning, which ignores the off-diagonal co-occurrence structure entirely; the
+contribution here is the preconditioner, not the outer iteration.] In a range of benchmarks
 against mature implementations of the method of alternating projections, we find that on
 sparse, poorly connected graphs (the regime where MAP convergence deteriorates) the
 graph-preconditioned solver delivers substantial speedups, while on dense,
@@ -212,12 +213,17 @@ or
 
 $ G hat(alpha)_mu = D' W mu, quad G = D' W D. $ <eq:fwl-normal>
 
-Equation @eq:fwl-normal is the linear system that we must actually solve: every
-residualization, whether of $y$ or of one column of $X$, reduces to a system in $G$ with
-a new right-hand side. MAP, LSMR, and the preconditioned solver developed in this paper
-all represent distinct strategies for solving this linear system. They differ along many
-dimensions, but for our purposes the key axis of variation is the extent to which each
-one exploits the structure of $G$. The sparsity pattern and conditioning of $G$ jointly
+Equation @eq:fwl-normal is the linear system that pins down every
+residualization: whether of $y$ or of one column of $X$, the fit reduces to a system in
+$G$ with a new right-hand side. The solvers we compare divide along a basic line. MAP and
+its accelerated variants treat @eq:fwl-normal directly as a linear system in $G$, solving
+it by block Gauss-Seidel sweeps over its diagonal blocks. Krylov least-squares methods ---
+LSMR and the preconditioned solver developed in this paper --- instead solve the
+mathematically equivalent least-squares problem $arg min_alpha || D alpha - mu ||_W^2$ by
+iterating on the design $D$ directly, without ever forming $G$; equation @eq:fwl-normal is
+recovered only as its first-order condition. They differ along many further dimensions,
+but for our purposes the key axis of variation is the extent to which each one exploits
+the structure of $G$. The sparsity pattern and conditioning of $G$ jointly
 determine how many iterations MAP requires to converge, whether a diagonal preconditioner
 suffices for a Krylov solver, and ultimately which solver proves fastest on a given
 problem. A careful analysis of the structure of $G$ is therefore foundational for the
@@ -504,14 +510,16 @@ the precise statement.
 
 Section 5 attributed MAP's slow convergence to thin connections in the fixed-effect
 graph. The same sparsity makes the Gramian $G$ poorly conditioned, so any iterative
-method applied directly to $G$ converges slowly. Preconditioning is the standard remedy
-for poorly conditioned iterative solves: rather than change the system $G alpha = b$,
-one solves the equivalent system
+method whose convergence is governed by the geometry of $G$ progresses slowly.
+Preconditioning is the standard remedy: rather than alter the least-squares fit, one
+supplies the Krylov iteration with an operator $M approx G$ so that it behaves as if
+applied to the better-conditioned operator
 
-$ M^(-1) G alpha = M^(-1) b $
+$ M^(-1) G $
 
-with a matrix $M$ chosen so that $M^(-1) G$ has better geometry than $G$. The fitted
-values are unchanged; only the operator presented to the iteration is altered.
+in place of $G$ --- for LSMR, by running the bidiagonalization in the $M$-weighted inner
+product, which clusters the eigenvalues of $M^(-1) G$. The fitted values are unchanged;
+only the geometry presented to the iteration is altered.
 
 The ideal choice $M = G$ converges in a single step, but computing $G^(-1)$ is precisely
 the costly operation we are trying to avoid when applying the Frisch-Waugh-Lovell
@@ -585,10 +593,11 @@ randomized approximate Cholesky factorizations from the Laplacian-solver literat
 
 The approximate local inverses are then assembled into an additive Schwarz
 preconditioner. This preconditioner is not the estimator itself but a reusable linear
-operator applied inside a Krylov solver, so its approximations do not alter the
-econometric target. CG continues to solve the original fixed-effect normal equations;
-the preconditioner merely supplies better search directions. Any imperfection in a
-local inverse is absorbed by the Krylov iteration, which terminates only once the
+operator applied inside a modified, factorization-free preconditioned LSMR iteration
+@fong2011 @arridge2014 @yang2024flexible, so its approximations do not alter the
+econometric target. LSMR continues to solve the original fixed-effect least-squares fit;
+the preconditioner merely supplies better-conditioned search directions. Any imperfection
+in a local inverse is absorbed by the Krylov iteration, which terminates only once the
 global residual meets the requested tolerance. Once constructed, the same
 preconditioner is reused when residualizing the outcome and each covariate.
 
@@ -635,7 +644,8 @@ local solve. Reading the formula from right to left, $R_s r$ restricts the globa
 residual to subdomain $s$, $tilde(D)_s$ applies the partition weights, $A_s^+$ solves
 the local system approximately, and $R_s'$ prolongates the weighted correction back to
 the global space. Using identical weights on restriction and prolongation makes the
-additive preconditioner symmetric, so it can be paired with conjugate gradient (CG).
+additive preconditioner symmetric positive definite, which is the property the
+preconditioned LSMR iteration requires of $M$.
 
 
 #align(center)[
@@ -745,7 +755,7 @@ diagonally-preconditioned Krylov solver. The benchmarked backends are:
   [`rust-map`], [PyFixest], [Vanilla Rust MAP backend without acceleration.],
   [`fixest`], [R `fixest`], [Sophisticated MAP implementation with Irons-Tuck acceleration, coefficient-space routines, and additional heuristics @berge2026fixest; see the standalone appendix.],
   [`FEM.jl`], [`FixedEffectModels.jl`], [LSMR, a Krylov method with diagonal preconditioning @fong2011 @fixedeffectmodels.],
-  [`within`], [PyFixest], [Conjugate-gradient backend with factor-pair Schwarz preconditioning.],
+  [`within`], [PyFixest], [The same LSMR Krylov method as `FEM.jl`, but with factor-pair Schwarz preconditioning in place of diagonal scaling.],
   table.hline(stroke: 0.8pt + table-rule),
 )
 ]
@@ -1162,7 +1172,7 @@ the full regression problem.
 
 When introducing a new fixed-effect solver, the burden falls on the implementation to
 demonstrate that it matches existing solutions. We should not take exact agreement for
-granted: MAP, CG, and LSMR-style routines use different convergence checks, residual
+granted: MAP and LSMR-style routines use different convergence checks, residual
 norms, stopping thresholds, and iteration caps. The tables below report targeted diagnostics for the
 PyFixest Rust backends used in this paper and for coefficient agreement with external
 software.
