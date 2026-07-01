@@ -1,0 +1,36 @@
+<svg viewBox="0 0 620 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #68727a; }
+      .worker { fill: #f3d8f1; stroke: #a84aa0; stroke-width: 2; }
+      .firm { fill: #dce8fb; stroke: #4f78b8; stroke-width: 2; }
+      .edge { stroke: #89939b; stroke-width: 2; }
+      .mover { stroke: #2f9d8a; stroke-width: 3; }
+      .stayer { stroke: #b4bbc1; stroke-width: 4; }
+    </style>
+  </defs>
+  <rect width="620" height="260" fill="#ffffff"/>
+  <text x="310" y="30" text-anchor="middle" font-size="16" font-weight="700">Worker-firm projection of the toy panel</text>
+  <text x="310" y="51" text-anchor="middle" font-size="12" class="muted">Workers are linked to the firms at which they are observed</text>
+
+  <text x="142" y="82" text-anchor="middle" font-size="12" class="muted">Workers</text>
+  <text x="478" y="82" text-anchor="middle" font-size="12" class="muted">Firms</text>
+
+  <line x1="142" y1="120" x2="478" y2="115" class="mover"/>
+  <line x1="142" y1="120" x2="478" y2="185" class="mover"/>
+  <line x1="142" y1="170" x2="478" y2="115" class="stayer"/>
+  <line x1="142" y1="220" x2="478" y2="185" class="stayer"/>
+
+  <circle cx="142" cy="120" r="23" class="worker"/><text x="142" y="126" text-anchor="middle" font-size="14" font-weight="700">W1</text>
+  <circle cx="142" cy="170" r="23" class="worker"/><text x="142" y="176" text-anchor="middle" font-size="14" font-weight="700">W2</text>
+  <circle cx="142" cy="220" r="23" class="worker"/><text x="142" y="226" text-anchor="middle" font-size="14" font-weight="700">W3</text>
+
+  <circle cx="478" cy="115" r="25" class="firm"/><text x="478" y="121" text-anchor="middle" font-size="14" font-weight="700">F1</text>
+  <circle cx="478" cy="185" r="25" class="firm"/><text x="478" y="191" text-anchor="middle" font-size="14" font-weight="700">F2</text>
+
+  <rect x="274" y="93" width="190" height="26" rx="5" fill="#ffffff" opacity="0.9"/>
+  <text x="369" y="111" text-anchor="middle" font-size="12" fill="#2f9d8a">mover connects F1 and F2</text>
+  <rect x="218" y="205" width="286" height="26" rx="5" fill="#ffffff" opacity="0.9"/>
+  <text x="361" y="223" text-anchor="middle" font-size="12" class="muted">stayers add observations but no firm-to-firm bridge</text>
+</svg>

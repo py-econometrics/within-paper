@@ -1,0 +1,51 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#7c858c"/>
+    </marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #6f777d; }
+      .firm { fill: #d8dcff; stroke: #555b68; stroke-width: 2.2; }
+      .worker { fill: #ffe2a7; stroke: #c84f4f; stroke-width: 2.4; }
+      .edge { stroke: #d99a9a; stroke-width: 3; }
+      .exact { stroke: #c84f4f; stroke-width: 3.2; }
+      .approx { stroke: #3a9b45; stroke-width: 3.2; }
+      .dash { stroke: #cfd5da; stroke-width: 2.2; stroke-dasharray: 6 5; }
+      .arrow { stroke: #7c858c; stroke-width: 1.8; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="760" height="300" fill="#ffffff"/>
+  <text x="112" y="36" text-anchor="middle" font-size="16" font-weight="700">Worker visits three firms</text>
+  <text x="386" y="36" text-anchor="middle" font-size="16" font-weight="700" fill="#c84f4f">Exact elimination</text>
+  <text x="618" y="36" text-anchor="middle" font-size="16" font-weight="700" fill="#3a9b45">Sparse approximation</text>
+
+  <line x1="112" y1="136" x2="58" y2="84" class="edge"/>
+  <line x1="112" y1="136" x2="166" y2="84" class="edge"/>
+  <line x1="112" y1="136" x2="112" y2="218" class="edge"/>
+  <circle cx="112" cy="136" r="29" class="worker"/><text x="112" y="142" text-anchor="middle" font-size="15" font-weight="700">W1</text>
+  <circle cx="58" cy="84" r="30" class="firm"/><text x="58" y="90" text-anchor="middle" font-size="15" font-weight="700">F1</text>
+  <circle cx="166" cy="84" r="30" class="firm"/><text x="166" y="90" text-anchor="middle" font-size="15" font-weight="700">F2</text>
+  <circle cx="112" cy="218" r="30" class="firm"/><text x="112" y="224" text-anchor="middle" font-size="15" font-weight="700">F3</text>
+
+  <path d="M220 112 L274 98" class="arrow"/>
+  <path d="M220 184 L274 198" class="arrow"/>
+
+  <line x1="326" y1="90" x2="446" y2="90" class="exact"/>
+  <line x1="326" y1="90" x2="386" y2="190" class="exact"/>
+  <line x1="446" y1="90" x2="386" y2="190" class="exact"/>
+  <circle cx="326" cy="90" r="30" class="firm"/><text x="326" y="96" text-anchor="middle" font-size="15" font-weight="700">F1</text>
+  <circle cx="446" cy="90" r="30" class="firm"/><text x="446" y="96" text-anchor="middle" font-size="15" font-weight="700">F2</text>
+  <circle cx="386" cy="190" r="30" class="firm"/><text x="386" y="196" text-anchor="middle" font-size="15" font-weight="700">F3</text>
+  <text x="386" y="246" text-anchor="middle" font-size="12" class="muted">A degree d worker creates</text>
+  <text x="386" y="262" text-anchor="middle" font-size="12" class="muted">d(d-1)/2 fill edges.</text>
+
+  <line x1="566" y1="90" x2="686" y2="90" class="dash"/>
+  <line x1="566" y1="90" x2="626" y2="190" class="approx"/>
+  <line x1="686" y1="90" x2="626" y2="190" class="approx"/>
+  <circle cx="566" cy="90" r="30" class="firm"/><text x="566" y="96" text-anchor="middle" font-size="15" font-weight="700">F1</text>
+  <circle cx="686" cy="90" r="30" class="firm"/><text x="686" y="96" text-anchor="middle" font-size="15" font-weight="700">F2</text>
+  <circle cx="626" cy="190" r="30" class="firm"/><text x="626" y="196" text-anchor="middle" font-size="15" font-weight="700">F3</text>
+  <text x="626" y="246" text-anchor="middle" font-size="12" class="muted">A sampled tree keeps only</text>
+  <text x="626" y="262" text-anchor="middle" font-size="12" class="muted">d-1 edges in this step.</text>
+</svg>

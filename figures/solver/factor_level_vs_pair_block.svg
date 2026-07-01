@@ -1,0 +1,176 @@
+<svg viewBox="0 0 820 470" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="820" height="470" fill="white"/>
+
+  <!-- Panel titles -->
+  <text x="190" y="36" text-anchor="middle" font-size="14" font-weight="bold" fill="#1f2937">Factor-level solve</text>
+  <text x="190" y="54" text-anchor="middle" font-size="10.5" fill="#555">Local operator = diagonal block only</text>
+
+  <text x="610" y="36" text-anchor="middle" font-size="14" font-weight="bold" fill="#1f2937">Factor-pair solve</text>
+  <text x="610" y="54" text-anchor="middle" font-size="10.5" fill="#555">Local operator = factor-pair Gramian block</text>
+
+  <!-- "vs" separator -->
+  <text x="405" y="200" text-anchor="middle" font-size="14" font-style="italic" fill="#777">vs</text>
+
+  <!-- =================== LEFT: factor-level (3x3) =================== -->
+  <!-- Column headers -->
+  <text x="160" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W1</text>
+  <text x="190" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W2</text>
+  <text x="220" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W3</text>
+
+  <!-- Row labels -->
+  <text x="138" y="113" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W1</text>
+  <text x="138" y="143" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W2</text>
+  <text x="138" y="173" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W3</text>
+
+  <!-- 3x3 grid -->
+  <g>
+    <!-- diagonals filled pink -->
+    <rect x="145" y="94" width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <rect x="175" y="124" width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <rect x="205" y="154" width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <!-- off-diagonals empty -->
+    <rect x="175" y="94" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+    <rect x="205" y="94" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+    <rect x="145" y="124" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+    <rect x="205" y="124" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+    <rect x="145" y="154" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+    <rect x="175" y="154" width="30" height="30" fill="#f7f7f9" stroke="#d8dee8" stroke-width="0.8"/>
+  </g>
+
+  <!-- diagonal entries (2,2,2) -->
+  <text x="160" y="115" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+  <text x="190" y="145" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+  <text x="220" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+
+  <!-- Caption under left matrix -->
+  <text x="190" y="218" text-anchor="middle" font-size="12" fill="#333">
+    <tspan font-style="italic">N</tspan><tspan font-size="9" baseline-shift="sub">W</tspan>
+    = diag(2, 2, 2)
+  </text>
+  <text x="190" y="244" text-anchor="middle" font-size="11" fill="#a14242">Cheap to invert, but does not solve</text>
+  <text x="190" y="259" text-anchor="middle" font-size="11" fill="#a14242">cross-factor coupling directly</text>
+
+  <!-- =================== RIGHT: factor-pair (5x5) =================== -->
+  <!-- Column headers -->
+  <text x="540" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W1</text>
+  <text x="570" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W2</text>
+  <text x="600" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">W3</text>
+  <text x="630" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">F1</text>
+  <text x="660" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">F2</text>
+
+  <!-- Row labels -->
+  <text x="518" y="113" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W1</text>
+  <text x="518" y="143" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W2</text>
+  <text x="518" y="173" text-anchor="end" font-size="11" font-weight="bold" fill="#333">W3</text>
+  <text x="518" y="203" text-anchor="end" font-size="11" font-weight="bold" fill="#333">F1</text>
+  <text x="518" y="233" text-anchor="end" font-size="11" font-weight="bold" fill="#333">F2</text>
+
+  <!-- 5x5 grid (cells 30x30, starting at 525,94) -->
+  <!-- Top-left N_W block (3x3, pink diagonal, empty off-diag) -->
+  <g>
+    <!-- diagonals -->
+    <rect x="525" y="94"  width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <rect x="555" y="124" width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <rect x="585" y="154" width="30" height="30" fill="#f6dcec" stroke="#b886a8" stroke-width="1.2"/>
+    <!-- off-diagonals (within W-W) -->
+    <rect x="555" y="94"  width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="585" y="94"  width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="525" y="124" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="585" y="124" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="525" y="154" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="555" y="154" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+  </g>
+
+  <!-- Top-right C_WF block (3x2, blue) -->
+  <g>
+    <rect x="615" y="94"  width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="645" y="94"  width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="615" y="124" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="645" y="124" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="615" y="154" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="645" y="154" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+  </g>
+
+  <!-- Bottom-left C_WF' block (2x3, blue) -->
+  <g>
+    <rect x="525" y="184" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="555" y="184" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="585" y="184" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="525" y="214" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+    <rect x="555" y="214" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="585" y="214" width="30" height="30" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="0.9"/>
+  </g>
+
+  <!-- Bottom-right N_F block (2x2, purple diagonal) -->
+  <g>
+    <rect x="615" y="184" width="30" height="30" fill="#e6dcf2" stroke="#9b86bd" stroke-width="1.2"/>
+    <rect x="645" y="214" width="30" height="30" fill="#e6dcf2" stroke="#9b86bd" stroke-width="1.2"/>
+    <rect x="645" y="184" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+    <rect x="615" y="214" width="30" height="30" fill="#fbfbfd" stroke="#dde2ec" stroke-width="0.7"/>
+  </g>
+
+  <!-- Entries: W-W diagonal (2,2,2) -->
+  <text x="540" y="115" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+  <text x="570" y="145" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+  <text x="600" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#9a3a76">2</text>
+
+  <!-- Entries: F-F diagonal (3,3) -->
+  <text x="630" y="205" text-anchor="middle" font-size="13" font-weight="bold" fill="#5c4a8a">3</text>
+  <text x="660" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#5c4a8a">3</text>
+
+  <!-- Entries: C_WF top-right (W1: 1,1 ; W2: 2,0 ; W3: 0,2) -->
+  <text x="630" y="115" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">1</text>
+  <text x="660" y="115" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">1</text>
+  <text x="630" y="145" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">2</text>
+  <text x="660" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">2</text>
+
+  <!-- Entries: C_WF' bottom-left -->
+  <text x="540" y="205" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">1</text>
+  <text x="570" y="205" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">2</text>
+  <text x="540" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">1</text>
+  <text x="600" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a5fa3">2</text>
+
+  <!-- Subdomain outline: dashed rectangle around the entire 5x5 block -->
+  <rect x="520" y="89" width="160" height="160" fill="none" stroke="#7a3b76" stroke-width="1.6" stroke-dasharray="5,3"/>
+
+  <!-- Caption under right matrix -->
+  <text x="610" y="280" text-anchor="middle" font-size="12" fill="#333">
+    <tspan font-style="italic">G</tspan><tspan font-size="9" baseline-shift="sub">(W,F)</tspan>
+    =
+    <tspan font-style="italic">block</tspan>
+    [
+    <tspan font-style="italic">N</tspan><tspan font-size="9" baseline-shift="sub">W</tspan>,
+    <tspan font-style="italic">C</tspan><tspan font-size="9" baseline-shift="sub">WF</tspan>;
+    <tspan font-style="italic">C</tspan><tspan font-size="9" baseline-shift="sub">WF</tspan>',
+    <tspan font-style="italic">N</tspan><tspan font-size="9" baseline-shift="sub">F</tspan>
+    ]
+  </text>
+  <text x="610" y="304" text-anchor="middle" font-size="11" fill="#2f6b53">Captures how workers and firms</text>
+  <text x="610" y="319" text-anchor="middle" font-size="11" fill="#2f6b53">interact within each subdomain</text>
+
+  <!-- Bottom annotation -->
+  <text x="410" y="362" text-anchor="middle" font-size="11.5" fill="#444">
+    MAP's one-factor update solves only the active factor's diagonal count block.
+  </text>
+  <text x="410" y="378" text-anchor="middle" font-size="11.5" fill="#444">
+    The factor-pair Schwarz solve includes <tspan font-style="italic">C</tspan><tspan font-size="9" baseline-shift="sub">WF</tspan>,
+  </text>
+  <text x="410" y="394" text-anchor="middle" font-size="11.5" fill="#444">
+    so each local correction uses worker-firm links directly.
+  </text>
+
+  <!-- Legend strip -->
+  <g transform="translate(120, 415)">
+    <rect x="0" y="0" width="14" height="14" fill="#f6dcec" stroke="#b886a8" stroke-width="1.1"/>
+    <text x="20" y="11" font-size="10.5" fill="#444">worker counts <tspan font-style="italic">N</tspan><tspan font-size="8" baseline-shift="sub">W</tspan></text>
+
+    <rect x="160" y="0" width="14" height="14" fill="#e6dcf2" stroke="#9b86bd" stroke-width="1.1"/>
+    <text x="180" y="11" font-size="10.5" fill="#444">firm counts <tspan font-style="italic">N</tspan><tspan font-size="8" baseline-shift="sub">F</tspan></text>
+
+    <rect x="310" y="0" width="14" height="14" fill="#e1ecfb" stroke="#7a9ed1" stroke-width="1.1"/>
+    <text x="330" y="11" font-size="10.5" fill="#444">cross-tab <tspan font-style="italic">C</tspan><tspan font-size="8" baseline-shift="sub">WF</tspan></text>
+
+    <rect x="465" y="0" width="14" height="14" fill="none" stroke="#7a3b76" stroke-width="1.4" stroke-dasharray="4,2.5"/>
+    <text x="485" y="11" font-size="10.5" fill="#444">factor-pair subdomain</text>
+  </g>
+</svg>

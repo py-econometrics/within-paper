@@ -1,0 +1,37 @@
+source_dataset_id,source_k,iter_type,iter_num,dgp,model_k,n_obs,n_fe,backend,time,success,error
+simple_10000_k10_iter_1,10,iter,1,simple,10,10000,2,pyfixest (rust-map),0.05213758398895152,True,
+simple_10000_k10_iter_2,10,iter,2,simple,10,10000,2,pyfixest (rust-map),0.05645004200050607,True,
+simple_10000_k10_iter_3,10,iter,3,simple,10,10000,2,pyfixest (rust-map),0.055700958997476846,True,
+simple_100000_k10_iter_1,10,iter,1,simple,10,100000,2,pyfixest (rust-map),0.29032154199376237,True,
+simple_100000_k10_iter_2,10,iter,2,simple,10,100000,2,pyfixest (rust-map),0.2761658750096103,True,
+simple_100000_k10_iter_3,10,iter,3,simple,10,100000,2,pyfixest (rust-map),0.2785959169996204,True,
+simple_1000000_k10_iter_1,10,iter,1,simple,10,1000000,2,pyfixest (rust-map),3.061071959004039,True,
+simple_1000000_k10_iter_2,10,iter,2,simple,10,1000000,2,pyfixest (rust-map),2.928700749995187,True,
+simple_1000000_k10_iter_3,10,iter,3,simple,10,1000000,2,pyfixest (rust-map),3.0698933329986176,True,
+difficult_10000_k10_iter_1,10,iter,1,difficult,10,10000,2,pyfixest (rust-map),0.05042216699803248,True,
+difficult_10000_k10_iter_2,10,iter,2,difficult,10,10000,2,pyfixest (rust-map),0.04747400000633206,True,
+difficult_10000_k10_iter_3,10,iter,3,difficult,10,10000,2,pyfixest (rust-map),0.04687449999619275,True,
+difficult_100000_k10_iter_1,10,iter,1,difficult,10,100000,2,pyfixest (rust-map),0.30254287499701604,True,
+difficult_100000_k10_iter_2,10,iter,2,difficult,10,100000,2,pyfixest (rust-map),0.26883945798908826,True,
+difficult_100000_k10_iter_3,10,iter,3,difficult,10,100000,2,pyfixest (rust-map),0.2734332079999149,True,
+difficult_1000000_k10_iter_1,10,iter,1,difficult,10,1000000,2,pyfixest (rust-map),3.2216865420050453,True,
+difficult_1000000_k10_iter_2,10,iter,2,difficult,10,1000000,2,pyfixest (rust-map),2.914834916999098,True,
+difficult_1000000_k10_iter_3,10,iter,3,difficult,10,1000000,2,pyfixest (rust-map),3.049430041006417,True,
+simple_10000_k10_iter_1,10,iter,1,simple,10,10000,3,pyfixest (rust-map),0.07847024999500718,True,
+simple_10000_k10_iter_2,10,iter,2,simple,10,10000,3,pyfixest (rust-map),0.0771292079880368,True,
+simple_10000_k10_iter_3,10,iter,3,simple,10,10000,3,pyfixest (rust-map),0.07322412499343045,True,
+simple_100000_k10_iter_1,10,iter,1,simple,10,100000,3,pyfixest (rust-map),2.206543666005018,True,
+simple_100000_k10_iter_2,10,iter,2,simple,10,100000,3,pyfixest (rust-map),0.8430451249878388,True,
+simple_100000_k10_iter_3,10,iter,3,simple,10,100000,3,pyfixest (rust-map),0.8246584160078783,True,
+simple_1000000_k10_iter_1,10,iter,1,simple,10,1000000,3,pyfixest (rust-map),30.32947695799521,True,
+simple_1000000_k10_iter_2,10,iter,2,simple,10,1000000,3,pyfixest (rust-map),21.420259749997058,True,
+simple_1000000_k10_iter_3,10,iter,3,simple,10,1000000,3,pyfixest (rust-map),25.285499416990206,True,
+difficult_10000_k10_iter_1,10,iter,1,difficult,10,10000,3,pyfixest (rust-map),0.13526620900665876,True,
+difficult_10000_k10_iter_2,10,iter,2,difficult,10,10000,3,pyfixest (rust-map),0.14624358298897278,True,
+difficult_10000_k10_iter_3,10,iter,3,difficult,10,10000,3,pyfixest (rust-map),0.15473720800946467,True,
+difficult_100000_k10_iter_1,10,iter,1,difficult,10,100000,3,pyfixest (rust-map),,False,Demeaning failed after 10000 iterations.
+difficult_100000_k10_iter_2,10,iter,2,difficult,10,100000,3,pyfixest (rust-map),,False,Demeaning failed after 10000 iterations.
+difficult_100000_k10_iter_3,10,iter,3,difficult,10,100000,3,pyfixest (rust-map),52.96746141598851,True,
+difficult_1000000_k10_iter_1,10,iter,1,difficult,10,1000000,3,pyfixest (rust-map),,False,Demeaning failed after 10000 iterations.
+difficult_1000000_k10_iter_2,10,iter,2,difficult,10,1000000,3,pyfixest (rust-map),,False,Demeaning failed after 10000 iterations.
+difficult_1000000_k10_iter_3,10,iter,3,difficult,10,1000000,3,pyfixest (rust-map),,False,Demeaning failed after 10000 iterations.

@@ -1,0 +1,35 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #6f777d; }
+      .axis { stroke: #8b9398; stroke-width: 1.6; fill: none; }
+      .grid { stroke: #d9dee2; stroke-width: 1; stroke-dasharray: 4 5; }
+      .fast { stroke: #2f9d8a; stroke-width: 3.2; fill: none; }
+      .slow { stroke: #c84f4f; stroke-width: 3.2; fill: none; }
+    </style>
+  </defs>
+  <rect width="720" height="280" fill="#ffffff"/>
+  <text x="180" y="34" text-anchor="middle" font-size="16" font-weight="700">Well-connected worker-firm graph</text>
+  <text x="180" y="54" text-anchor="middle" font-size="12" class="muted">Many movers; worker and firm effects separate quickly</text>
+  <text x="540" y="34" text-anchor="middle" font-size="16" font-weight="700">Sparse worker-firm graph</text>
+  <text x="540" y="54" text-anchor="middle" font-size="12" class="muted">Few movers; worker and firm effects are nearly nested</text>
+
+  <line x1="58" y1="222" x2="318" y2="222" class="axis"/>
+  <line x1="58" y1="222" x2="58" y2="76" class="axis"/>
+  <line x1="58" y1="200" x2="318" y2="200" class="grid"/>
+  <path d="M58 82 C82 111, 102 124, 128 143 C158 166, 190 184, 226 195 C254 204, 286 210, 318 216" class="fast"/>
+  <text x="188" y="250" text-anchor="middle" font-size="12" class="muted">MAP sweeps</text>
+  <text x="28" y="151" text-anchor="middle" font-size="12" class="muted" transform="rotate(-90 28 151)">relative residual</text>
+  <text x="322" y="204" font-size="11" fill="#2f9d8a">tol</text>
+  <text x="239" y="190" font-size="11" fill="#2f9d8a">converges in few sweeps</text>
+
+  <line x1="418" y1="222" x2="678" y2="222" class="axis"/>
+  <line x1="418" y1="222" x2="418" y2="76" class="axis"/>
+  <line x1="418" y1="200" x2="678" y2="200" class="grid"/>
+  <path d="M418 82 L440 111 L462 95 L484 129 L506 113 L528 145 L550 132 L572 160 L594 149 L616 174 L638 165 L660 187 L678 181" class="slow"/>
+  <text x="548" y="250" text-anchor="middle" font-size="12" class="muted">MAP sweeps</text>
+  <text x="388" y="151" text-anchor="middle" font-size="12" class="muted" transform="rotate(-90 388 151)">relative residual</text>
+  <text x="682" y="204" font-size="11" fill="#c84f4f">tol</text>
+  <text x="579" y="188" font-size="11" fill="#c84f4f">still far from tolerance</text>
+</svg>
