@@ -1,0 +1,81 @@
+<svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #6f777d; }
+      .small { font-size: 11px; }
+      .head { font-size: 16px; font-weight: 700; }
+      .cell { fill: #f7f8fa; stroke: #d3d8de; stroke-width: 1.1; }
+      .diag { fill: #ead9ec; stroke: #b96ab2; }
+      .wf { fill: #dfeafb; stroke: #4e78b9; }
+      .wy { fill: #eef2f7; stroke: #b8c2cc; stroke-dasharray: 5 4; }
+      .fy { fill: #eef2f7; stroke: #b8c2cc; stroke-dasharray: 5 4; }
+      .hard { fill: #245c9c; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="820" height="360" fill="#ffffff"/>
+  <text x="160" y="34" text-anchor="middle" class="head">One-factor updates</text>
+  <text x="160" y="54" text-anchor="middle" class="muted small">MAP solves diagonal count blocks one at a time</text>
+  <text x="500" y="34" text-anchor="middle" class="head">Selected factor-pair preconditioner</text>
+  <text x="500" y="54" text-anchor="middle" class="muted small">The hard worker-firm block is solved as a coupled local system</text>
+
+  <g transform="translate(54 86)">
+    <text x="48" y="-12" text-anchor="middle" class="small muted">Worker</text>
+    <text x="126" y="-12" text-anchor="middle" class="small muted">Firm</text>
+    <text x="204" y="-12" text-anchor="middle" class="small muted">Year</text>
+    <text x="-12" y="43" text-anchor="end" class="small muted">Worker</text>
+    <text x="-12" y="121" text-anchor="end" class="small muted">Firm</text>
+    <text x="-12" y="199" text-anchor="end" class="small muted">Year</text>
+    <rect x="0" y="0" width="72" height="72" class="diag"/>
+    <rect x="78" y="0" width="72" height="72" class="cell"/>
+    <rect x="156" y="0" width="72" height="72" class="cell"/>
+    <rect x="0" y="78" width="72" height="72" class="cell"/>
+    <rect x="78" y="78" width="72" height="72" class="diag"/>
+    <rect x="156" y="78" width="72" height="72" class="cell"/>
+    <rect x="0" y="156" width="72" height="72" class="cell"/>
+    <rect x="78" y="156" width="72" height="72" class="cell"/>
+    <rect x="156" y="156" width="72" height="72" class="diag"/>
+    <text x="36" y="43" text-anchor="middle" font-size="17" font-weight="700">Gww</text>
+    <text x="114" y="121" text-anchor="middle" font-size="17" font-weight="700">Gff</text>
+    <text x="192" y="199" text-anchor="middle" font-size="17" font-weight="700">Gyy</text>
+    <text x="114" y="43" text-anchor="middle" class="muted small">Cwf</text>
+    <text x="36" y="121" text-anchor="middle" class="muted small">Cfw</text>
+    <text x="192" y="43" text-anchor="middle" class="muted small">Cwy</text>
+    <text x="36" y="199" text-anchor="middle" class="muted small">Cyw</text>
+    <text x="192" y="121" text-anchor="middle" class="muted small">Cfy</text>
+    <text x="114" y="199" text-anchor="middle" class="muted small">Cyf</text>
+    <text x="114" y="252" text-anchor="middle" class="small muted">Cheap group means;</text>
+    <text x="114" y="268" text-anchor="middle" class="small muted">cross-factor blocks enter through residual updates.</text>
+  </g>
+
+  <g transform="translate(408 86)">
+    <text x="48" y="-12" text-anchor="middle" class="small muted">Worker</text>
+    <text x="126" y="-12" text-anchor="middle" class="small muted">Firm</text>
+    <text x="204" y="-12" text-anchor="middle" class="small muted">Year</text>
+    <text x="-12" y="43" text-anchor="end" class="small muted">Worker</text>
+    <text x="-12" y="121" text-anchor="end" class="small muted">Firm</text>
+    <text x="-12" y="199" text-anchor="end" class="small muted">Year</text>
+    <rect x="-7" y="-7" width="164" height="164" rx="6" fill="#f0f5fd" stroke="#4e78b9" stroke-width="2.2"/>
+    <rect x="0" y="0" width="72" height="72" class="diag"/>
+    <rect x="78" y="0" width="72" height="72" class="wf"/>
+    <rect x="156" y="0" width="72" height="72" class="wy"/>
+    <rect x="0" y="78" width="72" height="72" class="wf"/>
+    <rect x="78" y="78" width="72" height="72" class="diag"/>
+    <rect x="156" y="78" width="72" height="72" class="fy"/>
+    <rect x="0" y="156" width="72" height="72" class="wy"/>
+    <rect x="78" y="156" width="72" height="72" class="fy"/>
+    <rect x="156" y="156" width="72" height="72" class="diag"/>
+    <text x="36" y="43" text-anchor="middle" font-size="17" font-weight="700">Gww</text>
+    <text x="114" y="43" text-anchor="middle" class="hard">Cwf</text>
+    <text x="36" y="121" text-anchor="middle" class="hard">Cfw</text>
+    <text x="114" y="121" text-anchor="middle" font-size="17" font-weight="700">Gff</text>
+    <text x="192" y="199" text-anchor="middle" font-size="17" font-weight="700">Gyy</text>
+    <text x="192" y="43" text-anchor="middle" class="muted small">Cwy</text>
+    <text x="36" y="199" text-anchor="middle" class="muted small">Cyw</text>
+    <text x="192" y="121" text-anchor="middle" class="muted small">Cfy</text>
+    <text x="114" y="199" text-anchor="middle" class="muted small">Cyf</text>
+    <text x="78" y="176" text-anchor="middle" font-size="12" fill="#245c9c" font-weight="700">priority pair</text>
+    <text x="192" y="244" text-anchor="middle" class="small muted">Year pairs can be optional or swept cheaply.</text>
+    <text x="114" y="260" text-anchor="middle" class="small muted">Pair policy decides what is worth building.</text>
+  </g>
+</svg>

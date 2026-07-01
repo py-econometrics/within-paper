@@ -1,0 +1,49 @@
+<svg viewBox="0 0 820 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#7c858c"/>
+    </marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #2f3437; }
+      .muted { fill: #6f777d; }
+      .box { fill: #f7f8fa; stroke: #b9c2ca; stroke-width: 1.4; rx: 8; }
+      .blue { fill: #eef4fd; stroke: #5a7ebd; }
+      .green { fill: #eff8f1; stroke: #5e9b67; }
+      .orange { fill: #fff5e8; stroke: #b9884e; }
+      .arrow { stroke: #7c858c; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="820" height="220" fill="#ffffff"/>
+  <text x="410" y="28" text-anchor="middle" font-size="16" font-weight="700">Local factor-pair solve</text>
+  <text x="410" y="48" text-anchor="middle" font-size="12" class="muted">One selected subdomain, for example worker-firm</text>
+
+  <rect x="28" y="78" width="132" height="74" class="box"/>
+  <text x="94" y="104" text-anchor="middle" font-size="13" font-weight="700">Pair block</text>
+  <text x="94" y="124" text-anchor="middle" font-size="12" class="muted">[D, C; C', D]</text>
+
+  <path d="M170 115 L220 115" class="arrow"/>
+  <text x="195" y="99" text-anchor="middle" font-size="11" class="muted">sign flip</text>
+
+  <rect x="230" y="78" width="132" height="74" class="blue box"/>
+  <text x="296" y="104" text-anchor="middle" font-size="13" font-weight="700">Laplacian</text>
+  <text x="296" y="124" text-anchor="middle" font-size="12" class="muted">[D, -C; -C', D]</text>
+
+  <path d="M372 115 L422 115" class="arrow"/>
+  <text x="397" y="99" text-anchor="middle" font-size="11" class="muted">eliminate</text>
+
+  <rect x="432" y="78" width="132" height="74" class="orange box"/>
+  <text x="498" y="104" text-anchor="middle" font-size="13" font-weight="700">Schur system</text>
+  <text x="498" y="124" text-anchor="middle" font-size="12" class="muted">smaller graph</text>
+
+  <path d="M574 115 L624 115" class="arrow"/>
+  <text x="599" y="99" text-anchor="middle" font-size="11" class="muted">approx factor</text>
+
+  <rect x="634" y="78" width="158" height="74" class="green box"/>
+  <text x="713" y="104" text-anchor="middle" font-size="13" font-weight="700">Apply correction</text>
+  <text x="713" y="124" text-anchor="middle" font-size="12" class="muted">solve and back-substitute</text>
+
+  <text x="94" y="178" text-anchor="middle" font-size="11" class="muted">contains co-occurrences</text>
+  <text x="296" y="178" text-anchor="middle" font-size="11" class="muted">connects to Laplacian solvers</text>
+  <text x="498" y="178" text-anchor="middle" font-size="11" class="muted">fill can be expensive</text>
+  <text x="713" y="178" text-anchor="middle" font-size="11" class="muted">outer Krylov step corrects error</text>
+</svg>

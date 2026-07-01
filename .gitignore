@@ -1,0 +1,12 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# local OS / interpreter byproducts
+.DS_Store
+__pycache__/
+benchmarks/__pycache__/
+benchmarks/julia-env/
+
+# generated benchmark data
+data/*.parquet
