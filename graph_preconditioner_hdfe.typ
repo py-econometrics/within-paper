@@ -1293,33 +1293,29 @@ beta_hat = np.linalg.lstsq(X_tilde, y_tilde, rcond=None)[0]
 = Conclusion
 
 We have developed a graph-based preconditioner for fixed-effect demeaning and compared
-it with MAP on synthetic and empirical benchmarks. Which solver is faster depends on how
-well connected the fixed-effect graph is.
+it with MAP on synthetic and empirical benchmarks. Which of the two solvers is faster depends on 
+the structure of the fixed effects graph.
 
-When the graph is dense and well connected, MAP is difficult to outperform. Its sweeps are cheap and
-mature implementations are well accelerated, so a preconditioner mostly adds overhead, as
+When the graph is dense and well connected, MAP is difficult to outperform. Its sweeps are cheap, 
+and a preconditioner mostly adds overhead, as
 in the simple fixest design and the smaller, well-connected Correia datasets. When a
 factor pair is sparsely connected, through low mobility, strong sorting, or near-nesting,
 MAP passes information across the graph slowly, and the factor-pair preconditioner is
-faster, often by a wide margin. In AKM panels this pair is the worker-firm match; the
-same pattern arises in other two-way designs whenever the identifying moves are sparse or
-confined to clusters.
+faster, often by a wide margin. 
 
 The preconditioner depends only on the fixed-effect graph, so it can be built once and
 reused across demeaning calls. Reuse matters most when a single estimation issues many
 such calls: IRLS-based GLMs such as PPML demean once per iteration, so the construction
-cost is paid once while the faster convergence accrues at every step. In our PPML
+cost is paid once while the faster convergence can accrue at every iteration step. In our PPML
 benchmark on a hard three-way design, `within` finishes in seconds where the MAP-based
 routines take minutes or fail to converge.
 
-There is no universal default; which solver to prefer depends on the fixed-effect graph,
-and the gap diagnostic of Section 5 measures the relevant structure cheaply, before the
-solve. The two mistakes are not symmetric: on an easy graph the preconditioner adds
-seconds of setup, whereas on a hard one MAP can cost minutes or a failed run. MAP is
-therefore the lighter option for small, clearly well-connected problems. The
-preconditioner is the safer one whenever a fit is slow, the graph is sparse, or the
-estimation is an IRLS-based GLM, and the better default when the graph structure is
-unknown.
+Which solver to prefer depends on the fixed-effect graph. Accelerated MAP
+and diagonally preconditioned LSMR are good defaults across much of the range our
+benchmarks cover: they carry (almost) no setup cost, and on dense, well-connected graphs they
+are the fastest options. The factor-pair preconditioner amortizes its setup cost in the
+remaining cases, and we recommend it when the gap diagnostic is small, when a fit is
+unexpectedly slow, or for IRLS-based GLM, which repeat the demeaning step many times.
 
 #set heading(numbering: none)
 #pagebreak()
