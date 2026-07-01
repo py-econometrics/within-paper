@@ -5,8 +5,17 @@
 # local OS / interpreter byproducts
 .DS_Store
 __pycache__/
+.pytest_cache/
 benchmarks/__pycache__/
 benchmarks/julia-env/
 
 # generated benchmark data
 data/*.parquet
+
+# local Codex skill marker
+academic-voice.skill
+academic-voice/
+
+# local assistant/project metadata
+.claude/
+.cluade/
