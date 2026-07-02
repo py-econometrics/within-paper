@@ -637,10 +637,11 @@ left to the outer LSMR iteration.
 == Approximate Pair Solves via Graph Laplacians
 
 For $P^(-1)$ to serve as the operator $M^(-1)$ inside LSMR, each pair contribution must
-be computed without solving a large dense system. For factor pairs with few levels,
-direct dense inversion is enough. In the example worker-firm panel of Section 4, the pair
-block has three worker levels and two firm levels, so inverting the $5 times 5$ matrix
-is a small dense calculation. At the scale of modern worker-firm register data, however,
+be computed without solving a large dense system. For factor pairs with few levels, we
+invert the pair block directly. In the example worker-firm panel of Section 4, the pair
+block has three worker levels and two firm levels; after the normalization of
+Section 6.1 removes the one free constant, the local solve is a $4 times 4$
+inversion. At the scale of modern worker-firm register data, however,
 a single pair can carry hundreds of thousands of levels per side, and direct inversion
 becomes the same kind of large linear-algebra problem the preconditioner is meant to
 avoid. We instead use the graph-Laplacian structure of the pair block.
@@ -1067,9 +1068,7 @@ still effective. We exploit this property by building the preconditioner once an
 stale version on subsequent IRLS iterations. Staleness slows the outer Krylov solver
 but does not bias its solution; the iteration still converges to the correct demeaned
 residuals. The construction cost is therefore paid once per regression rather than
-once per IRLS step. We could instead rebuild the preconditioner whenever the Krylov
-iteration count drifts upward, but the benchmarks below use the simple build-once
-strategy.
+once per IRLS step. 
 
 We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
 benchmark suite @berge2026fixest at $n = 1$M observations, $k = 10$ covariates, and two
@@ -1180,10 +1179,10 @@ the full regression problem.
 
 == Numerical Equivalence
 
-When we introduce a new fixed-effect solver, the burden falls on the implementation to
-demonstrate that it matches existing solutions. We should not take exact agreement for
-granted: MAP and LSMR-style routines use different convergence checks, residual
-norms, stopping thresholds, and iteration caps. 
+Before trusting a new fixed-effect solver, we must verify that it reproduces the
+estimates of existing routines. MAP and LSMR-style routines differ in their convergence
+checks, residual norms, stopping thresholds, and iteration caps, so two correct
+implementations can return coefficients that agree only up to their tolerances.
 
 We use the 100K-observation simple and difficult data generating processes from the fixest
 benchmarks as diagnostic cases. The simple
