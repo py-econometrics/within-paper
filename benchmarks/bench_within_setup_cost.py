@@ -26,26 +26,24 @@ import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_WITHIN_REPO = Path("/Users/afischer/Documents/within")
-DEFAULT_PYFIXEST_REPO = Path("/Users/afischer/Documents/pyfixest")
 FE_COLS = ["indiv_id", "firm_id", "year"]
 
 
 def _add_repo_paths() -> None:
-    within_repo = Path(os.environ.get("WITHIN_REPO", DEFAULT_WITHIN_REPO))
-    pyfixest_repo = Path(os.environ.get("PYFIXEST_REPO", DEFAULT_PYFIXEST_REPO))
-    for path in [
-        within_repo / "python",
-        pyfixest_repo / "benchmarks" / "modular",
-    ]:
-        if path.exists():
-            sys.path.insert(0, str(path))
+    within_repo_value = os.environ.get("WITHIN_REPO")
+    if within_repo_value:
+        source_path = Path(within_repo_value).expanduser().resolve() / "python"
+        if not source_path.exists():
+            raise FileNotFoundError(f"WITHIN_REPO has no Python package directory: {source_path}")
+        sys.path.insert(0, str(source_path))
+    sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
 
 
 _add_repo_paths()
 
 from dgp_functions import base_dgp  # noqa: E402
-from within import CG, Solver, solve_batch  # noqa: E402
+import within  # noqa: E402
+from within import LsmrOptions, Solver, solve_batch  # noqa: E402
 
 
 def _seed_for(dgp: str, n_obs: int, iteration: int) -> int:
@@ -63,18 +61,25 @@ def _make_problem(dgp: str, n_obs: int, k: int, seed: int) -> tuple[np.ndarray, 
     return categories, rhs
 
 
+def _setup_share(setup_wall: float, solve_wall: float) -> float:
+    total = setup_wall + solve_wall
+    if total <= 0:
+        raise ValueError("setup and solve time must sum to a positive value")
+    return setup_wall / total
+
+
 def _run_once(dgp: str, n_obs: int, k: int, iteration: int, tol: float, maxiter: int) -> dict:
     categories, rhs = _make_problem(dgp, n_obs, k, _seed_for(dgp, n_obs, iteration))
-    config = CG(tol=tol, maxiter=maxiter)
+    config = LsmrOptions(tol=tol, maxiter=maxiter)
 
     gc.collect()
     t0 = time.perf_counter()
-    solver = Solver(categories, config)
+    solver = Solver(categories)
     setup_wall = time.perf_counter() - t0
 
     gc.collect()
     t0 = time.perf_counter()
-    reused = solver.solve_batch(rhs)
+    reused = solver.solve_batch(rhs, config)
     solve_wall = time.perf_counter() - t0
 
     gc.collect()
@@ -92,6 +97,7 @@ def _run_once(dgp: str, n_obs: int, k: int, iteration: int, tol: float, maxiter:
         "solve_after_setup_wall_s": solve_wall,
         "full_oneshot_wall_s": full_wall,
         "setup_share_of_full": setup_wall / full_wall,
+        "setup_share_of_reused_total": _setup_share(setup_wall, solve_wall),
         "reused_result_time_total_s": reused.time_total,
         "oneshot_result_time_total_s": oneshot.time_total,
         "max_iterations_reused": max(reused.iterations),
@@ -117,6 +123,7 @@ def _median_rows(rows: list[dict]) -> list[dict]:
         "solve_after_setup_wall_s",
         "full_oneshot_wall_s",
         "setup_share_of_full",
+        "setup_share_of_reused_total",
         "reused_result_time_total_s",
         "oneshot_result_time_total_s",
         "max_iterations_reused",
@@ -143,7 +150,7 @@ def _median_rows(rows: list[dict]) -> list[dict]:
 def _write_csv(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -159,9 +166,11 @@ def main() -> None:
     parser.add_argument(
         "--out",
         type=Path,
-        default=ROOT / "data" / "benchmarks" / "within_setup_cost.csv",
+        default=ROOT / "results" / "runs" / "latest" / "within_setup_cost.csv",
     )
     args = parser.parse_args()
+
+    print(f"[within-setup] using {within.__file__}", flush=True)
 
     rows = []
     for dgp in args.dgps:
@@ -176,7 +185,7 @@ def main() -> None:
             print(
                 "  setup={setup_wall_s:.3f}s solve-after-setup="
                 "{solve_after_setup_wall_s:.3f}s full={full_oneshot_wall_s:.3f}s "
-                "setup-share={setup_share_of_full:.1%}".format(**row),
+                "setup-share={setup_share_of_reused_total:.1%}".format(**row),
                 flush=True,
             )
 
@@ -192,7 +201,7 @@ def main() -> None:
             f"setup={row['median_setup_wall_s']:.3f}s "
             f"solve={row['median_solve_after_setup_wall_s']:.3f}s "
             f"full={row['median_full_oneshot_wall_s']:.3f}s "
-            f"setup-share={row['median_setup_share_of_full']:.1%} "
+            f"setup-share={row['median_setup_share_of_reused_total']:.1%} "
             f"iters={row['median_max_iterations_reused']:.0f}",
             flush=True,
         )

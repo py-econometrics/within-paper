@@ -31,6 +31,21 @@
 #let miss = text(fill: rgb("#777777"))[--]
 #let dg(body) = text(fill: rgb("#2563eb"), body)
 #let cr(body) = text(fill: rgb("#c2410c"), body)
+#import "generated/paper_values.typ": result_akm_mobility_first_gap
+#import "generated/paper_values.typ": result_ols_difficult_within
+#import "generated/paper_values.typ": result_ols_difficult_gpu
+#import "generated/paper_values.typ": result_ols_difficult_rust_map
+#import "generated/paper_values.typ": result_correia_uniform_harder_gap
+#import "generated/paper_values.typ": result_ppml_simple_three_map
+#import "generated/paper_values.typ": result_ppml_simple_three_glfem
+#import "generated/paper_values.typ": result_ppml_simple_three_within
+#import "generated/paper_values.typ": result_ppml_difficult_three_glfem
+#import "generated/paper_values.typ": result_ppml_difficult_three_within
+#import "generated/paper_values.typ": result_agreement_fixest_max
+#import "generated/paper_values.typ": result_setup_simple_setup, result_setup_simple_solve, result_setup_simple_share
+#import "generated/paper_values.typ": result_setup_difficult_setup, result_setup_difficult_solve, result_setup_difficult_share
+#import "generated/paper_values.typ": result_ols_gpu_vs_fem, result_ppml_within_vs_fixest, result_ppml_within_vs_glfem
+#import "generated/paper_values.typ": result_memory_100k_overhead, result_memory_1m_overhead, result_directors_component_share
 
 #align(center)[
   #set par(justify: false)
@@ -70,8 +85,8 @@
       We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
       built from small, local factor-pair subproblems - worker-firm, worker-year, and
       so on - that use the graph directly. 
-      Benchmarks show MAP remains fastest on dense designs, while graph preconditioning
-      reduces runtime on sparse worker-firm graphs and under strong sorting.
+      Benchmarks show that factor-pair setup does not amortize on dense designs, while
+      graph preconditioning reduces runtime on sparse worker-firm graphs and under strong sorting.
     ]
   ]
 ]
@@ -145,8 +160,8 @@ contribution is the preconditioner, not the use of LSMR for the outer iteration.
 against mature implementations of the method of alternating projections, we find that on
 sparse, poorly connected graphs (the regime where MAP convergence deteriorates) the
 graph-preconditioned solver lowers runtime, while on dense,
-well-connected graphs the preconditioner setup cost does not amortize and MAP should
-remain the natural default.
+well-connected graphs the preconditioner setup cost does not amortize and lower-overhead
+MAP or diagonally preconditioned Krylov methods remain the natural defaults.
 
 The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
 absorption problem, and Section 3 introduces the AKM model as our running example.
@@ -770,8 +785,10 @@ diagonal versus factor-pair preconditioning:
 )
 ]
 
-All reported CPU times are medians across three benchmark iterations run on an Apple M4
-Mac mini with 10 CPU cores and 16 GB of memory running macOS 15.3.1.
+Each CPU cell uses three benchmark trials run on an Apple M4 Mac mini with 10 CPU cores
+and 16 GB of memory running macOS 15.3.1. Times are medians over the trials that
+converged. When fewer than three converge, the table reports the successful-trial count;
+a failed cell means that all three trials reached the iteration cap.
 
 We do not include `reghdfe` @reghdfe @correia2017 directly in the benchmark tables because Stata is not open
 source and we lack a license. `reghdfe` is a mature accelerated-MAP
@@ -797,39 +814,23 @@ Krylov solver should become relatively more competitive in the low-mobility desi
 
 #text(size: 8.9pt)[
 #strong[Mobility benchmark ($n = 1$M).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`akm_mobility_1`], [$1.38 times 10^(-1)$ (1.00)], [0.29s], [0.16s], [0.28s], [0.51s],
-  [`akm_mobility_2`], [$3.41 times 10^(-2)$ (1.00)], [1.10s], [0.36s], [0.58s], [0.38s],
-  [`akm_mobility_3`], [$5.18 times 10^(-3)$ (0.61)], [12.48s], [1.31s], [1.80s], [0.33s],
-  [`akm_mobility_4`], [$3.04 times 10^(-4)$ (0.27)], [51.95s], [3.42s], [2.78s], [0.34s],
-  [`akm_mobility_5`], [$1.65 times 10^(-3)$ (0.53)], [63.23s], [4.17s], [3.34s], [0.35s],
-		  [`akm_mobility_6`], [$7.57 times 10^(-4)$ (0.37)], [#miss], [5.27s], [3.86s], [0.35s],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#include "generated/tables/akm_mobility.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
 		and worker, firm, and year fixed effects. Lower rows reduce worker mobility
 		within a 10-period panel, thereby thinning the worker-firm graph. Lower mobility
-		makes the worker-firm pair harder for MAP and correspondingly more favorable
-		to the preconditioned method. A dash indicates that no completed run is available
-		for that cell. Gap is defined as $1-rho_(W F)$ for the worker-firm pair;
+			makes the worker-firm pair harder for MAP and correspondingly more favorable
+			to the preconditioned method. A parenthesized fraction after a time is the number
+			of converged trials; `failed` means none of the three trials converged. Gap is
+			defined as $1-rho_(W F)$ for the worker-firm pair;
 		parentheses report the observation share of the component attaining the gap.]
 		]
 
 The mobility benchmark matches the predicted pattern. When mobility is high,
-preconditioning yields little advantage: `fixest` is the fastest backend in
-`akm_mobility_1`, and `within` incurs setup costs that are not offset by improved
-convergence. As mobility declines, the worker-firm gap falls by more than two orders
-of magnitude, from $1.38 times 10^(-1)$ to below $10^(-3)$ (the decline is not
-strictly monotone, because the reported gap is attained on different connected
-components), and MAP runtimes rise sharply. `within`'s runtime stays nearly flat across
+preconditioning yields little advantage, and `within` incurs setup costs that are not
+offset by improved convergence. As mobility declines, the worker-firm gap falls by more than two orders
+of magnitude, from #result_akm_mobility_first_gap to below $10^(-3)$, and MAP runtimes
+rise sharply. `within`'s runtime stays nearly flat across
 all designs. In the lowest-mobility configurations, the
 preconditioned method is the fastest backend because it operates on the worker-firm graph
 directly rather than propagating information through many sweeps that update one
@@ -848,21 +849,7 @@ factor-pair solves use the worker-firm graph directly.
 
 #text(size: 8.9pt)[
 #strong[Sorting benchmark ($n = 1$M).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`akm_sorting_1`], [$7.62 times 10^(-3)$ (0.83)], [6.79s], [0.81s], [1.43s], [0.32s],
-  [`akm_sorting_2`], [$2.41 times 10^(-3)$ (0.62)], [9.73s], [1.12s], [1.68s], [0.34s],
-  [`akm_sorting_3`], [$1.50 times 10^(-4)$ (0.59)], [10.31s], [1.24s], [1.67s], [0.33s],
-  [`akm_sorting_4`], [$2.14 times 10^(-5)$ (0.51)], [14.94s], [1.58s], [1.87s], [0.33s],
-		  [`akm_sorting_5`], [$3.97 times 10^(-5)$ (0.53)], [25.77s], [1.80s], [1.94s], [0.34s],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#include "generated/tables/akm_sorting.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
 		and worker, firm, and year fixed effects. Lower rows raise the degree of
@@ -874,9 +861,9 @@ factor-pair solves use the worker-firm graph directly.
 
 The sorting benchmark gives the parallel result. As movers sort more strongly across
 firms, the worker-firm graph separates into weakly connected blocks. The worker-firm gap
-falls by more than two orders of magnitude, and MAP-based runtimes rise. The gap does not fall
-monotonically, because different components attain the reported value in different rows,
-but its overall decline is clear. `within` remains nearly flat because its factor-pair
+ends about four times smaller, and MAP-based runtimes generally rise. The gap does not fall
+monotonically across the intermediate designs, but its overall decline is clear. `within`
+remains nearly flat because its factor-pair
 preconditioner uses the worker-firm links directly, rather than relying on residual
 updates that cycle through one fixed-effect dimension at a time.
 
@@ -900,18 +887,7 @@ preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
 
 #text(size: 8.8pt)[
 #strong[Simple vs. difficult design (10M observations, 3 FE).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.72fr, 0.72fr, 0.72fr, 0.78fr, 0.86fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`], th[`torch-cuda`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [2.01s], [0.93s], [2.27s], [10.53s], [4.73s],
-  [difficult (sparse graph)], [$1.67 times 10^(-5)$ (1.00)], [382.9s], [32.7s], [28.7s], [3.25s], [8.73s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/ols.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. Both designs
   use 10M observations, one covariate, and three fixed effects. Gap denotes
@@ -921,32 +897,33 @@ preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
   preconditioning (the same algorithm as
 `FixedEffectModels.jl`), run on an NVIDIA CUDA device; the local benchmark machine does
 not possess a CUDA GPU. The standalone `within` demeaning API decomposes one-shot runtime
-into reusable solver construction and batch solve: simple design 5.76s + 1.51s
-(roughly 80% setup); difficult design 0.40s + 1.00s (roughly 29% setup). PyFixest
+into reusable solver construction and batch solve: simple design #result_setup_simple_setup + #result_setup_simple_solve
+(#result_setup_simple_share setup); difficult design #result_setup_difficult_setup + #result_setup_difficult_solve
+(#result_setup_difficult_share setup). PyFixest
 regression overhead is incurred in addition to these figures.]
   ]
 
-On the "simple" design, the graph is dense and the worker-firm gap is large. MAP
-therefore converges quickly: `fixest` with Irons-Tuck acceleration is fastest, while
-`within` is slowest because the factor-pair preconditioner does not repay its setup cost.
-In the standalone demeaning breakdown, roughly four fifths of `within`'s demeaning time
+On the "simple" design, the graph is dense and the worker-firm gap is large. Both MAP
+backends therefore converge quickly, while `within` is slowest because the factor-pair
+preconditioner does not repay its setup cost.
+In the standalone demeaning breakdown, #result_setup_simple_share of `within`'s demeaning time
 on the simple design is spent building the preconditioner.
 
 On the difficult design, the ranking reverses. MAP convergence degrades sharply, to
-the point that `rust-map` without acceleration needs over six minutes.
-`within` completes in 3.25s, an order of magnitude faster than the best MAP backend,
+the point that `rust-map` without acceleration needs #result_ols_difficult_rust_map.
+`within` completes in #result_ols_difficult_within, far faster than either MAP backend,
 because its factor-pair preconditioner captures the sparse worker-firm coupling
 directly. A nearly zero diagnostic gap identifies the regime in which MAP requires many
 sweeps to disentangle worker and firm effects. The setup share of the standalone
-demeaning time falls to about 29%, indicating that the preconditioner setup is now
+demeaning time falls to #result_setup_difficult_share, indicating that the preconditioner setup is now
 amortized.
 
 On the simple design, `torch-cuda` is not
 competitive with CPU `fixest`, since host-to-device transfer and
 kernel launch overheads outweigh the gain from parallelizing already inexpensive
-iterations. On the difficult design, GPU parallelism reduces runtime to 8.73s (roughly
-three times faster than CPU `FEM.jl`), but the iteration count remains governed by the
-quality of the diagonal preconditioner, which is limited on this graph. `within` at 3.25s
+iterations. On the difficult design, GPU parallelism reduces runtime to #result_ols_difficult_gpu (#result_ols_gpu_vs_fem
+faster than CPU `FEM.jl`), but the iteration count remains governed by the
+quality of the diagonal preconditioner, which is limited on this graph. `within` at #result_ols_difficult_within
 remains faster on CPU by using a factor-pair preconditioner that captures the
 cross-factor coupling the diagonal cannot. Hardware acceleration and stronger
 preconditioning address different bottlenecks: the GPU speeds up each iteration,
@@ -965,36 +942,22 @@ reference set for comparing the same software backends outside the AKM generator
 
 #text(size: 8.9pt)[
 #strong[Correia synthetic benchmarks.]
-#table(
-  columns: (1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`synthetic-complete`], [1.000 (1.00)], [0.074s], [0.062s], [0.044s], [0.114s],
-  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.122s], [0.079s], [0.083s], [0.117s],
-  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.367s], [0.251s], [0.353s], [0.957s],
-  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.994s], [0.952s], [0.575s], [0.514s],
-  [`synthetic-assortative`], [0.00133 (0.70)], [26.22s], [3.02s], [2.99s], [1.46s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/correia_synthetic.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
   `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
   share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
-  geometry. The `synthetic-zigzag` dataset is omitted because every backend terminates
-  with a numerical error rather than a converged solution under default settings, making
-  it a stress case rather than a runtime comparison.]
+  geometry. The `synthetic-zigzag` dataset is omitted because `rust-map` reaches its
+  iteration cap while the converged runtimes of the other backends span several orders of
+  magnitude. It is more useful as a stress case than as a compact runtime comparison.]
   ]
 
 These results are less clear than the controlled AKM experiments, which is itself informative.
 Several datasets are small enough, or sufficiently well connected, that setup cost
 matters as much as conditioning; on the complete and easier uniform designs, the gap is
-large and low-overhead methods perform well. The harder rows reverse the ranking. By
-`synthetic-uniform-harder`, the gap has fallen to $2.49 times 10^(-2)$ and `within` is
-already the fastest backend. On the assortative benchmark, the preconditioned method
+large and low-overhead methods perform well. The ranking changes on the hardest rows. By
+`synthetic-uniform-harder`, the gap has fallen to #result_correia_uniform_harder_gap and `within` has
+become competitive with the fastest backend. On the assortative benchmark, the preconditioned method
 exhibits its clearest advantage: sorting generates cross-factor structure that MAP's
 updates handle only slowly.
 
@@ -1012,24 +975,7 @@ DGPs only approximate.
 
 #text(size: 8.9pt)[
 #strong[Correia real-data benchmarks.]
-#table(
-  columns: (1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`credit`], [0.402 (1.00)], [0.177s], [0.134s], [0.158s], [0.139s],
-  [`soccer`], [0.889 (1.00)], [0.018s], [0.014s], [0.016s], [0.031s],
-  [`enron`], [0.00704 (0.98)], [4.37s], [0.749s], [0.689s], [0.537s],
-  [`github`], [0.000630 (0.32)], [86.44s], [4.50s], [4.60s], [0.380s],
-  [`patents`], [0.000518 (0.95)], [19.66s], [1.29s], [1.43s], [0.826s],
-  [`workers`], [0.000274 (0.63)], [128.34s], [5.55s], [4.94s], [0.491s],
-  [`schools`], [0.00221 (1.00)], [11.04s], [1.10s], [1.28s], [0.224s],
-  [`directors`], [0.000512 (0.30)], [4.26s], [0.216s], [1.21s], [0.300s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/correia_real.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs on singleton-dropped
   samples, as produced by the PyFixest benchmark suite. The gap is $1-rho$ for the
@@ -1042,11 +988,11 @@ DGPs only approximate.
 The empirical datasets show the same pattern in less stylized form. Accelerated MAP is
 difficult to outperform on small or compact graphs such as `credit` and `soccer`, where
 the gaps are large. The `directors` row illustrates why the component share is useful:
-the worst component is hard, but it contains about thirty percent of the observations, so
+the worst component is hard, but it contains #result_directors_component_share of the observations, so
 the full problem is not as costly for MAP as the gap alone would suggest. On larger
-networks with hard components covering a substantial portion of the sample, particularly
-`enron`, `github`, `patents`, `workers`, and `schools`, the factor-pair preconditioner is
-fastest by a wide margin. 
+networks with hard components covering a substantial portion of the sample, the
+factor-pair preconditioner is fastest on `enron`, `github`, `patents`, `workers`, and
+`schools`. The margin is modest on `enron` and wider on the other four datasets.
 
 == Poisson / PPML Benchmark
 
@@ -1071,7 +1017,7 @@ residuals. The construction cost is therefore paid once per regression rather th
 once per IRLS step. 
 
 We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
-benchmark suite @berge2026fixest at $n = 1$M observations, $k = 10$ covariates, and two
+benchmark suite @berge2026fixest at $n = 1$M observations, one covariate, and two
 or three fixed effects (worker-year, or worker-firm-year), using the same iteration
 protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
@@ -1080,30 +1026,15 @@ protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
 #v(0.35em)
 
 #text(size: 8.8pt)[
-#strong[Poisson benchmarks (1M observations, k=10 covariates).]
-#table(
-  columns: (1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[FE], th[`fixest`], th[`rust-map`], th[`GLFEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [2], [1.92s], [3.06s], [8.83s], [6.21s],
-  [difficult (sparse graph)], [2], [1.91s], [3.05s], [7.93s], [6.40s],
-  [simple (dense graph)], [3], [7.80s], [25.29s], [#sym.tilde.op 48s], [13.33s],
-  [difficult (sparse graph)], [3], [309.2s], [failed], [#sym.tilde.op 800s], [8.89s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#strong[Poisson benchmarks (1M observations, one covariate).]
+#include "generated/tables/ppml.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
-  $n = 1$M and $k = 10$ covariates. `fixest` is R `fixest::fepois`; `rust-map` and
+  $n = 1$M and one covariate. `fixest` is R `fixest::fepois`; `rust-map` and
   `within` are the PyFixest `fepois` routine with the unpreconditioned MAP backend and
   the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
-  `GLFixedEffectModels.jl`. The two `GLFEM.jl` entries marked #sym.tilde.op are read
-  approximately from a follow-up run because the harness CSV for those cells contained a
-  subprocess error rather than a recorded time. "failed" indicates that all three
-  iterations of `rust-map` reached the 10000-iteration MAP cap without converging.]
+  `GLFixedEffectModels.jl`. `failed` indicates that all three `rust-map` trials reached
+  the 10000-iteration MAP cap without converging.]
   ]
 
 The patterns observed in the OLS benchmarks carry over. With two fixed effects, all four
@@ -1111,12 +1042,13 @@ backends complete in comparable time on both designs and R `fixest` is fastest: 
 worker-year pair alone does not create a regime in which the preconditioner amortizes
 its setup cost, even with the IRLS-induced reuse. With a third fixed effect, the picture
 changes. On the three-FE simple design MAP still converges and `fixest` remains
-fastest, but the unaccelerated `rust-map` slows to 25s, `GLFEM.jl` to roughly 48s, and
-`within` lands between them at 13s. The three-FE difficult design provides the sharpest
-contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes on the
-order of 800s, `fixest`'s IRLS loop takes several minutes with large run-to-run variance,
-and `within` finishes in under nine seconds, roughly 35 times faster than `fixest` and
-nearly two orders of magnitude faster than `GLFEM.jl`. The factor-pair preconditioner captures
+fastest, but the unaccelerated `rust-map` slows to #result_ppml_simple_three_map, `GLFEM.jl` to
+#result_ppml_simple_three_glfem, and `within` lands between them at #result_ppml_simple_three_within.
+The three-FE difficult design provides the sharpest
+contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes
+#result_ppml_difficult_three_glfem, `fixest`'s IRLS loop takes several minutes with large run-to-run variance,
+and `within` finishes in #result_ppml_difficult_three_within, #result_ppml_within_vs_fixest faster than `fixest` and
+#result_ppml_within_vs_glfem faster than `GLFEM.jl`. The factor-pair preconditioner captures
 the same sparse worker-firm coupling that drove the OLS benchmark results, and the IRLS outer
 loop inherits the gain without modification.
 
@@ -1144,34 +1076,18 @@ strategy. Both backends are executed in isolated processes and report peak RSS v
 #v(0.4em)
 
 #text(size: 8.9pt)[
-#strong[Memory footprint (3 FE, $k = 10$).]
-#table(
-  columns: (1.25fr, 1.0fr, 0.85fr, 0.85fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [428 MB], [487 MB],
-  [difficult (sparse graph)], [$1.30 times 10^(-3)$ (1.00)], [432 MB], [479 MB],
-  table.hline(stroke: 0.35pt + table-light-rule),
-  table.cell(colspan: 4, fill: table-head-fill)[#emph[1M observations]],
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [1,188 MB], [1,703 MB],
-		  [difficult (sparse graph)], [$1.67 times 10^(-5)$ (1.00)], [1,263 MB], [1,398 MB],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#strong[Memory footprint (3 FE, one covariate).]
+#include "generated/tables/memory.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
-		isolated Python processes. 10 covariates, three fixed effects. These two DGPs serve as
+		isolated Python processes. One covariate, three fixed effects. These two DGPs serve as
 		representative probes; we do not claim that memory behavior is design-specific. Gap
 		denotes $1-rho_(W F)$ for the worker-firm pair in the corresponding generated design.]
 		]
 
-At 100K observations, the preconditioner adds roughly 50 MB on both the easy and the
-hard graph. At 1M observations the overhead is larger in absolute terms (135--515 MB),
-but it remains modest relative to the data footprint of a panel with 10 covariates. 
+At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M observations
+the overhead is larger in absolute terms (#result_memory_1m_overhead),
+but it remains modest relative to the data footprint of a panel with one covariate.
 The preconditioned solver consumes more memory than MAP, yet the additional
 storage for factor-pair co-occurrences, partition weights, and local approximate
 Cholesky factors remains small relative to
@@ -1189,46 +1105,27 @@ benchmarks as diagnostic cases. The simple
 design examines the "easy-to-converge" regime where all methods should agree almost exactly. The
 difficult design examines the regime where conditioning is poor and small differences in
 stopping rules are most likely to emerge. The graph diagnostic distinguishes these
-cases: the worker-firm gap is approximately 0.857 in the simple design and
-approximately 0.00130 in the difficult design. The table below collects one regression
+cases: the worker-firm gap is large in the simple design and near zero in the difficult
+design. The table below collects one regression
 coefficient for all four backends.
 
 #v(0.4em)
 
 #text(size: 9.2pt)[
-#strong[Coefficient agreement (100K observations, 3 FE, $k = 10$).]
-#table(
-  columns: (0.95fr, 1.0fr, 0.95fr, 0.95fr, 0.95fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, left, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Backend], th[$hat(beta)_1$], th[Avg |diff|], th[Max |diff|]),
-  table.hline(stroke: 0.45pt + table-rule),
-  table.cell(rowspan: 4)[simple],
-  [`rust-map`], [0.99914206], [--], [--],
-  [`within`], [0.99914206], [$1.5 times 10^(-14)$], [$3.5 times 10^(-14)$],
-  [`fixest`], [0.99909173], [$2.2 times 10^(-5)$], [$5.0 times 10^(-5)$],
-  [`FEM.jl`], [0.99914206], [$2.1 times 10^(-12)$], [$5.3 times 10^(-12)$],
-  table.hline(stroke: 0.35pt + table-light-rule),
-  table.cell(rowspan: 4)[difficult],
-  [`rust-map`], [1.00086122], [--], [--],
-  [`within`], [1.00086098], [$1.4 times 10^(-7)$], [$3.4 times 10^(-7)$],
-  [`fixest`], [1.00081490], [$2.0 times 10^(-5)$], [$5.0 times 10^(-5)$],
-  [`FEM.jl`], [1.00086098], [$1.4 times 10^(-7)$], [$3.4 times 10^(-7)$],
-  table.hline(stroke: 0.8pt + table-rule),
-)
+#strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
+#include "generated/tables/agreement.typ"
 #v(0.25em)
 #text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
 Differences are absolute slope-coefficient deviations from `rust-map`, averaged
-(Avg) and maximized (Max) across all 10 covariates. `within` is the PyFixest
+(Avg) and maximized (Max) across the reported coefficient; the two are identical in this
+one-covariate benchmark. `within` is the PyFixest
 preconditioned Rust backend.]
 ]
 
 The `within` and `FEM.jl` rows are almost identical to `rust-map` at the reported
-defaults. R `fixest` is also close, but not at machine precision: the largest
-coefficient difference is approximately $5 times 10^(-5)$. This difference is not
-surprising, because the packages use different stopping rules.
+defaults. R `fixest` is also close; its largest reported coefficient difference is
+#result_agreement_fixest_max. The remaining differences reflect the packages' stopping
+rules and numerical tolerances.
 
 = Software
 
@@ -1302,10 +1199,11 @@ factor pair is sparsely connected, through low mobility, strong sorting, or near
 MAP passes information across the graph slowly, and the factor-pair preconditioner is
 faster, often by a wide margin. 
 
-The preconditioner depends only on the fixed-effect graph, so it can be built once and
-reused across demeaning calls. Reuse matters most when a single estimation issues many
-such calls: IRLS-based GLMs such as PPML demean once per iteration, so the construction
-cost is paid once while the faster convergence can accrue at every iteration step. In our PPML
+The fixed-effect graph does not change across demeaning calls. In IRLS, the weights do
+change, but the implementation can reuse a slightly stale preconditioner. Reuse matters
+most when a single estimation issues many such calls: IRLS-based GLMs such as PPML demean
+once per iteration, so the construction cost is paid once while the faster convergence
+can accrue at every iteration step. In our PPML
 benchmark on a hard three-way design, `within` finishes in seconds where the MAP-based
 routines take minutes or fail to converge.
 
