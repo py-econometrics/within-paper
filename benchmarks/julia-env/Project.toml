@@ -1,0 +1,16 @@
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+GLFixedEffectModels = "bafb0ae5-e5f5-5100-81b6-6a55d777c812"
+GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Parquet2 = "98572fba-bba0-415d-956f-fa77e587d26d"
+StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+
+[sources]
+# The corresponding git trees are pinned by Manifest.toml. Do not add a branch
+# here: resolving `master` at benchmark time makes published timings drift.
+FixedEffectModels = {url = "https://github.com/FixedEffects/FixedEffectModels.jl"}
+GLFixedEffectModels = {url = "https://github.com/jmboehm/GLFixedEffectModels.jl"}
