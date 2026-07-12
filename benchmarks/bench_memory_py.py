@@ -25,7 +25,7 @@ with warnings.catch_warnings():
     fit = pf.feols("{fml}", data=df, vcov="iid",
                    demeaner_backend=backend,
                    copy_data=False, store_data=False)
-if not fit.convergence:
+if not getattr(fit, "convergence", getattr(fit, "_convergence", True)):
     raise RuntimeError("PyFixest model did not converge")
 elapsed = time.perf_counter() - t0
 divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
