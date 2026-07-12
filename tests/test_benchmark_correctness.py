@@ -21,7 +21,13 @@ from bench_within_setup_cost import _setup_share  # noqa: E402
 from benchmark_correia import summarize_results  # noqa: E402
 from dgps import _seed_for  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
-from paper_results import _render_trial_result, _synchronize_external_results  # noqa: E402
+from paper_results import (  # noqa: E402
+    _component_share,
+    _largest_backend_metric,
+    _numeric_cell,
+    _render_trial_result,
+    _synchronize_external_results,
+)
 from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
 
 
@@ -119,6 +125,21 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         ) as mocked_svds:
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(mocked_svds.call_args.kwargs["solver"], "propack")
+
+    def test_prose_values_select_the_named_backend_and_largest_metric(self) -> None:
+        rows = [
+            ["#agreement-simple", "`fixest`", "", "", "$1.1 times 10^(-14)$"],
+            ["#agreement-difficult", "`fixest`", "", "", "$1.9 times 10^(-7)$"],
+        ]
+        self.assertEqual(_numeric_cell(rows[0][4]), 1.1e-14)
+        self.assertEqual(
+            _largest_backend_metric(rows, "fixest", 4), "$1.9 times 10^(-7)$"
+        )
+
+    def test_component_share_ignores_scientific_exponent(self) -> None:
+        self.assertEqual(
+            _component_share("$5.12 times 10^(-4)$ (0.30)"), 0.30
+        )
 
 
 if __name__ == "__main__":
