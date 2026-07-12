@@ -12,9 +12,9 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Design], th[FE], th[`fixest`], th[`rust-map`], th[`GLFEM.jl`], th[`within`]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [2], [1.51s], [1.81s], [2.21s], [3.79s],
-  [difficult (sparse graph)], [2], [1.47s], [1.76s], [2.22s], [3.73s],
-  [simple (dense graph)], [3], [6.66s], [10.6s], [8.70s], [8.65s],
-  [difficult (sparse graph)], [3], [337.7s], [failed], [180.0s], [6.24s],
+  [simple (dense graph)], [2], [1.25s], [1.67s], [2.19s], [3.21s],
+  [difficult (sparse graph)], [2], [1.22s], [1.64s], [2.23s], [3.21s],
+  [simple (dense graph)], [3], [5.69s], [10.0s], [8.65s], [8.67s],
+  [difficult (sparse graph)], [3], [324.3s], [failed (0/3)], [165.7s], [5.27s],
   table.hline(stroke: 0.8pt + table-rule),
 )
