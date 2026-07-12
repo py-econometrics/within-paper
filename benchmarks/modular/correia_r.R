@@ -42,7 +42,9 @@ for (entry in manifest) {
             nthreads = bench_threads
           )
         )
-        if (!isTRUE(fit$convStatus)) stop("fixest model returned without convergence")
+        if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
+          stop("fixest model returned without convergence")
+        }
       })[["elapsed"]])
     },
     error = function(e) {

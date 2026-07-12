@@ -97,7 +97,9 @@ for (idx in seq_along(manifest)) {
         suppressMessages(
           fit <- feols(formula, data = df, vcov = vcov_arg, nthreads = bench_threads)
         )
-        if (!isTRUE(fit$convStatus)) stop("fixest model returned without convergence")
+        if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
+          stop("fixest model returned without convergence")
+        }
       })[["elapsed"]])
     },
     error = function(e) {

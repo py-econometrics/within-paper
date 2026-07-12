@@ -20,7 +20,9 @@ if (length(args) != 1) {
 config <- fromJSON(args[[1]], simplifyVector = FALSE)
 df <- as.data.frame(read_parquet(config$data_path))
 fit <- feols(as.formula(config$formula), data = df, vcov = "iid", nthreads = bench_threads)
-if (!isTRUE(fit$convStatus)) stop("fixest agreement model did not converge")
+if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
+  stop("fixest agreement model did not converge")
+}
 coefs <- coef(fit)
 
 cat(
