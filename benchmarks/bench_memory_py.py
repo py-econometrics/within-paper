@@ -18,12 +18,13 @@ import pyfixest as pf
 
 size, dgp_type, backend = sys.argv[1], sys.argv[2], sys.argv[3]
 df = pd.read_parquet(f"data/{{dgp_type}}_{{size}}.parquet")
+demeaner = pf.MapDemeaner() if backend == "rust" else pf.LsmrDemeaner()
 gc.collect()
 t0 = time.perf_counter()
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=UserWarning)
     fit = pf.feols("{fml}", data=df, vcov="iid",
-                   demeaner_backend=backend,
+                   demeaner=demeaner,
                    copy_data=False, store_data=False)
 if not getattr(fit, "convergence", getattr(fit, "_convergence", True)):
     raise RuntimeError("PyFixest model did not converge")
