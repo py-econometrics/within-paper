@@ -39,6 +39,10 @@ OUTPUT_PATH = Path(os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.
 OUTPUT_ROWS: list[dict[str, object]] = []
 
 
+def _fit_converged(fit) -> bool:
+    return bool(getattr(fit, "convergence", getattr(fit, "_convergence", True)))
+
+
 def _run_json_subprocess(command: list[str], config: dict) -> dict:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(config, f)
@@ -149,7 +153,7 @@ for dgp_type in ["simple", "difficult"]:
                            copy_data=False, store_data=True)
         fit_cg = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust-cg",
                           copy_data=False, store_data=True)
-    if not fit_map.convergence or not fit_cg.convergence:
+    if not _fit_converged(fit_map) or not _fit_converged(fit_cg):
         raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
 
     # Coefficient differences
