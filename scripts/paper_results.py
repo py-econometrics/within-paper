@@ -352,12 +352,12 @@ def render(args: argparse.Namespace) -> None:
 
     memory_100k = memory_overheads(memory_rows[1:3])
     memory_1m = memory_overheads(memory_rows[4:6])
-    directors_share = re.search(r"\(([^)]+)\)", tables["correia_real"]["rows"][-1][1])
+    directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
     prose_values = {
         "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
         "result_ols_difficult_within": tables["ols"]["rows"][1][5],
         "result_ols_difficult_gpu": tables["ols"]["rows"][1][6],
-        "result_ols_difficult_rust_map": tables["ols"]["rows"][1][3],
+        "result_ols_difficult_rust_map": tables["ols"]["rows"][1][2],
         "result_correia_uniform_harder_gap": tables["correia_synthetic"]["rows"][3][1],
         "result_ppml_simple_three_map": tables["ppml"]["rows"][2][3],
         "result_ppml_simple_three_glfem": tables["ppml"]["rows"][2][4],
@@ -365,7 +365,9 @@ def render(args: argparse.Namespace) -> None:
         "result_ppml_difficult_three_fixest": tables["ppml"]["rows"][3][2],
         "result_ppml_difficult_three_glfem": tables["ppml"]["rows"][3][4],
         "result_ppml_difficult_three_within": tables["ppml"]["rows"][3][5],
-        "result_agreement_fixest_max": tables["agreement"]["rows"][2][4],
+        "result_agreement_fixest_max": _largest_backend_metric(
+            tables["agreement"]["rows"], "fixest", 4
+        ),
         "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
         "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
         "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
@@ -377,7 +379,9 @@ def render(args: argparse.Namespace) -> None:
         "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MB" if memory_100k else "--",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MB" if memory_1m else "--",
-        "result_directors_component_share": f"{float(directors_share.group(1)):.0%}" if directors_share else "--",
+        "result_directors_component_share": (
+            f"{directors_share:.0%}" if directors_share is not None else "--"
+        ),
     }
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
@@ -594,10 +598,34 @@ def _matches_runtime_target(
 
 
 def _numeric_cell(value: str) -> float | None:
+    scientific = re.search(
+        r"(-?\d[\d,]*\.?\d*)\s+times\s+10\^\((-?\d+)\)", value
+    )
+    if scientific is not None:
+        mantissa = float(scientific.group(1).replace(",", ""))
+        return mantissa * 10 ** int(scientific.group(2))
     match = re.search(r"(?:\d[\d,]*\.?\d*|\.\d+)", value)
     if match is None:
         return None
     return float(match.group().replace(",", ""))
+
+
+def _largest_backend_metric(
+    rows: list[list[str]], backend: str, column: int
+) -> str:
+    candidates = [
+        row[column]
+        for row in rows
+        if _clean_cell(row[1]) == backend and _numeric_cell(row[column]) is not None
+    ]
+    if not candidates:
+        return "--"
+    return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
+
+
+def _component_share(value: str) -> float | None:
+    match = re.search(r"\((0(?:\.\d+)?|1(?:\.0+)?)\)\s*$", value)
+    return float(match.group(1)) if match else None
 
 
 def _format_ratio(numerator: float | None, denominator: float | None) -> str:
