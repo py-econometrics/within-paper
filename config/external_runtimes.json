@@ -1,0 +1,14 @@
+{
+  "r": {
+    "packages": {
+      "arrow": "24.0.0",
+      "fixest": "0.14.2",
+      "jsonlite": "2.0.0"
+    },
+    "threads_env": "BENCH_THREADS"
+  },
+  "julia": {
+    "project": "benchmarks/julia-env",
+    "threads_env": "JULIA_NUM_THREADS"
+  }
+}

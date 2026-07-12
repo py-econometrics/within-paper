@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "local_reproducible": false,
+  "reason": "The reference Apple M4 benchmark machine has no NVIDIA CUDA device.",
+  "measurements": [
+    {
+      "table": "ols",
+      "row": "simple",
+      "backend": "torch-cuda",
+      "time_s": 4.73
+    },
+    {
+      "table": "ols",
+      "row": "difficult",
+      "backend": "torch-cuda",
+      "time_s": 8.73
+    }
+  ]
+}

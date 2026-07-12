@@ -10,13 +10,15 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 MODULAR = ROOT / "benchmarks" / "modular"
 BENCHMARKS = ROOT / "benchmarks"
-for path in (MODULAR, BENCHMARKS):
+SCRIPTS = ROOT / "scripts"
+for path in (MODULAR, BENCHMARKS, SCRIPTS):
     sys.path.insert(0, str(path))
 
 from bench_within_setup_cost import _setup_share  # noqa: E402
 from benchmark_correia import summarize_results  # noqa: E402
 from dgps import _seed_for  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
+from paper_results import _render_trial_result, _synchronize_external_results  # noqa: E402
 
 
 class BenchmarkCorrectnessTests(unittest.TestCase):
@@ -67,6 +69,34 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(row["n_success"], 2)
         self.assertFalse(row["success"])
         self.assertEqual(row["time"], 2.0)
+
+    def test_complete_trial_rendering_preserves_nonconvergence(self) -> None:
+        partial = [
+            {"iter_num": "1", "success": "True", "time": "1.0"},
+            {"iter_num": "2", "success": "True", "time": "3.0"},
+            {"iter_num": "3", "success": "False", "time": ""},
+        ]
+        failed = [
+            {"iter_num": str(i), "success": "False", "time": ""}
+            for i in range(1, 4)
+        ]
+        self.assertEqual(_render_trial_result(partial), "2.00s (2/3)")
+        self.assertEqual(_render_trial_result(failed), "failed (0/3)")
+        self.assertEqual(_render_trial_result(partial[:2]), "incomplete")
+
+    def test_external_cuda_measurements_are_explicit(self) -> None:
+        document = {
+            "tables": {
+                "ols": {
+                    "header": ["Design", "Gap", "`torch-cuda`"],
+                    "rows": [["simple (dense graph)", "", "old"], ["difficult (sparse graph)", "", "old"]],
+                }
+            }
+        }
+        changed = _synchronize_external_results(document)
+        self.assertEqual(changed, 2)
+        self.assertEqual(document["tables"]["ols"]["rows"][0][2], "4.73s")
+        self.assertEqual(document["tables"]["ols"]["rows"][1][2], "8.73s")
 
 
 if __name__ == "__main__":
