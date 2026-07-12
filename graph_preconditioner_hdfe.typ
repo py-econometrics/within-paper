@@ -85,8 +85,8 @@
       We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
       built from small, local factor-pair subproblems - worker-firm, worker-year, and
       so on - that use the graph directly. 
-      Benchmarks show MAP remains fastest on dense designs, while graph preconditioning
-      reduces runtime on sparse worker-firm graphs and under strong sorting.
+      Benchmarks show that factor-pair setup does not amortize on dense designs, while
+      graph preconditioning reduces runtime on sparse worker-firm graphs and under strong sorting.
     ]
   ]
 ]
@@ -160,8 +160,8 @@ contribution is the preconditioner, not the use of LSMR for the outer iteration.
 against mature implementations of the method of alternating projections, we find that on
 sparse, poorly connected graphs (the regime where MAP convergence deteriorates) the
 graph-preconditioned solver lowers runtime, while on dense,
-well-connected graphs the preconditioner setup cost does not amortize and MAP should
-remain the natural default.
+well-connected graphs the preconditioner setup cost does not amortize and lower-overhead
+MAP or diagonally preconditioned Krylov methods remain the natural defaults.
 
 The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
 absorption problem, and Section 3 introduces the AKM model as our running example.
@@ -829,9 +829,8 @@ Krylov solver should become relatively more competitive in the low-mobility desi
 The mobility benchmark matches the predicted pattern. When mobility is high,
 preconditioning yields little advantage, and `within` incurs setup costs that are not
 offset by improved convergence. As mobility declines, the worker-firm gap falls by more than two orders
-of magnitude, from #result_akm_mobility_first_gap to below $10^(-3)$ (the decline is not
-strictly monotone, because the reported gap is attained on different connected
-components), and MAP runtimes rise sharply. `within`'s runtime stays nearly flat across
+of magnitude, from #result_akm_mobility_first_gap to below $10^(-3)$, and MAP runtimes
+rise sharply. `within`'s runtime stays nearly flat across
 all designs. In the lowest-mobility configurations, the
 preconditioned method is the fastest backend because it operates on the worker-firm graph
 directly rather than propagating information through many sweeps that update one
@@ -862,9 +861,9 @@ factor-pair solves use the worker-firm graph directly.
 
 The sorting benchmark gives the parallel result. As movers sort more strongly across
 firms, the worker-firm graph separates into weakly connected blocks. The worker-firm gap
-falls by more than two orders of magnitude, and MAP-based runtimes rise. The gap does not fall
-monotonically, because different components attain the reported value in different rows,
-but its overall decline is clear. `within` remains nearly flat because its factor-pair
+ends about four times smaller, and MAP-based runtimes generally rise. The gap does not fall
+monotonically across the intermediate designs, but its overall decline is clear. `within`
+remains nearly flat because its factor-pair
 preconditioner uses the worker-firm links directly, rather than relying on residual
 updates that cycle through one fixed-effect dimension at a time.
 
@@ -956,7 +955,7 @@ reference set for comparing the same software backends outside the AKM generator
 These results are less clear than the controlled AKM experiments, which is itself informative.
 Several datasets are small enough, or sufficiently well connected, that setup cost
 matters as much as conditioning; on the complete and easier uniform designs, the gap is
-large and low-overhead methods perform well. The harder rows reverse the ranking. By
+large and low-overhead methods perform well. The ranking changes on the hardest rows. By
 `synthetic-uniform-harder`, the gap has fallen to #result_correia_uniform_harder_gap and `within` has
 become competitive with the fastest backend. On the assortative benchmark, the preconditioned method
 exhibits its clearest advantage: sorting generates cross-factor structure that MAP's
@@ -991,9 +990,9 @@ difficult to outperform on small or compact graphs such as `credit` and `soccer`
 the gaps are large. The `directors` row illustrates why the component share is useful:
 the worst component is hard, but it contains #result_directors_component_share of the observations, so
 the full problem is not as costly for MAP as the gap alone would suggest. On larger
-networks with hard components covering a substantial portion of the sample, particularly
-`enron`, `github`, `patents`, `workers`, and `schools`, the factor-pair preconditioner is
-fastest by a wide margin. 
+networks with hard components covering a substantial portion of the sample, the
+factor-pair preconditioner is fastest on `enron`, `github`, `patents`, `workers`, and
+`schools`. The margin is modest on `enron` and wider on the other four datasets.
 
 == Poisson / PPML Benchmark
 
@@ -1200,10 +1199,11 @@ factor pair is sparsely connected, through low mobility, strong sorting, or near
 MAP passes information across the graph slowly, and the factor-pair preconditioner is
 faster, often by a wide margin. 
 
-The preconditioner depends only on the fixed-effect graph, so it can be built once and
-reused across demeaning calls. Reuse matters most when a single estimation issues many
-such calls: IRLS-based GLMs such as PPML demean once per iteration, so the construction
-cost is paid once while the faster convergence can accrue at every iteration step. In our PPML
+The fixed-effect graph does not change across demeaning calls. In IRLS, the weights do
+change, but the implementation can reuse a slightly stale preconditioner. Reuse matters
+most when a single estimation issues many such calls: IRLS-based GLMs such as PPML demean
+once per iteration, so the construction cost is paid once while the faster convergence
+can accrue at every iteration step. In our PPML
 benchmark on a hard three-way design, `within` finishes in seconds where the MAP-based
 routines take minutes or fail to converge.
 
