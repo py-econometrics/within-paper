@@ -122,6 +122,7 @@ def _runtime_provenance() -> dict:
         "processor": platform.processor(),
         "bench_threads": os.environ.get("BENCH_THREADS"),
         "julia_num_threads": os.environ.get("JULIA_NUM_THREADS"),
+        "within_repo": os.environ.get("WITHIN_REPO"),
         "git_commit": _git_commit(),
         "git_dirty": _git_dirty(),
         "code_sha256": _code_fingerprint(),
@@ -387,6 +388,11 @@ def collect(args: argparse.Namespace) -> None:
     run_dir = ROOT / "results" / "runs" / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     runtime = _runtime_provenance()
+    if runtime["within_repo"]:
+        raise SystemExit(
+            "Refusing to collect paper results with WITHIN_REPO set; "
+            "the paper run must use the locked within-py package"
+        )
     if runtime["git_dirty"]:
         raise SystemExit(
             "Refusing to collect paper results from a dirty tracked worktree; "
