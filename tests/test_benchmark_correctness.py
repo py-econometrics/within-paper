@@ -3,8 +3,11 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
+import scipy.sparse as sp
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +22,7 @@ from benchmark_correia import summarize_results  # noqa: E402
 from dgps import _seed_for  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
 from paper_results import _render_trial_result, _synchronize_external_results  # noqa: E402
+from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
 
 
 class BenchmarkCorrectnessTests(unittest.TestCase):
@@ -97,6 +101,24 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(changed, 2)
         self.assertEqual(document["tables"]["ols"]["rows"][0][2], "4.73s")
         self.assertEqual(document["tables"]["ols"]["rows"][1][2], "8.73s")
+
+    def test_large_hardness_blocks_use_arpack(self) -> None:
+        matrix = sp.eye(20_001, format="csr")
+        with patch(
+            "benchmarks.modular.compute_hardness.svds",
+            return_value=np.array([0.5, 1.0]),
+        ) as mocked_svds:
+            self.assertEqual(_component_rho(matrix), 0.25)
+        self.assertEqual(mocked_svds.call_args.kwargs["solver"], "arpack")
+
+    def test_smaller_hardness_blocks_use_propack(self) -> None:
+        matrix = sp.eye(65, format="csr")
+        with patch(
+            "benchmarks.modular.compute_hardness.svds",
+            return_value=np.array([0.5, 1.0]),
+        ) as mocked_svds:
+            self.assertEqual(_component_rho(matrix), 0.25)
+        self.assertEqual(mocked_svds.call_args.kwargs["solver"], "propack")
 
 
 if __name__ == "__main__":

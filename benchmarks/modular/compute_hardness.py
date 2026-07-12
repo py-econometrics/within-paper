@@ -32,6 +32,7 @@ CORREIA_DIR = ROOT / "data" / "correia_data"
 DATA_DIR = ROOT / "benchmarks" / "data"
 MEMORY_DATA_DIR = ROOT / "data"
 DEFAULT_OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
+PROPACK_MAX_MIN_DIM = 20_000
 CORREIA_DATASETS = (
     "credit2", "credit", "soccer", "synthetic-complete",
     "synthetic-uniform-easy", "synthetic-uniform-hard",
@@ -85,28 +86,34 @@ def _component_rho(cooccurrence: sp.csr_matrix) -> float:
         @ cooccurrence
         @ sp.diags(1.0 / np.sqrt(col_sums))
     ).tocsr()
+    solver = "dense"
     try:
         if min(normalized.shape) <= 64:
             singular_values = np.linalg.svd(normalized.toarray(), compute_uv=False)
         else:
-            # ARPACK works on H' H. On a long, nearly disconnected graph such
-            # as synthetic-zigzag, sigma_1 and sigma_2 are extremely close to
-            # one, so this squared eigenproblem can fail to converge even after
-            # tens of thousands of iterations. PROPACK works on H directly and
-            # is substantially more reliable for these clustered singular
-            # values. A stringent tolerance is needed because 1 - rho is the
-            # reported statistic.
+            # PROPACK resolves the clustered singular values of the small
+            # zigzag graph, where ARPACK often fails to converge. SciPy's
+            # PROPACK backend can terminate the interpreter on larger irregular
+            # blocks, however, while ARPACK handles those blocks reliably.
+            # The tight tolerance matters because the reported value is 1-rho.
+            solver = (
+                "propack"
+                if min(normalized.shape) <= PROPACK_MAX_MIN_DIM
+                else "arpack"
+            )
             singular_values = svds(
                 normalized,
                 k=2,
                 which="LM",
-                solver="propack",
+                solver=solver,
                 tol=1e-10,
                 maxiter=200_000,
                 return_singular_vectors=False,
             )
     except Exception as exc:
-        raise RuntimeError(f"singular-value calculation failed with PROPACK: {exc}") from exc
+        raise RuntimeError(
+            f"singular-value calculation failed with {solver.upper()}: {exc}"
+        ) from exc
     singular_values = np.sort(singular_values)[::-1]
     if len(singular_values) < 2:
         return 0.0
