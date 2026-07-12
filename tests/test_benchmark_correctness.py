@@ -27,6 +27,7 @@ from paper_results import (  # noqa: E402
     _numeric_cell,
     _render_trial_result,
     _synchronize_external_results,
+    _table_fragment,
 )
 from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
 
@@ -140,6 +141,22 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(
             _component_share("$5.12 times 10^(-4)$ (0.30)"), 0.30
         )
+
+    def test_agreement_rowspan_is_rendered_as_typst_code(self) -> None:
+        table = {
+            "columns": "(1fr, 1fr)",
+            "align": "(left, left)",
+            "header": ["Design", "Backend"],
+            "rows": [
+                ["#agreement-simple", "`rust-map`"],
+                ["", "`within`"],
+            ],
+        }
+        fragment = _table_fragment("agreement", table)
+        self.assertIn("table.cell(rowspan: 4)[simple], [`rust-map`]", fragment)
+        self.assertNotIn("[table.cell(rowspan: 4)[simple]]", fragment)
+        self.assertIn("\n  [`within`],", fragment)
+        self.assertNotIn("\n  [], [`within`],", fragment)
 
 
 if __name__ == "__main__":

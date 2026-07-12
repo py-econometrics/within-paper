@@ -321,8 +321,16 @@ def _table_fragment(name: str, table: dict) -> str:
         elif marker == "#agreement-difficult":
             lines.append("  table.hline(stroke: 0.35pt + table-light-rule),")
             row = ["table.cell(rowspan: 4)[difficult]", *row[1:]]
+        elif name == "agreement":
+            # The first grid slot is already occupied by the row-spanning
+            # design cell, so subsequent rows contain only four cells.
+            row = row[1:]
         cells = [cell if cell else "" for cell in row]
-        lines.append("  " + ", ".join(f"[{cell}]" for cell in cells) + ",")
+        rendered_cells = [
+            cell if index == 0 and cell.startswith("table.cell(") else f"[{cell}]"
+            for index, cell in enumerate(cells)
+        ]
+        lines.append("  " + ", ".join(rendered_cells) + ",")
     lines.extend(["  table.hline(stroke: 0.8pt + table-rule),", ")", ""])
     return "\n".join(lines)
 
