@@ -7,10 +7,26 @@
 __pycache__/
 .pytest_cache/
 benchmarks/__pycache__/
-benchmarks/julia-env/
+benchmarks/julia-env/*
+!benchmarks/julia-env/Project.toml
+!benchmarks/julia-env/Manifest.toml
 
 # generated benchmark data
-data/*.parquet
+*.parquet
+benchmarks/data/*.hash
+
+# Correia HDFE benchmark data (download separately, ~600MB of CSVs)
+# metadata and READMEs stay tracked; see data/correia_data/README.md
+data/correia_data/*.csv
+
+# Reproducibility run artifacts. Canonical paper summaries and generated Typst
+# fragments are tracked; raw timing runs remain local.
+results/runs/
+results/legacy/
+benchmarks/results/
+benchmarks/modular/*.csv
+data/benchmarks/*.csv
+figures/benchmarks/
 
 # local Codex skill marker
 academic-voice.skill
@@ -19,3 +35,4 @@ academic-voice/
 # local assistant/project metadata
 .claude/
 .cluade/
+.serena/

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "source_of_truth": "results/paper/benchmark_tables.json",
+  "external_sources": [
+    "results/external/cuda.json"
+  ],
+  "claims": [
+    {
+      "id": "akm-mobility-table",
+      "table": "akm_mobility",
+      "sources": [
+        "benchmarks/results/feols_akm_sweep__*.csv",
+        "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "akm-sorting-table",
+      "table": "akm_sorting",
+      "sources": [
+        "benchmarks/results/feols_akm_sweep__*.csv",
+        "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "ols-table",
+      "table": "ols",
+      "sources": [
+        "benchmarks/results/feols_bench__*.csv",
+        "results/runs/latest/hardness.csv",
+        "results/external/cuda.json"
+      ]
+    },
+    {
+      "id": "correia-synthetic-table",
+      "table": "correia_synthetic",
+      "sources": [
+        "benchmarks/results/correia-benchmarks.csv",
+        "benchmarks/results/correia-benchmarks-raw__*.csv",
+        "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "correia-real-table",
+      "table": "correia_real",
+      "sources": [
+        "benchmarks/results/correia-benchmarks.csv",
+        "benchmarks/results/correia-benchmarks-raw__*.csv",
+        "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "ppml-table",
+      "table": "ppml",
+      "sources": [
+        "benchmarks/results/fepois_bench__*.csv"
+      ]
+    },
+    {
+      "id": "memory-table",
+      "table": "memory",
+      "sources": [
+        "results/runs/latest/memory.csv",
+        "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "agreement-table",
+      "table": "agreement",
+      "sources": [
+        "results/runs/latest/agreement.csv"
+      ]
+    },
+    {
+      "id": "within-setup-cost",
+      "table": "ols",
+      "sources": [
+        "results/runs/latest/within_setup_cost.csv",
+        "results/runs/latest/within_setup_cost_summary.csv"
+      ],
+      "note": "Supplies the reusable-solver setup and solve prose values."
+    }
+  ]
+}
