@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pyfixest.core.detect_singletons import detect_singletons  # noqa: E402
+from dgps import get_akm_sweep_scenario_names  # noqa: E402
 
 CORREIA_DIR = ROOT / "data" / "correia_data"
 DATA_DIR = ROOT / "benchmarks" / "data"
@@ -178,8 +179,18 @@ def enumerate_datasets() -> list[DatasetSpec]:
         path = CORREIA_DIR / f"{dataset}.csv"
         if path.exists():
             specs.append(DatasetSpec(dataset, "correia", path, ("id1", "id2"), _read_csv))
-    for path in sorted(DATA_DIR.glob("akm_*_1000000_k1_iter_1.parquet")):
-        specs.append(DatasetSpec(path.stem, "akm", path, ("indiv_id", "firm_id", "year"), _read_parquet))
+    for dgp_name in get_akm_sweep_scenario_names():
+        path = DATA_DIR / f"{dgp_name}_1000000_k1_iter_1.parquet"
+        if path.exists():
+            specs.append(
+                DatasetSpec(
+                    path.stem,
+                    "akm",
+                    path,
+                    ("indiv_id", "firm_id", "year"),
+                    _read_parquet,
+                )
+            )
     for family in ("simple", "difficult"):
         path = DATA_DIR / f"{family}_1000000_k1_iter_1.parquet"
         if path.exists():
