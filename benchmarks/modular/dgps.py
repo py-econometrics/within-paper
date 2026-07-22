@@ -25,9 +25,7 @@ def _seed_for(dgp_name: str, n: int, iteration: int) -> int:
     stable_offset = int.from_bytes(
         hashlib.sha256(dgp_name.encode("utf-8")).digest()[:2], "big"
     ) % 97
-    dgp_offset = {"simple": 0, "difficult": 1, "akm_baseline": 2}.get(
-        dgp_name, stable_offset
-    )
+    dgp_offset = {"simple": 0, "difficult": 1}.get(dgp_name, stable_offset)
     return n * 100 + iteration * 17 + dgp_offset + 42
 
 
@@ -182,37 +180,20 @@ _AKM_DEFAULTS: dict[str, Any] = {
     "lambda_": 0.8,
     "beta_x1": 0.5,
     "n_match_bins": 2048,
-    "entry_exit_share": 0.0,
-    "entry_exit_n_periods": 2,
 }
 
 def _scenario(name: str, **overrides: Any) -> AKMSweepScenario:
     return AKMSweepScenario(name=name, overrides=overrides)
 
 
-def _expected_obs_per_worker(params: dict[str, Any]) -> float:
-    n_time = int(params["n_time"])
-    short_share = float(params.get("entry_exit_share", 0.0))
-    short_periods = int(params.get("entry_exit_n_periods", n_time))
-    return (1 - short_share) * n_time + short_share * short_periods
-
-
-def _actual_obs_count(n_workers: int, params: dict[str, Any]) -> int:
-    n_time = int(params["n_time"])
-    short_share = float(params.get("entry_exit_share", 0.0))
-    short_periods = int(params.get("entry_exit_n_periods", n_time))
-    n_short_workers = round(short_share * n_workers)
-    return (n_workers - n_short_workers) * n_time + n_short_workers * short_periods
-
-
 def _infer_worker_count(target_n_obs: int, params: dict[str, Any]) -> int:
-    expected_obs_per_worker = max(_expected_obs_per_worker(params), 1.0)
-    floor_workers = max(1, int(target_n_obs / expected_obs_per_worker))
+    n_time = max(int(params["n_time"]), 1)
+    floor_workers = max(1, int(target_n_obs / n_time))
     candidates = {floor_workers, floor_workers + 1}
     return min(
         candidates,
         key=lambda n_workers: (
-            abs(_actual_obs_count(n_workers, params) - target_n_obs),
+            abs(n_workers * n_time - target_n_obs),
             n_workers,
         ),
     )
@@ -220,9 +201,6 @@ def _infer_worker_count(target_n_obs: int, params: dict[str, Any]) -> int:
 
 def _akm_sweep_scenarios() -> list[AKMSweepScenario]:
     return [
-        # ── Act 1: Reference point ──
-        _scenario("akm_baseline"),
-        # ── Act 2: Single-axis sweeps ──
         # sorting
         _scenario("akm_sorting_1", rho=0.0),
         _scenario("akm_sorting_2", rho=5.0),
@@ -237,6 +215,10 @@ def _akm_sweep_scenarios() -> list[AKMSweepScenario]:
         _scenario("akm_mobility_5", delta=0.005),
         _scenario("akm_mobility_6", delta=0.001),
     ]
+
+
+def get_akm_sweep_scenario_names() -> tuple[str, ...]:
+    return tuple(scenario.name for scenario in _akm_sweep_scenarios())
 
 
 class BaseDGP:

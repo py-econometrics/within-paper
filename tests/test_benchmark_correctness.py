@@ -25,7 +25,7 @@ from benchmark_correia import summarize_results  # noqa: E402
 from benchmark_fepois import SPECS as FEPOIS_SPECS  # noqa: E402
 from akm_dgp import AKMConfig, simulate_akm_panel  # noqa: E402
 from dgp_functions import paper_base_dgp  # noqa: E402
-from dgps import BaseDGP, _seed_for  # noqa: E402
+from dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
 from paper_results import (  # noqa: E402
     _component_share,
@@ -47,6 +47,24 @@ def _frame_hash(frame: pd.DataFrame) -> str:
 
 
 class BenchmarkCorrectnessTests(unittest.TestCase):
+    def test_akm_scenarios_match_the_paper_sweeps(self) -> None:
+        self.assertEqual(
+            get_akm_sweep_scenario_names(),
+            (
+                "akm_sorting_1",
+                "akm_sorting_2",
+                "akm_sorting_3",
+                "akm_sorting_4",
+                "akm_sorting_5",
+                "akm_mobility_1",
+                "akm_mobility_2",
+                "akm_mobility_3",
+                "akm_mobility_4",
+                "akm_mobility_5",
+                "akm_mobility_6",
+            ),
+        )
+
     def test_paper_base_dgp_preserves_values_and_six_column_schema(self) -> None:
         expected = {
             "simple": "b95147d29c724cf3079a3cc46079369d4da778bf0bccb5af5948f99888e900bb",
