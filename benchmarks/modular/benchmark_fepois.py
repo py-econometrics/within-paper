@@ -7,7 +7,7 @@ from pathlib import Path
 from benchmarker_sets import build_standard_fepois_benchmarkers
 from dgps import BaseDGP
 from interfaces import FeolsSpec
-from runner import generate_datasets, plot_results, run_benchmarks
+from runner import generate_datasets, run_benchmarks
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -21,7 +21,6 @@ N_ITERS = 3
 BURN_IN = 1
 DATA_DIR = PROJECT_ROOT / "benchmarks" / "data"
 OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "fepois_bench.csv"
-FIGURE_DIR = PROJECT_ROOT / "figures" / "benchmarks" / "fepois-benchmarks"
 
 DGPS = [
     BaseDGP(DATA_DIR, "simple", k_values=tuple(K_VALUES)),
@@ -45,19 +44,12 @@ SPECS = [
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "benchmarks" / "results")
-    parser.add_argument("--figure-dir", type=Path, default=FIGURE_DIR)
     parser.add_argument("--reuse-existing", action="store_true")
     args = parser.parse_args()
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     datasets = generate_datasets(DGPS, SIZES, N_ITERS, BURN_IN)
     bundle = build_standard_fepois_benchmarkers()
-    results_df = run_benchmarks(
+    run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
-    )
-    plot_results(
-        results_df,
-        output_csv,
-        figure_dir=args.figure_dir,
-        figure_backends=bundle.figure_backends,
     )

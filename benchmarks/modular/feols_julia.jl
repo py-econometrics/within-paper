@@ -91,7 +91,6 @@ function main()
 
     config = JSON3.read(read(ARGS[1], String))
     manifest = config[:manifest]
-    formula_str = String(config[:formula])
     fe_cols = String.(config[:fe_cols])
     n_fe = length(fe_cols)
     vcov_type = String(config[:vcov_type])
