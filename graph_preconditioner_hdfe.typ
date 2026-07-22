@@ -790,6 +790,15 @@ and 16 GB of memory running macOS 15.3.1. Times are medians over the trials that
 converged. When fewer than three converge, the table reports the successful-trial count;
 a failed cell means that all three trials reached the iteration cap.
 
+Each backend runs at its own package-default convergence tolerance and iteration cap, and
+these defaults differ across implementations: PyFixest's MAP stops at a $10^(-6)$ tolerance
+and 10,000 iterations, while the preconditioned `within` solver stops at the tighter
+$10^(-8)$ and 1,000 iterations. We report each package as a practitioner runs it out of the
+box rather than imposing a single harmonized stopping rule. The asymmetry is conservative
+for our method, since `within` converges to a tighter tolerance, and the numerical
+equivalence checks below confirm that the backends agree on the estimated
+coefficient regardless of these differences.
+
 We do not include `reghdfe` @reghdfe @correia2017 directly in the benchmark tables because Stata is not open
 source and we lack a license. `reghdfe` is a mature accelerated-MAP
 implementation; algorithmically, it belongs to the same
@@ -896,7 +905,9 @@ preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
   at 10M observations. `torch-cuda` denotes the PyFixest GPU LSMR backend with diagonal
   preconditioning (the same algorithm as
 `FixedEffectModels.jl`), run on an NVIDIA CUDA device; the local benchmark machine does
-not possess a CUDA GPU. The standalone `within` demeaning API decomposes one-shot runtime
+not possess a CUDA GPU. Because the GPU figures therefore come from different hardware than
+the CPU columns, the GPU-to-CPU comparison is indicative only and should not be read as a
+controlled same-machine ratio. The standalone `within` demeaning API decomposes one-shot runtime
 into reusable solver construction and batch solve: simple design #result_setup_simple_setup + #result_setup_simple_solve
 (#result_setup_simple_share setup); difficult design #result_setup_difficult_setup + #result_setup_difficult_solve
 (#result_setup_difficult_share setup). PyFixest
@@ -919,10 +930,11 @@ demeaning time falls to #result_setup_difficult_share, indicating that the preco
 amortized.
 
 On the simple design, `torch-cuda` is not
-competitive with CPU `fixest`, since host-to-device transfer and
-kernel launch overheads outweigh the gain from parallelizing already inexpensive
-iterations. On the difficult design, GPU parallelism reduces runtime to #result_ols_difficult_gpu (#result_ols_gpu_vs_fem
-faster than CPU `FEM.jl`), but the iteration count remains governed by the
+competitive with CPU `fixest`, a pattern consistent with host-to-device transfer and
+kernel-launch overheads outweighing the gain from parallelizing already inexpensive
+iterations, though we do not measure those overheads directly. On the difficult design, GPU
+parallelism reduces runtime to #result_ols_difficult_gpu (about #result_ols_gpu_vs_fem
+faster than CPU `FEM.jl`, on separate hardware), but the iteration count remains governed by the
 quality of the diagonal preconditioner, which is limited on this graph. `within` at #result_ols_difficult_within
 remains faster on CPU by using a factor-pair preconditioner that captures the
 cross-factor coupling the diagonal cannot. Hardware acceleration and stronger
@@ -947,9 +959,10 @@ reference set for comparing the same software backends outside the AKM generator
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
   `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
   share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
-  geometry. The `synthetic-zigzag` dataset is omitted because `rust-map` reaches its
-  iteration cap while the converged runtimes of the other backends span several orders of
-  magnitude. It is more useful as a stress case than as a compact runtime comparison.]
+  geometry. The `synthetic-zigzag` dataset is reported in text rather than in the table:
+  it is a tiny path-like stress case on which all three baseline backends (`rust-map`,
+  `fixest`, and `FEM.jl`) reach their iteration caps and fail to converge, while `within`
+  converges in 0.020s. It is more useful as a stress case than as a compact runtime comparison.]
   ]
 
 These results are less clear than the controlled AKM experiments, which is itself informative.
@@ -1019,7 +1032,11 @@ once per IRLS step.
 We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
 benchmark suite @berge2026fixest at $n = 1$M observations, one covariate, and two
 or three fixed effects (worker-year, or worker-firm-year), using the same iteration
-protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
+protocol as the OLS benchmarks. The outcome is a count variable drawn from an
+overdispersed negative-binomial process (dispersion $theta = 0.5$) rather than an exact
+Poisson draw; PPML estimates it consistently as a Poisson pseudo-likelihood, and the
+design stresses the demeaning inner loop regardless of the outcome's dispersion. The
+compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
 `rust-map` and the preconditioned `within` solver.
 
@@ -1034,7 +1051,10 @@ protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
   `within` are the PyFixest `fepois` routine with the unpreconditioned MAP backend and
   the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
   `GLFixedEffectModels.jl`. `failed` indicates that all three `rust-map` trials reached
-  the 10000-iteration MAP cap without converging.]
+  the 10000-iteration MAP cap without converging. The dense- and sparse-graph
+  descriptions apply to the three-FE rows, where the worker-firm graph is absorbed; the
+  two-FE rows absorb worker and year only, so the firm structure that distinguishes the
+  two designs does not enter those models.]
   ]
 
 The patterns observed in the OLS benchmarks carry over. With two fixed effects, all four
@@ -1086,12 +1106,12 @@ strategy. Both backends are executed in isolated processes and report peak RSS v
 		]
 
 At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M observations
-the overhead is larger in absolute terms (#result_memory_1m_overhead),
-but it remains modest relative to the data footprint of a panel with one covariate.
-The preconditioned solver consumes more memory than MAP, yet the additional
-storage for factor-pair co-occurrences, partition weights, and local approximate
-Cholesky factors remains small relative to
-the full regression problem.
+the overhead is larger in absolute terms (#result_memory_1m_overhead), a substantial
+fraction, roughly one-quarter to two-fifths, of the corresponding MAP peak RSS.
+The preconditioned solver thus trades additional memory, spent on factor-pair
+co-occurrences, partition weights, and local approximate Cholesky factors, for its
+convergence advantage on poorly conditioned graphs. Each memory cell is a single
+measurement rather than a three-trial median.
 
 == Numerical Equivalence
 

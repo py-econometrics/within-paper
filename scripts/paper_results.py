@@ -385,8 +385,8 @@ def render(args: argparse.Namespace) -> None:
         "result_ols_gpu_vs_fem": _format_ratio(_numeric_cell(ols_difficult[4]), _numeric_cell(ols_difficult[6])),
         "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[2]), _numeric_cell(ppml_difficult[5])),
         "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
-        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MB" if memory_100k else "--",
-        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MB" if memory_1m else "--",
+        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
+        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
         "result_directors_component_share": (
             f"{directors_share:.0%}" if directors_share is not None else "--"
         ),
@@ -491,9 +491,9 @@ def _rows_from_csvs() -> list[dict[str, str]]:
 
 def _backend_name(value: str) -> str | None:
     text = value.lower()
-    if "within" in text or "rust-cg" in text:
+    if "within" in text or "rust-cg" in text or "rust_cg" in text:
         return "within"
-    if "rust-map" in text or text in {"rust", "pyfixest-map"}:
+    if "rust-map" in text or "rust_map" in text or text in {"rust", "pyfixest-map", "pyfixest_map"}:
         return "rust-map"
     if "torch-cuda" in text:
         return "torch-cuda"
@@ -606,6 +606,10 @@ def _matches_runtime_target(
 
 
 def _numeric_cell(value: str) -> float | None:
+    if "failed" in value.lower():
+        # A failed cell such as "failed (0/3)" carries no runtime; do not let the
+        # "0" in the trial count read back as a 0.0-second measurement.
+        return None
     scientific = re.search(
         r"(-?\d[\d,]*\.?\d*)\s+times\s+10\^\((-?\d+)\)", value
     )
@@ -666,6 +670,8 @@ def _format_hardness(gap: float, share: float) -> str:
         exponent = int(f"{gap:.0e}".split("e")[1])
         mantissa = gap / (10**exponent)
         gap_text = f"${mantissa:.2f} times 10^({exponent})$"
+    elif gap >= 1.0:
+        gap_text = f"{gap:.2f}"
     else:
         gap_text = f"{gap:.3g}"
     return f"{gap_text} ({share:.2f})"
@@ -846,11 +852,11 @@ def _synchronize_canonical_tables(
         with memory_path.open(newline="", encoding="utf-8") as handle:
             measurements = list(csv.DictReader(handle))
         table = document["tables"]["memory"]
-        for row in table["rows"]:
+        for index, row in enumerate(table["rows"]):
             if row[0].startswith("#"):
                 continue
             dgp = row[0].split()[0]
-            size = "100k" if table["rows"].index(row) < 4 else "1m"
+            size = "100k" if index < 4 else "1m"
             for column, backend in ((2, "rust"), (3, "rust-cg")):
                 candidates = [
                     item
@@ -869,7 +875,7 @@ def _synchronize_canonical_tables(
                     None,
                 )
                 if match and match["rss_mb"]:
-                    rendered = f"{int(float(match['rss_mb'])):,} MB"
+                    rendered = f"{int(float(match['rss_mb'])):,} MiB"
                 elif candidates:
                     rendered = "failed"
                 else:

@@ -286,7 +286,7 @@
       "rows": [
         [
           "`synthetic-complete`",
-          "0.76 (1.00)",
+          "1.00 (1.00)",
           "0.070s",
           "0.059s",
           "0.034s",
@@ -345,14 +345,14 @@
         [
           "simple (dense graph)",
           "0.857 (1.00)",
-          "315 MB",
-          "357 MB"
+          "315 MiB",
+          "357 MiB"
         ],
         [
           "difficult (sparse graph)",
           "$1.30 times 10^(-3)$ (1.00)",
-          "304 MB",
-          "352 MB"
+          "304 MiB",
+          "352 MiB"
         ],
         [
           "#memory-1m",
@@ -363,14 +363,14 @@
         [
           "simple (dense graph)",
           "0.857 (1.00)",
-          "734 MB",
-          "1,047 MB"
+          "734 MiB",
+          "1,047 MiB"
         ],
         [
           "difficult (sparse graph)",
           "$1.67 times 10^(-5)$ (1.00)",
-          "693 MB",
-          "872 MB"
+          "693 MiB",
+          "872 MiB"
         ]
       ]
     },
@@ -420,7 +420,7 @@
       ],
       "rows": [
         [
-          "simple (dense graph)",
+          "simple",
           "2",
           "1.25s",
           "1.67s",
@@ -428,7 +428,7 @@
           "3.21s"
         ],
         [
-          "difficult (sparse graph)",
+          "difficult",
           "2",
           "1.22s",
           "1.64s",

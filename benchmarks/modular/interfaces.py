@@ -71,7 +71,6 @@ class FeolsResult:
     time: float | None
     success: bool
     error: str | None = None
-    substeps: dict[str, float] | None = None
 
 
 class FeolsBenchmarkerProtocol(Protocol):

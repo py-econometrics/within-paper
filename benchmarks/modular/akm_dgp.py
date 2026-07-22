@@ -8,8 +8,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
 
 
 @dataclass(frozen=True)
@@ -529,85 +527,3 @@ def simulate_akm_panel(
             data["occ_changed"] = occ_changed.ravel()[observed_mask]
 
     return pd.DataFrame(data)
-
-
-def summarize_akm_panel(df: pd.DataFrame) -> dict[str, float]:
-    """Compute graph and mobility diagnostics from a simulated AKM panel."""
-    obs_per_worker = df.groupby("indiv_id").size()
-    mover_worker_ids = (
-        df.groupby("indiv_id")["firm_id"]
-        .nunique()
-        .loc[lambda s: s > 1]
-        .index.to_numpy()
-    )
-    mover_obs = df[df["indiv_id"].isin(mover_worker_ids)]
-    edges = mover_obs[["indiv_id", "firm_id"]].drop_duplicates()
-
-    diagnostics: dict[str, float] = {
-        "mean_observed_periods": float(obs_per_worker.mean()),
-        "two_period_worker_share": float(obs_per_worker.eq(2).mean()),
-        "mover_share": float(len(mover_worker_ids) / df["indiv_id"].nunique()),
-        "singleton_count": float(
-            df.groupby(["indiv_id", "firm_id"]).size().eq(1).sum()
-        ),
-    }
-
-    if "firm_industry" in df.columns:
-        diagnostics["cross_industry_share"] = float(
-            df.groupby("indiv_id")["firm_industry"].nunique().gt(1).mean()
-        )
-    if "occ_id" in df.columns:
-        top_occ_share = (
-            df.groupby("firm_id")["occ_id"]
-            .value_counts(normalize=True)
-            .groupby("firm_id")
-            .max()
-        )
-        diagnostics["within_firm_occ_concentration"] = float(top_occ_share.mean())
-
-        sorted_df = df.sort_values(["indiv_id", "year"]).copy()
-        prev_firm = sorted_df.groupby("indiv_id")["firm_id"].shift()
-        prev_occ = sorted_df.groupby("indiv_id")["occ_id"].shift()
-        move_mask = prev_firm.notna() & sorted_df["firm_id"].ne(prev_firm)
-
-        if move_mask.any():
-            diagnostics["realized_occ_change_share"] = float(
-                sorted_df.loc[move_mask, "occ_id"].ne(prev_occ.loc[move_mask]).mean()
-            )
-        else:
-            diagnostics["realized_occ_change_share"] = 0.0
-
-        if "occ_move_compatible" in sorted_df.columns:
-            mover_rows = sorted_df.loc[move_mask]
-            diagnostics["compatible_move_share"] = float(
-                mover_rows["occ_move_compatible"].mean()
-            )
-            diagnostics["forced_occ_change_share"] = float(
-                mover_rows["occ_forced_change"].mean()
-            )
-
-    if edges.empty:
-        diagnostics["connected_components"] = 0.0
-        diagnostics["largest_connected_set_share"] = 0.0
-        return diagnostics
-
-    worker_codes, worker_levels = pd.factorize(edges["indiv_id"], sort=False)
-    firm_codes, firm_levels = pd.factorize(edges["firm_id"], sort=False)
-    n_workers = len(worker_levels)
-    row = np.concatenate([worker_codes, firm_codes + n_workers])
-    col = np.concatenate([firm_codes + n_workers, worker_codes])
-    data = np.ones(len(row), dtype=np.int8)
-    graph = csr_matrix((data, (row, col)), shape=(n_workers + len(firm_levels),) * 2)
-    n_components, labels = connected_components(graph, directed=False)
-    component_sizes = np.bincount(labels)
-    largest_component = int(component_sizes.argmax())
-
-    worker_component = pd.Series(labels[:n_workers], index=worker_levels)
-    firm_component = pd.Series(labels[n_workers:], index=firm_levels)
-    in_largest = df["indiv_id"].map(worker_component).eq(largest_component) & df[
-        "firm_id"
-    ].map(firm_component).eq(largest_component)
-
-    diagnostics["connected_components"] = float(n_components)
-    diagnostics["largest_connected_set_share"] = float(in_largest.mean())
-    return diagnostics

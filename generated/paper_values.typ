@@ -28,6 +28,6 @@
 #let result_ols_gpu_vs_fem = [3.1 times]
 #let result_ppml_within_vs_fixest = [62 times]
 #let result_ppml_within_vs_glfem = [31 times]
-#let result_memory_100k_overhead = [42--48 MB]
-#let result_memory_1m_overhead = [179--313 MB]
+#let result_memory_100k_overhead = [42--48 MiB]
+#let result_memory_1m_overhead = [179--313 MiB]
 #let result_directors_component_share = [30%]

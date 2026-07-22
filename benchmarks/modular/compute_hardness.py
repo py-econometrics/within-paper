@@ -33,6 +33,11 @@ DATA_DIR = ROOT / "benchmarks" / "data"
 MEMORY_DATA_DIR = ROOT / "data"
 DEFAULT_OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 PROPACK_MAX_MIN_DIM = 20_000
+# Materialize a dense SVD whenever the normalized block has at most this many
+# entries. Dense SVD is exact and, unlike the iterative solvers, resolves
+# rank-deficient spectra correctly (the complete bipartite graph is rank one, so
+# its second singular value is exactly zero and its gap is exactly 1).
+DENSE_MAX_ENTRIES = 1_000_000
 CORREIA_DATASETS = (
     "credit2", "credit", "soccer", "synthetic-complete",
     "synthetic-uniform-easy", "synthetic-uniform-hard",
@@ -75,6 +80,41 @@ def _factorize(values: np.ndarray) -> tuple[np.ndarray, int]:
     return codes.astype(np.int64, copy=False), int(codes.max()) + 1 if len(codes) else 0
 
 
+def _top_two_singular_values(normalized: sp.csr_matrix) -> np.ndarray:
+    """Return the two largest singular values of a normalized bipartite block.
+
+    Small blocks use an exact dense SVD, which is the only reliable option on
+    rank-deficient spectra: the complete bipartite graph is rank one, so its
+    second singular value is exactly zero, and the iterative solvers return
+    spurious nonzero values for it. Larger blocks use ARPACK, which is accurate
+    on well-separated spectra, and fall back to PROPACK for clustered spectra
+    (e.g. the path-like ``synthetic-zigzag`` graph) where ARPACK fails to
+    converge. PROPACK is only attempted below ``PROPACK_MAX_MIN_DIM`` because its
+    SciPy backend can terminate the interpreter on very large irregular blocks.
+    """
+    rows, cols = normalized.shape
+    if min(rows, cols) <= 64 or rows * cols <= DENSE_MAX_ENTRIES:
+        return np.linalg.svd(normalized.toarray(), compute_uv=False)
+    solvers = ["arpack"]
+    if min(rows, cols) <= PROPACK_MAX_MIN_DIM:
+        solvers.append("propack")
+    errors: list[str] = []
+    for solver in solvers:
+        try:
+            return svds(
+                normalized,
+                k=2,
+                which="LM",
+                solver=solver,
+                tol=1e-10,
+                maxiter=200_000,
+                return_singular_vectors=False,
+            )
+        except Exception as exc:  # noqa: BLE001 - try the next solver, then report
+            errors.append(f"{solver.upper()}: {exc}")
+    raise RuntimeError("singular-value calculation failed (" + "; ".join(errors) + ")")
+
+
 def _component_rho(cooccurrence: sp.csr_matrix) -> float:
     """Return ``sigma_2(H)^2`` for one connected bipartite component."""
     if min(cooccurrence.shape) < 2:
@@ -86,35 +126,7 @@ def _component_rho(cooccurrence: sp.csr_matrix) -> float:
         @ cooccurrence
         @ sp.diags(1.0 / np.sqrt(col_sums))
     ).tocsr()
-    solver = "dense"
-    try:
-        if min(normalized.shape) <= 64:
-            singular_values = np.linalg.svd(normalized.toarray(), compute_uv=False)
-        else:
-            # PROPACK resolves the clustered singular values of the small
-            # zigzag graph, where ARPACK often fails to converge. SciPy's
-            # PROPACK backend can terminate the interpreter on larger irregular
-            # blocks, however, while ARPACK handles those blocks reliably.
-            # The tight tolerance matters because the reported value is 1-rho.
-            solver = (
-                "propack"
-                if min(normalized.shape) <= PROPACK_MAX_MIN_DIM
-                else "arpack"
-            )
-            singular_values = svds(
-                normalized,
-                k=2,
-                which="LM",
-                solver=solver,
-                tol=1e-10,
-                maxiter=200_000,
-                return_singular_vectors=False,
-            )
-    except Exception as exc:
-        raise RuntimeError(
-            f"singular-value calculation failed with {solver.upper()}: {exc}"
-        ) from exc
-    singular_values = np.sort(singular_values)[::-1]
+    singular_values = np.sort(_top_two_singular_values(normalized))[::-1]
     if len(singular_values) < 2:
         return 0.0
     sigma_2 = min(max(float(singular_values[1]), 0.0), 1.0)

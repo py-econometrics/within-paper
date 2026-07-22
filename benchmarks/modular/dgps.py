@@ -30,10 +30,27 @@ def _seed_for(dgp_name: str, n: int, iteration: int) -> int:
     return n * 100 + iteration * 17 + dgp_offset + 42
 
 
+def _generator_source_hash() -> str:
+    """Digest the DGP generator sources so a code change invalidates the cache.
+
+    Hashing only the parameter JSON would let a changed generator silently reuse
+    stale Parquet inputs while provenance attributes them to the current code.
+    """
+    digest = hashlib.sha256()
+    here = Path(__file__).parent
+    for source in ("dgp_functions.py", "akm_dgp.py"):
+        digest.update((here / source).read_bytes())
+    return digest.hexdigest()[:16]
+
+
+_GENERATOR_SOURCE_HASH = _generator_source_hash()
+
+
 def _param_hash(params: dict) -> str:
-    """Stable SHA-256 hex digest of sorted, canonical JSON of params."""
+    """Stable SHA-256 digest of the params plus the generator source hash."""
     canonical = json.dumps(params, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+    payload = f"{_GENERATOR_SOURCE_HASH}:{canonical}"
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 def _is_cached(data_path: Path, expected_hash: str) -> bool:
