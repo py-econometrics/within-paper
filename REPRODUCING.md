@@ -122,16 +122,18 @@ fingerprint, resolves every claim-registry source, checks that every generated t
 included by the manuscript, and rejects missing or incomplete trials. `reproduce-paper`
 runs the same check before compiling the PDF.
 
-Each timing cell must contain three attempted trials. A normal cell is their median. If
-only some trials converge, the table shows the median of those trials and the successful
-count, such as `(2/3)`. If none converge, the table records `failed (0/3)`. Both are valid
-measured outcomes; an absent or incomplete trial set fails verification. CUDA values are
-stored separately in `results/external/cuda.json` because the reference machine cannot
-run them.
+Each locally reproduced timing cell must contain three attempted trials. A normal cell is
+their median. If only some trials converge, the table shows the median of those trials and
+the successful count, such as `(2/3)`. If none converge, the table records `failed (0/3)`.
+Both are valid measured outcomes; an absent or incomplete trial set fails verification.
+The CUDA cells are a documented exception: `results/external/cuda.json` retains legacy
+values from the PyFixest benchmark suite whose exact hardware, trial, and run metadata are
+unavailable. They are indicative only and cannot be reproduced on the reference machine.
 
 ## Compare results
 
 Coefficient and graph-diagnostic results should agree to their reported precision. Timing
-and peak-RSS measurements depend on the machine and current system load. The values in the
-paper come from the recorded Apple M4 ten-core run; a run on other hardware can reproduce
-the experiment without reproducing the same number of seconds.
+and peak-RSS measurements depend on the machine and current system load. Apart from the
+legacy CUDA cells described above, the values in the paper come from the recorded Apple M4
+ten-core run; a run on other hardware can reproduce the experiment without reproducing the
+same number of seconds.

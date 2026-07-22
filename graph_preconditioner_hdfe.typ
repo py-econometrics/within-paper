@@ -33,7 +33,6 @@
 #let cr(body) = text(fill: rgb("#c2410c"), body)
 #import "generated/paper_values.typ": result_akm_mobility_first_gap
 #import "generated/paper_values.typ": result_ols_difficult_within
-#import "generated/paper_values.typ": result_ols_difficult_gpu
 #import "generated/paper_values.typ": result_ols_difficult_rust_map
 #import "generated/paper_values.typ": result_correia_uniform_harder_gap
 #import "generated/paper_values.typ": result_ppml_simple_three_map
@@ -44,7 +43,7 @@
 #import "generated/paper_values.typ": result_agreement_fixest_max
 #import "generated/paper_values.typ": result_setup_simple_setup, result_setup_simple_solve, result_setup_simple_share
 #import "generated/paper_values.typ": result_setup_difficult_setup, result_setup_difficult_solve, result_setup_difficult_share
-#import "generated/paper_values.typ": result_ols_gpu_vs_fem, result_ppml_within_vs_fixest, result_ppml_within_vs_glfem
+#import "generated/paper_values.typ": result_ppml_within_vs_fixest, result_ppml_within_vs_glfem
 #import "generated/paper_values.typ": result_memory_100k_overhead, result_memory_1m_overhead, result_directors_component_share
 
 #align(center)[
@@ -890,27 +889,25 @@ well-connected graph. The
 difficult design should be harder because worker and firm effects are nearly collinear.
 Factor-pair preconditioning should perform well on the difficult design, but may fail to
 amortize its setup cost on the simple design. For this comparison we add a fifth
-backend, `torch-cuda`: the PyFixest GPU backend, which runs the same diagonally
-preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
+column, `torch-cuda`, containing legacy GPU timings from the PyFixest benchmark suite.
 
 #text(size: 8.8pt)[
 #strong[Simple vs. difficult design (10M observations, 3 FE).]
 #include "generated/tables/ols.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. Both designs
-  use 10M observations, one covariate, and three fixed effects. Gap denotes
+  #text(size: 8.2pt)[#emph[Note:] Locally reproduced CPU entries are medians over three
+  full regression calls using 10M observations, one covariate, and three fixed effects. Gap denotes
   $1-rho_(W F)$ for the worker-firm pair, reported from the generated 1M version of the
-  same DGP family; the runtime rows use the identical simple/difficult graph construction
-  at 10M observations. `torch-cuda` denotes the PyFixest GPU LSMR backend with diagonal
-  preconditioning (the same algorithm as
-`FixedEffectModels.jl`), run on an NVIDIA CUDA device; the local benchmark machine does
-not possess a CUDA GPU. Because the GPU figures therefore come from different hardware than
-the CPU columns, the GPU-to-CPU comparison is indicative only and should not be read as a
-controlled same-machine ratio. The standalone `within` demeaning API decomposes one-shot runtime
-into reusable solver construction and batch solve: simple design #result_setup_simple_setup + #result_setup_simple_solve
-(#result_setup_simple_share setup); difficult design #result_setup_difficult_setup + #result_setup_difficult_solve
-(#result_setup_difficult_share setup). PyFixest
-regression overhead is incurred in addition to these figures.]
+  same DGP family; the local runtime rows use the identical simple/difficult graph
+  construction at 10M observations. The `torch-cuda` cells reproduce legacy values from
+  the PyFixest benchmark suite. Exact accelerator, host, software-environment, trial, and
+  run metadata are unavailable. We retain them as indicative historical results only;
+  they are not quantitatively comparable to the locally reproduced CPU timings. The
+  standalone `within` demeaning API decomposes one-shot runtime into reusable solver
+  construction and batch solve: simple design #result_setup_simple_setup + #result_setup_simple_solve
+  (#result_setup_simple_share setup); difficult design #result_setup_difficult_setup + #result_setup_difficult_solve
+  (#result_setup_difficult_share setup). PyFixest regression overhead is incurred in
+  addition to these figures.]
   ]
 
 On the "simple" design, the graph is dense and the worker-firm gap is large. Both MAP
@@ -928,18 +925,9 @@ sweeps to disentangle worker and firm effects. The setup share of the standalone
 demeaning time falls to #result_setup_difficult_share, indicating that the preconditioner setup is now
 amortized.
 
-On the simple design, `torch-cuda` is not
-competitive with CPU `fixest`, a pattern consistent with host-to-device transfer and
-kernel-launch overheads outweighing the gain from parallelizing already inexpensive
-iterations, though we do not measure those overheads directly. On the difficult design, GPU
-parallelism reduces runtime to #result_ols_difficult_gpu (about #result_ols_gpu_vs_fem
-faster than CPU `FEM.jl`, on separate hardware), but the iteration count remains governed by the
-quality of the diagonal preconditioner, which is limited on this graph. `within` at #result_ols_difficult_within
-remains faster on CPU by using a factor-pair preconditioner that captures the
-cross-factor coupling the diagonal cannot. Hardware acceleration and stronger
-preconditioning address different bottlenecks: the GPU speeds up each iteration,
-whereas on poorly conditioned designs the iteration count, which only the
-preconditioner controls, dominates runtime.
+The legacy `torch-cuda` entries are included only to document the historical PyFixest
+measurements. Without their exact run provenance or a same-machine comparison, we do not
+use them to rank the backends or infer why their runtimes differ from the CPU results.
 
 #v(0.35em)
 

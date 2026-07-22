@@ -1,7 +1,6 @@
 // Generated result values; do not edit by hand.
 #let result_akm_mobility_first_gap = [0.373 (1.00)]
 #let result_ols_difficult_within = [4.73s]
-#let result_ols_difficult_gpu = [8.73s]
 #let result_ols_difficult_rust_map = [331.7s]
 #let result_correia_uniform_harder_gap = [0.0249 (1.00)]
 #let result_ppml_simple_three_map = [10.0s]
@@ -16,7 +15,6 @@
 #let result_setup_difficult_setup = [0.897s]
 #let result_setup_difficult_solve = [1.49s]
 #let result_setup_difficult_share = [38%]
-#let result_ols_gpu_vs_fem = [3.1 times]
 #let result_ppml_within_vs_fixest = [62 times]
 #let result_ppml_within_vs_glfem = [31 times]
 #let result_memory_100k_overhead = [42--48 MiB]
