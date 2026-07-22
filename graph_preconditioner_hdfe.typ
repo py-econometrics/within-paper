@@ -1029,10 +1029,10 @@ residuals. The construction cost is therefore paid once per regression rather th
 once per IRLS step. 
 
 We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
-benchmark suite @berge2026fixest at $n = 1$M observations, one covariate, and two
-or three fixed effects (worker-year, or worker-firm-year), using the same iteration
-protocol as the OLS benchmarks. The outcome is a count variable drawn from an
-overdispersed negative-binomial process (dispersion $theta = 0.5$) rather than an exact
+benchmark suite @berge2026fixest at $n = 1$M observations, one covariate, and worker,
+firm, and year fixed effects, using the same iteration protocol as the OLS benchmarks.
+The outcome is a count variable drawn from an overdispersed negative-binomial process
+(dispersion $theta = 0.5$) rather than an exact
 Poisson draw; PPML estimates it consistently as a Poisson pseudo-likelihood, and the
 design stresses the demeaning inner loop regardless of the outcome's dispersion. The
 compared backends are R `fixest`'s `fepois`,
@@ -1043,28 +1043,23 @@ outer IRLS iterations; their other stopping rules remain at package defaults.
 #v(0.35em)
 
 #text(size: 8.8pt)[
-#strong[Poisson benchmarks (1M observations, one covariate).]
+#strong[Poisson benchmarks (1M observations, one covariate, worker-firm-year fixed effects).]
 #include "generated/tables/ppml.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
-  $n = 1$M and one covariate. `fixest` is R `fixest::fepois`; `rust-map` and
-  `within` are the PyFixest `fepois` routine with the unpreconditioned MAP backend and
-  the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
+  $n = 1$M, one covariate, and three fixed effects. `fixest` is R `fixest::fepois`;
+  `rust-map` and `within` are the PyFixest `fepois` routine with the unpreconditioned MAP
+  backend and the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
   `GLFixedEffectModels.jl`. `failed` indicates that all three `rust-map` trials reached
-  the 10000-iteration MAP cap without converging. The dense- and sparse-graph
-  descriptions apply to the three-FE rows, where the worker-firm graph is absorbed; the
-  two-FE rows absorb worker and year only, so the firm structure that distinguishes the
-  two designs does not enter those models.]
+  the 10000-iteration MAP cap without converging. The dense- and sparse-graph descriptions
+  refer to the absorbed worker-firm graph.]
   ]
 
-The patterns observed in the OLS benchmarks carry over. With two fixed effects, all four
-backends complete in comparable time on both designs and R `fixest` is fastest: the
-worker-year pair alone does not create a regime in which the preconditioner amortizes
-its setup cost, even with the IRLS-induced reuse. With a third fixed effect, the picture
-changes. On the three-FE simple design MAP still converges and `fixest` remains
-fastest, but the unaccelerated `rust-map` slows to #result_ppml_simple_three_map, `GLFEM.jl` to
+The patterns observed in the OLS benchmarks carry over. On the simple design, MAP still
+converges and `fixest` remains fastest, but the unaccelerated `rust-map` slows to
+#result_ppml_simple_three_map, `GLFEM.jl` to
 #result_ppml_simple_three_glfem, and `within` lands between them at #result_ppml_simple_three_within.
-The three-FE difficult design provides the sharpest
+The difficult design provides the sharpest
 contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes
 #result_ppml_difficult_three_glfem, `fixest`'s IRLS loop takes several minutes with large run-to-run variance,
 and `within` finishes in #result_ppml_difficult_three_within, #result_ppml_within_vs_fixest faster than `fixest` and

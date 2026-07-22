@@ -49,8 +49,9 @@ The setup-cost benchmark uses the `within-py` package locked by Pixi. Developers
 `WITHIN_REPO` for an explicit local checkout, but paper-result collection rejects that
 override.
 
-All regressions reported in the paper use `x1` as their only slope covariate. The DGP,
-sample size, number of fixed effects, and software backend change across experiments.
+All regressions reported in the paper use `x1` as their only slope covariate. The PPML
+benchmark absorbs worker, firm, and year fixed effects. The DGP, sample size, number of
+fixed effects, and software backend change across the other experiments.
 
 ## Download the Correia data
 

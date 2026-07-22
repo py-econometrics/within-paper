@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -19,6 +20,7 @@ for path in (MODULAR, BENCHMARKS, SCRIPTS):
 
 from bench_within_setup_cost import _setup_share  # noqa: E402
 from benchmark_correia import summarize_results  # noqa: E402
+from benchmark_fepois import SPECS as FEPOIS_SPECS  # noqa: E402
 from dgps import _seed_for  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
 from paper_results import (  # noqa: E402
@@ -28,11 +30,34 @@ from paper_results import (  # noqa: E402
     _render_trial_result,
     _synchronize_external_results,
     _table_fragment,
+    _validate_ppml_results,
 )
 from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
 
 
 class BenchmarkCorrectnessTests(unittest.TestCase):
+    def test_ppml_uses_only_worker_firm_year_fixed_effects(self) -> None:
+        self.assertEqual(len(FEPOIS_SPECS), 1)
+        self.assertEqual(FEPOIS_SPECS[0].fe_cols, ["indiv_id", "year", "firm_id"])
+
+    def test_canonical_ppml_table_contains_only_three_fe_rows(self) -> None:
+        document = json.loads(
+            (ROOT / "results" / "paper" / "benchmark_tables.json").read_text()
+        )
+        rows = document["tables"]["ppml"]["rows"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row[1] for row in rows}, {"3"})
+
+    def test_ppml_sync_rejects_old_two_fe_results(self) -> None:
+        rows = [
+            {
+                "_source_file": "benchmarks/results/fepois_bench__example.csv",
+                "n_fe": "2",
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "only n_fe=3"):
+            _validate_ppml_results(rows)
+
     def test_named_dgp_seed_is_stable(self) -> None:
         self.assertEqual(_seed_for("akm_mobility_1", 1_000_000, 1), 100_000_085)
 

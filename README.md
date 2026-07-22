@@ -27,8 +27,9 @@ counts seen by `fixest` and Julia and stops if they do not match the requested v
 `reproduce-paper` runs the benchmark suite, computes the graph diagnostics, updates the
 generated Typst tables and prose values, checks that the required results are present,
 and builds `graph_preconditioner_hdfe.pdf`. A full run takes several hours. The benchmark
-regressions use one slope covariate (`x1`); their sample sizes and fixed-effect structures
-vary by experiment.
+regressions use one slope covariate (`x1`); the PPML benchmark absorbs worker, firm, and
+year fixed effects, while sample sizes and fixed-effect structures vary in other
+experiments.
 
 The reference machine has no NVIDIA GPU, so the CUDA cells retain measurements from a
 separate CUDA run. Every other paper cell is expected to come from the local pipeline;

@@ -345,7 +345,12 @@ def render(args: argparse.Namespace) -> None:
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
     ols_difficult = tables["ols"]["rows"][1]
-    ppml_difficult = tables["ppml"]["rows"][3]
+    ppml_rows = {
+        _clean_cell(row[0]): row
+        for row in tables["ppml"]["rows"]
+    }
+    ppml_simple = ppml_rows["simple (dense graph)"]
+    ppml_difficult = ppml_rows["difficult (sparse graph)"]
     memory_rows = tables["memory"]["rows"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
@@ -365,11 +370,11 @@ def render(args: argparse.Namespace) -> None:
         "result_ols_difficult_gpu": tables["ols"]["rows"][1][6],
         "result_ols_difficult_rust_map": tables["ols"]["rows"][1][2],
         "result_correia_uniform_harder_gap": tables["correia_synthetic"]["rows"][3][1],
-        "result_ppml_simple_three_map": tables["ppml"]["rows"][2][3],
-        "result_ppml_simple_three_glfem": tables["ppml"]["rows"][2][4],
-        "result_ppml_simple_three_within": tables["ppml"]["rows"][2][5],
-        "result_ppml_difficult_three_glfem": tables["ppml"]["rows"][3][4],
-        "result_ppml_difficult_three_within": tables["ppml"]["rows"][3][5],
+        "result_ppml_simple_three_map": ppml_simple[3],
+        "result_ppml_simple_three_glfem": ppml_simple[4],
+        "result_ppml_simple_three_within": ppml_simple[5],
+        "result_ppml_difficult_three_glfem": ppml_difficult[4],
+        "result_ppml_difficult_three_within": ppml_difficult[5],
         "result_agreement_fixest_max": _largest_backend_metric(
             tables["agreement"]["rows"], "fixest", 4
         ),
@@ -568,6 +573,23 @@ def _integer_field(row: dict[str, str], name: str) -> int | None:
         return int(float(row.get(name, "")))
     except (TypeError, ValueError):
         return None
+
+
+def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
+    unexpected = sorted(
+        {
+            str(row.get("n_fe") or "missing")
+            for row in rows
+            if "fepois_bench__" in row.get("_source_file", "")
+            and _integer_field(row, "n_fe") != 3
+        }
+    )
+    if unexpected:
+        raise ValueError(
+            "PPML result files must contain only n_fe=3 rows; found "
+            f"{', '.join(unexpected)}. Archive old results and rerun without "
+            "--reuse-existing."
+        )
 
 
 def _paper_runtime_target(
@@ -821,6 +843,7 @@ def _synchronize_canonical_tables(
     replaced whenever a complete median is present in a new benchmark output.
     """
     raw = _rows_from_csvs()
+    _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
     changed = 0
