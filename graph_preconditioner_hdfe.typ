@@ -790,14 +790,13 @@ and 16 GB of memory running macOS 15.3.1. Times are medians over the trials that
 converged. When fewer than three converge, the table reports the successful-trial count;
 a failed cell means that all three trials reached the iteration cap.
 
-Each backend runs at its own package-default convergence tolerance and iteration cap, and
-these defaults differ across implementations: PyFixest's MAP stops at a $10^(-6)$ tolerance
-and 10,000 iterations, while the preconditioned `within` solver stops at the tighter
-$10^(-8)$ and 1,000 iterations. We report each package as a practitioner runs it out of the
-box rather than imposing a single harmonized stopping rule. The asymmetry is conservative
-for our method, since `within` converges to a tighter tolerance, and the numerical
-equivalence checks below confirm that the backends agree on the estimated
-coefficient regardless of these differences.
+Each OLS backend runs at its own package-default convergence tolerance and iteration cap,
+which differ across implementations. For example, PyFixest's MAP stops at a $10^(-6)$
+tolerance and 10,000 iterations, while the preconditioned `within` solver stops at the
+tighter $10^(-8)$ and 1,000 iterations. We do not impose a harmonized stopping rule. The
+asymmetry is conservative for our method, since `within` converges to a tighter tolerance,
+and the numerical equivalence checks below confirm that the backends agree on the
+estimated coefficient regardless of these differences.
 
 We do not include `reghdfe` @reghdfe @correia2017 directly in the benchmark tables because Stata is not open
 source and we lack a license. `reghdfe` is a mature accelerated-MAP
@@ -1038,7 +1037,8 @@ Poisson draw; PPML estimates it consistently as a Poisson pseudo-likelihood, and
 design stresses the demeaning inner loop regardless of the outcome's dispersion. The
 compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
-`rust-map` and the preconditioned `within` solver.
+`rust-map` and the preconditioned `within` solver. All packages use a common cap of 100
+outer IRLS iterations; their other stopping rules remain at package defaults.
 
 #v(0.35em)
 

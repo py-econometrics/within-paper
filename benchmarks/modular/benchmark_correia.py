@@ -36,8 +36,6 @@ OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
 RAW_OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "correia-benchmarks-raw.csv"
 SCRIPT_DIR = Path(__file__).resolve().parent
 N_ITERATIONS = 3
-TOLERANCE = 1e-8
-R_FIXEF_ITERATIONS = 100_000
 
 DATASETS = [
     "credit2",
@@ -109,29 +107,16 @@ def load_datasets() -> list[BenchmarkDataset]:
 
 
 def build_benchmarkers() -> list:
-    extra_config = {"tolerance": TOLERANCE, "fixef_iterations": R_FIXEF_ITERATIONS}
     return [
-        PyFeolsBenchmarkerFullApi(
-            "pyfixest-map",
-            "rust",
-            fixef_tol=TOLERANCE,
-            fixef_maxiter=100_000,
-        ),
-        PyFeolsBenchmarkerFullApi(
-            "pyfixest-within",
-            "within",
-            fixef_tol=TOLERANCE,
-            fixef_maxiter=100_000,
-        ),
+        PyFeolsBenchmarkerFullApi("pyfixest-map", "rust"),
+        PyFeolsBenchmarkerFullApi("pyfixest-within", "within"),
         FixestFeolsBenchmarker(
             "fixest",
             script_path=SCRIPT_DIR / "correia_r.R",
-            extra_config=extra_config,
         ),
         JuliaFeolsBenchmarker(
             "FixedEffectModels",
             script_path=SCRIPT_DIR / "correia_julia.jl",
-            extra_config=extra_config,
         ),
     ]
 
@@ -227,10 +212,7 @@ def print_runtime_summary(results_df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
-    print(
-        f"[correia] using tolerance {TOLERANCE:g}; convergence criteria differ by backend",
-        flush=True,
-    )
+    print("[correia] using package-default stopping rules", flush=True)
     raw_results = run_benchmarks(
         build_benchmarkers(),
         load_datasets(),

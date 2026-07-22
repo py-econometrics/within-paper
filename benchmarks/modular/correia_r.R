@@ -19,8 +19,6 @@ if (length(args) != 1) {
 config <- fromJSON(args[[1]], simplifyVector = FALSE)
 manifest <- config$manifest
 formula <- as.formula(config$formula)
-tolerance <- config$tolerance
-fixef_iterations <- config$fixef_iterations
 
 for (entry in manifest) {
   elapsed <- NULL
@@ -34,13 +32,7 @@ for (entry in manifest) {
       n_obs <- nrow(df)
       elapsed <- unname(system.time({
         suppressMessages(
-          fit <- feols(
-            formula,
-            data = df,
-            fixef.tol = tolerance,
-            fixef.iter = fixef_iterations,
-            nthreads = bench_threads
-          )
+          fit <- feols(formula, data = df, nthreads = bench_threads)
         )
         if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
           stop("fixest model returned without convergence")

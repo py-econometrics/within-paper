@@ -54,9 +54,7 @@ if __name__ == "__main__":
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     datasets = generate_akm_datasets()
-    bundle = build_standard_feols_benchmarkers(
-        fixef_maxiter=10000, include_torch=False
-    )
+    bundle = build_standard_feols_benchmarkers(include_torch=False)
     run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )
