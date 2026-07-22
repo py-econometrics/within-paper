@@ -7,7 +7,7 @@ from pathlib import Path
 from benchmarker_sets import build_standard_feols_benchmarkers
 from dgps import get_akm_sweep_scenarios
 from interfaces import FeolsSpec
-from runner import plot_results, run_benchmarks
+from runner import run_benchmarks
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -21,7 +21,6 @@ BURN_IN = 1
 DEFAULT_N_OBS = 1_000_000
 DATA_DIR = PROJECT_ROOT / "benchmarks" / "data"
 OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "feols_akm_sweep.csv"
-FIGURE_DIR = PROJECT_ROOT / "figures" / "benchmarks" / "akm-benchmarks"
 
 DGPS = get_akm_sweep_scenarios(DATA_DIR)
 
@@ -50,7 +49,6 @@ def generate_akm_datasets():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "benchmarks" / "results")
-    parser.add_argument("--figure-dir", type=Path, default=FIGURE_DIR)
     parser.add_argument("--reuse-existing", action="store_true")
     args = parser.parse_args()
     output_csv = args.output_dir / OUTPUT_CSV.name
@@ -59,12 +57,6 @@ if __name__ == "__main__":
     bundle = build_standard_feols_benchmarkers(
         fixef_maxiter=10000, include_torch=False
     )
-    results_df = run_benchmarks(
+    run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
-    )
-    plot_results(
-        results_df,
-        output_csv,
-        figure_dir=args.figure_dir,
-        figure_backends=bundle.figure_backends,
     )

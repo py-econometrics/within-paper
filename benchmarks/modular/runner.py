@@ -14,7 +14,6 @@ try:
         FeolsResult,
         FeolsSpec,
     )
-    from .plotting import plot_benchmarks
 except ImportError:
     from interfaces import (
         BenchmarkDataset,
@@ -23,7 +22,6 @@ except ImportError:
         FeolsResult,
         FeolsSpec,
     )
-    from plotting import plot_benchmarks
 
 
 def _serialize_result(result: FeolsResult) -> dict:
@@ -82,19 +80,3 @@ def run_benchmarks(
         df.to_csv(csv_path, index=False)
         frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-
-def plot_results(
-    results_df: pd.DataFrame,
-    output_csv: Path,
-    *,
-    figure_dir: Path | None = None,
-    figure_backends: list[str] | None = None,
-) -> None:
-    plot_df = results_df[results_df["success"] & results_df["time"].notna()].copy()
-    plot_benchmarks(
-        plot_df,
-        output_csv.with_suffix(".png"),
-        figure_dir=figure_dir,
-        figure_backends=figure_backends,
-    )

@@ -18,7 +18,6 @@ from fepois_benchmarkers import (
 @dataclass(frozen=True)
 class BenchmarkerBundle:
     benchmarkers: list
-    figure_backends: list[str]
 
 
 def build_standard_feols_benchmarkers(
@@ -102,12 +101,7 @@ def build_standard_feols_benchmarkers(
             "availability checks."
         )
 
-    figure_backends = [b.name for b in benchmarkers]
-
-    return BenchmarkerBundle(
-        benchmarkers=benchmarkers,
-        figure_backends=figure_backends,
-    )
+    return BenchmarkerBundle(benchmarkers=benchmarkers)
 
 
 def build_standard_fepois_benchmarkers(
@@ -144,9 +138,4 @@ def build_standard_fepois_benchmarkers(
             "No benchmarkers available after applying include flags."
         )
 
-    figure_backends = [b.name for b in benchmarkers]
-
-    return BenchmarkerBundle(
-        benchmarkers=benchmarkers,
-        figure_backends=figure_backends,
-    )
+    return BenchmarkerBundle(benchmarkers=benchmarkers)

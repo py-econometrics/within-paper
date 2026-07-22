@@ -7,8 +7,7 @@ version = "0.1.0"
 
 [tasks]
 compile = "typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
-compile-friedrichs = "typst compile friedrichs_note.typ friedrichs_note.pdf"
-check-external-runtimes = { cmd = "python scripts/paper_results.py check-external-runtimes", description = "Check native R and Julia runtimes, packages, and locked Julia project" }
+check-external-runtimes ={ cmd = "python scripts/paper_results.py check-external-runtimes", description = "Check native R and Julia runtimes, packages, and locked Julia project" }
 setup-julia-env = { cmd = "python scripts/paper_results.py setup-julia-env", description = "Instantiate the tracked Julia package environment" }
 _julia-setup = { depends-on = ["setup-julia-env"], description = "Compatibility alias for Julia benchmark dependencies" }
 fetch-correia = { cmd = "python scripts/paper_results.py fetch-correia", description = "Download and checksum-verify the Correia HDFE CSV collection" }
@@ -34,7 +33,6 @@ verify-paper-results = { cmd = "python scripts/paper_results.py verify", descrip
 [dependencies]
 typst = ">=0.14.2,<0.15"
 python = ">=3.14.4,<3.15"
-matplotlib = ">=3.8"
 scipy = ">=1.11"
 
 [pypi-dependencies]

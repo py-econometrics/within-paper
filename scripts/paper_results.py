@@ -344,8 +344,6 @@ def render(args: argparse.Namespace) -> None:
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
-    for name in tables:
-        values.append(f'#let paper_{name}_source = "results/paper/benchmark_tables.json"')
     ols_difficult = tables["ols"]["rows"][1]
     ppml_difficult = tables["ppml"]["rows"][3]
     memory_rows = tables["memory"]["rows"]
@@ -370,7 +368,6 @@ def render(args: argparse.Namespace) -> None:
         "result_ppml_simple_three_map": tables["ppml"]["rows"][2][3],
         "result_ppml_simple_three_glfem": tables["ppml"]["rows"][2][4],
         "result_ppml_simple_three_within": tables["ppml"]["rows"][2][5],
-        "result_ppml_difficult_three_fixest": tables["ppml"]["rows"][3][2],
         "result_ppml_difficult_three_glfem": tables["ppml"]["rows"][3][4],
         "result_ppml_difficult_three_within": tables["ppml"]["rows"][3][5],
         "result_agreement_fixest_max": _largest_backend_metric(
