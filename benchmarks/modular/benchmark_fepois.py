@@ -31,11 +31,10 @@ SPECS = [
     FeolsSpec(
         depvar="negbin_y",
         covariates=[f"x{i}" for i in range(1, k + 1)],
-        fe_cols=fe_cols,
+        fe_cols=["indiv_id", "year", "firm_id"],
         vcov="iid",
     )
     for k in K_VALUES
-    for fe_cols in (["indiv_id", "year"], ["indiv_id", "year", "firm_id"])
 ]
 
 # ---------------------------------------------------------------------------
