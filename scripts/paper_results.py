@@ -17,6 +17,7 @@ import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import math
 import os
 import platform
 import re
@@ -40,6 +41,10 @@ RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXTERNAL_RESULTS_PATH = ROOT / "results" / "external" / "cuda.json"
 CORREIA_DIR = ROOT / "data" / "correia_data"
 EXPECTED_TRIALS = 3
+EXPECTED_EXTERNAL_CUDA_TARGETS = {
+    ("ols", "simple", "torch-cuda"),
+    ("ols", "difficult", "torch-cuda"),
+}
 RAW_GLOBS = (
     "benchmarks/results/*.csv",
     "results/runs/latest/*.csv",
@@ -344,7 +349,6 @@ def render(args: argparse.Namespace) -> None:
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
-    ols_difficult = tables["ols"]["rows"][1]
     ppml_rows = {
         _clean_cell(row[0]): row
         for row in tables["ppml"]["rows"]
@@ -367,7 +371,6 @@ def render(args: argparse.Namespace) -> None:
     prose_values = {
         "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
         "result_ols_difficult_within": tables["ols"]["rows"][1][5],
-        "result_ols_difficult_gpu": tables["ols"]["rows"][1][6],
         "result_ols_difficult_rust_map": tables["ols"]["rows"][1][2],
         "result_correia_uniform_harder_gap": tables["correia_synthetic"]["rows"][3][1],
         "result_ppml_simple_three_map": ppml_simple[3],
@@ -384,7 +387,6 @@ def render(args: argparse.Namespace) -> None:
         "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
         "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
         "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
-        "result_ols_gpu_vs_fem": _format_ratio(_numeric_cell(ols_difficult[4]), _numeric_cell(ols_difficult[6])),
         "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[2]), _numeric_cell(ppml_difficult[5])),
         "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
@@ -812,10 +814,63 @@ def _synchronize_setup_cost(document: dict) -> int:
     return changed
 
 
+def _validate_external_results(external: dict) -> list[dict]:
+    required_metadata = {
+        "schema_version": 2,
+        "source": "legacy PyFixest benchmark suite",
+        "status": "indicative_only",
+        "exact_run_provenance_available": False,
+        "cross_machine_comparison_allowed": False,
+        "local_reproducible": False,
+    }
+    for field, expected in required_metadata.items():
+        actual = external.get(field)
+        matches = actual is expected if isinstance(expected, bool) else actual == expected
+        if not matches:
+            raise ValueError(
+                f"External CUDA metadata {field!r} must be {expected!r}"
+            )
+    provenance_note = external.get("provenance_note")
+    if not isinstance(provenance_note, str) or not provenance_note.strip():
+        raise ValueError("External CUDA metadata must explain the missing provenance")
+
+    measurements = external.get("measurements")
+    if not isinstance(measurements, list):
+        raise ValueError("External CUDA measurements must be a list")
+
+    targets = []
+    for measurement in measurements:
+        if not isinstance(measurement, dict):
+            raise ValueError("Each external CUDA measurement must be an object")
+        target = tuple(measurement.get(field) for field in ("table", "row", "backend"))
+        if not all(isinstance(value, str) for value in target):
+            raise ValueError("External CUDA targets must use string identifiers")
+        targets.append(target)
+        time_s = measurement.get("time_s")
+        if (
+            isinstance(time_s, bool)
+            or not isinstance(time_s, (int, float))
+            or not math.isfinite(time_s)
+            or time_s <= 0
+        ):
+            raise ValueError(
+                f"External CUDA timing must be finite and positive: {time_s!r}"
+            )
+
+    if len(targets) != len(set(targets)):
+        raise ValueError("External CUDA measurements contain duplicate targets")
+    if set(targets) != EXPECTED_EXTERNAL_CUDA_TARGETS:
+        raise ValueError(
+            "External CUDA measurements must contain exactly the simple and difficult "
+            "OLS torch-cuda targets"
+        )
+    return measurements
+
+
 def _synchronize_external_results(document: dict) -> int:
-    external = _read_json(EXTERNAL_RESULTS_PATH)
+    measurements = _validate_external_results(_read_json(EXTERNAL_RESULTS_PATH))
     changed = 0
-    for measurement in external.get("measurements", []):
+    for measurement in measurements:
         table_name = measurement["table"]
         row_name = measurement["row"]
         backend = measurement["backend"]

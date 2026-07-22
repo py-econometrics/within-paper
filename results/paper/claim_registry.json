@@ -4,6 +4,9 @@
   "external_sources": [
     "results/external/cuda.json"
   ],
+  "external_source_notes": {
+    "results/external/cuda.json": "Legacy PyFixest benchmark-suite values retained as indicative only; exact run provenance is unavailable."
+  },
   "claims": [
     {
       "id": "akm-mobility-table",

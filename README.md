@@ -31,10 +31,12 @@ regressions use one slope covariate (`x1`); the PPML benchmark absorbs worker, f
 year fixed effects, while sample sizes and fixed-effect structures vary in other
 experiments.
 
-The reference machine has no NVIDIA GPU, so the CUDA cells retain measurements from a
-separate CUDA run. Every other paper cell is expected to come from the local pipeline;
-`verify-paper-results` treats a missing or incomplete local cell as an error. A complete
-set of non-converged MAP trials is retained as a measured result.
+The reference machine has no NVIDIA GPU, so the CUDA cells retain legacy values from the
+PyFixest benchmark suite. Exact CUDA hardware and run metadata are unavailable; these
+values are indicative only and are not compared quantitatively with the local CPU results.
+Every other paper cell is expected to come from the local pipeline; `verify-paper-results`
+treats a missing or incomplete local cell as an error. A complete set of non-converged MAP
+trials is retained as a measured result.
 
 To move old untracked results out of the active result directories before a new run:
 
