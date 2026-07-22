@@ -23,8 +23,8 @@ DATA_DIR = PROJECT_ROOT / "benchmarks" / "data"
 OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "fepois_bench.csv"
 
 DGPS = [
-    BaseDGP(DATA_DIR, "simple", k_values=tuple(K_VALUES)),
-    BaseDGP(DATA_DIR, "difficult", k_values=tuple(K_VALUES)),
+    BaseDGP(DATA_DIR, "simple"),
+    BaseDGP(DATA_DIR, "difficult"),
 ]
 
 SPECS = [

@@ -7,6 +7,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+PAPER_BASE_COLUMNS = ("indiv_id", "firm_id", "year", "y", "negbin_y", "x1")
+PAPER_BASE_MAX_K = 10
+
 
 def base_dgp(
     n: int = 1000,
@@ -75,3 +78,15 @@ def base_dgp(
         data[f"x{j + 1}"] = x[:, j]
 
     return pd.DataFrame(data)
+
+
+def paper_base_dgp(n: int, type_: str, seed: int) -> pd.DataFrame:
+    """Generate the value-preserving, one-covariate paper input."""
+    frame = base_dgp(
+        n=n,
+        type_=type_,
+        k=1,
+        max_k=PAPER_BASE_MAX_K,
+        seed=seed,
+    )
+    return frame.loc[:, PAPER_BASE_COLUMNS]

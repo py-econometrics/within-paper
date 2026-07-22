@@ -7,15 +7,16 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 try:
     from .akm_dgp import AKMConfig, simulate_akm_panel
-    from .dgp_functions import base_dgp
+    from .dgp_functions import PAPER_BASE_MAX_K, paper_base_dgp
     from .interfaces import BenchmarkDataset
 except ImportError:
     from akm_dgp import AKMConfig, simulate_akm_panel
-    from dgp_functions import base_dgp
+    from dgp_functions import PAPER_BASE_MAX_K, paper_base_dgp
     from interfaces import BenchmarkDataset
 
 
@@ -30,33 +31,64 @@ def _seed_for(dgp_name: str, n: int, iteration: int) -> int:
     return n * 100 + iteration * 17 + dgp_offset + 42
 
 
-def _generator_source_hash() -> str:
-    """Digest the DGP generator sources so a code change invalidates the cache.
+BASE_DGP_SCHEMA = pa.schema(
+    [
+        ("indiv_id", pa.int64()),
+        ("firm_id", pa.int64()),
+        ("year", pa.int64()),
+        ("y", pa.float64()),
+        ("negbin_y", pa.int64()),
+        ("x1", pa.float64()),
+    ]
+)
+AKM_DGP_SCHEMA = pa.schema(
+    [
+        ("indiv_id", pa.int64()),
+        ("firm_id", pa.int32()),
+        ("year", pa.int64()),
+        ("x1", pa.float64()),
+        ("y", pa.float64()),
+    ]
+)
+
+
+def _generator_source_hash(source: str) -> str:
+    """Digest one DGP source so only that generator's cache is invalidated.
 
     Hashing only the parameter JSON would let a changed generator silently reuse
     stale Parquet inputs while provenance attributes them to the current code.
     """
-    digest = hashlib.sha256()
-    here = Path(__file__).parent
-    for source in ("dgp_functions.py", "akm_dgp.py"):
-        digest.update((here / source).read_bytes())
-    return digest.hexdigest()[:16]
+    source_path = Path(__file__).parent / source
+    return hashlib.sha256(source_path.read_bytes()).hexdigest()[:16]
 
 
-_GENERATOR_SOURCE_HASH = _generator_source_hash()
+_BASE_GENERATOR_SOURCE_HASH = _generator_source_hash("dgp_functions.py")
+_AKM_GENERATOR_SOURCE_HASH = _generator_source_hash("akm_dgp.py")
 
 
-def _param_hash(params: dict) -> str:
+def _param_hash(params: dict, generator_source_hash: str) -> str:
     """Stable SHA-256 digest of the params plus the generator source hash."""
     canonical = json.dumps(params, sort_keys=True, separators=(",", ":"))
-    payload = f"{_GENERATOR_SOURCE_HASH}:{canonical}"
+    payload = f"{generator_source_hash}:{canonical}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def _is_cached(data_path: Path, expected_hash: str) -> bool:
+def _has_schema(data_path: Path, expected_schema: pa.Schema) -> bool:
+    try:
+        return pq.read_schema(data_path).equals(expected_schema, check_metadata=False)
+    except (OSError, pa.ArrowException):
+        return False
+
+
+def _is_cached(
+    data_path: Path, expected_hash: str, expected_schema: pa.Schema
+) -> bool:
     hash_path = data_path.with_suffix(".hash")
     if data_path.exists() and hash_path.exists():
-        return hash_path.read_text().strip() == expected_hash
+        return (
+            hash_path.read_text().strip() == expected_hash
+            and _has_schema(data_path, expected_schema)
+        )
     return False
 
 
@@ -74,6 +106,8 @@ def _generate_datasets(
     data_dir: Path,
     make_params: Callable[[int], dict],
     generate: Callable[[int], Any],
+    generator_source_hash: str,
+    expected_schema: pa.Schema,
 ) -> list[BenchmarkDataset]:
     """Generate parquet-backed datasets for one DGP/size combination."""
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -89,15 +123,19 @@ def _generate_datasets(
 
         seed = _seed_for(dgp_name, n, i)
         params = make_params(seed)
-        h = _param_hash(params)
+        h = _param_hash(params, generator_source_hash)
 
-        if _is_cached(data_path, h):
+        if _is_cached(data_path, h, expected_schema):
             cached_count += 1
             n_obs_actual = pq.read_metadata(data_path).num_rows
         else:
             df = generate(seed)
             n_obs_actual = len(df)
-            df.to_parquet(data_path)
+            df.to_parquet(data_path, index=False)
+            if not _has_schema(data_path, expected_schema):
+                raise ValueError(
+                    f"Generated dataset has an unexpected schema: {data_path}"
+                )
             _write_hash(data_path, h)
 
         datasets.append(
@@ -202,12 +240,9 @@ def _akm_sweep_scenarios() -> list[AKMSweepScenario]:
 
 
 class BaseDGP:
-    def __init__(
-        self, data_dir: Path, dgp_type: str = "simple", k_values: tuple[int, ...] = (1,)
-    ):
+    def __init__(self, data_dir: Path, dgp_type: str = "simple"):
         self._data_dir = data_dir
         self._dgp_type = dgp_type
-        self._k_values = tuple(sorted(set(k_values)))
 
     @property
     def dgp_name(self) -> str:
@@ -217,24 +252,25 @@ class BaseDGP:
         self, n: int, n_iters: int = 3, burn_in: int = 1
     ) -> list[BenchmarkDataset]:
         dgp_type = self._dgp_type
-        max_k = max(self._k_values)
-        k_label = ",".join(str(k) for k in self._k_values)
-        print(f"[data] generating {self.dgp_name} n={n:,} k={k_label}")
+        print(f"[data] generating {self.dgp_name} n={n:,} k=1")
         return _generate_datasets(
             dgp_name=self.dgp_name,
             n=n,
-            k=max_k,
+            k=1,
             n_iters=n_iters,
             burn_in=burn_in,
             data_dir=self._data_dir,
             make_params=lambda seed: {
                 "dgp_type": dgp_type,
                 "n": n,
-                "k_values": self._k_values,
-                "active_k": max_k,
+                "active_k": 1,
+                "latent_k": PAPER_BASE_MAX_K,
+                "schema_version": 1,
                 "seed": seed,
             },
-            generate=lambda seed: base_dgp(n=n, type_=dgp_type, k=max_k, seed=seed),
+            generate=lambda seed: paper_base_dgp(n=n, type_=dgp_type, seed=seed),
+            generator_source_hash=_BASE_GENERATOR_SOURCE_HASH,
+            expected_schema=BASE_DGP_SCHEMA,
         )
 
 
@@ -273,6 +309,8 @@ class AKMSweepDGP:
             data_dir=self._data_dir,
             make_params=lambda seed: {**asdict(config), "seed": seed},
             generate=lambda seed: simulate_akm_panel(config, seed=seed),
+            generator_source_hash=_AKM_GENERATOR_SOURCE_HASH,
+            expected_schema=AKM_DGP_SCHEMA,
         )
 
 
