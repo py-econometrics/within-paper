@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-SIZES = [1_000_000, 10_000_000]
+SIZES = [10_000_000]
 # The OLS paper table is a one-covariate benchmark. Other benchmark families
 # have their own one-covariate specifications below.
 K_VALUES = [1]

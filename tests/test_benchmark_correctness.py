@@ -22,7 +22,11 @@ for path in (MODULAR, BENCHMARKS, SCRIPTS):
 
 from bench_within_setup_cost import _setup_share  # noqa: E402
 from benchmark_correia import summarize_results  # noqa: E402
-from benchmark_fepois import SPECS as FEPOIS_SPECS  # noqa: E402
+from benchmark_fepois import (  # noqa: E402
+    SIZES as FEPOIS_SIZES,
+    SPECS as FEPOIS_SPECS,
+)
+from benchmark_main import SIZES as OLS_SIZES  # noqa: E402
 from akm_dgp import AKMConfig, simulate_akm_panel  # noqa: E402
 from dgp_functions import paper_base_dgp  # noqa: E402
 from dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names  # noqa: E402
@@ -47,6 +51,10 @@ def _frame_hash(frame: pd.DataFrame) -> str:
 
 
 class BenchmarkCorrectnessTests(unittest.TestCase):
+    def test_ols_skips_unreported_one_million_fits(self) -> None:
+        self.assertEqual(OLS_SIZES, [10_000_000])
+        self.assertEqual(FEPOIS_SIZES, [1_000_000])
+
     def test_akm_scenarios_match_the_paper_sweeps(self) -> None:
         self.assertEqual(
             get_akm_sweep_scenario_names(),
