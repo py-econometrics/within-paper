@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +23,9 @@ for path in (MODULAR, BENCHMARKS, SCRIPTS):
 from bench_within_setup_cost import _setup_share  # noqa: E402
 from benchmark_correia import summarize_results  # noqa: E402
 from benchmark_fepois import SPECS as FEPOIS_SPECS  # noqa: E402
-from dgps import _seed_for  # noqa: E402
+from akm_dgp import AKMConfig, simulate_akm_panel  # noqa: E402
+from dgp_functions import paper_base_dgp  # noqa: E402
+from dgps import BaseDGP, _seed_for  # noqa: E402
 from feols_benchmarkers import _as_bool  # noqa: E402
 from paper_results import (  # noqa: E402
     _component_share,
@@ -36,7 +40,70 @@ from paper_results import (  # noqa: E402
 from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
 
 
+def _frame_hash(frame: pd.DataFrame) -> str:
+    metadata = "|".join(frame.columns) + "\n" + "|".join(map(str, frame.dtypes))
+    values = pd.util.hash_pandas_object(frame, index=False).values.tobytes()
+    return hashlib.sha256(metadata.encode() + values).hexdigest()
+
+
 class BenchmarkCorrectnessTests(unittest.TestCase):
+    def test_paper_base_dgp_preserves_values_and_six_column_schema(self) -> None:
+        expected = {
+            "simple": "b95147d29c724cf3079a3cc46079369d4da778bf0bccb5af5948f99888e900bb",
+            "difficult": "9ab47efb6b6cc909903555afb8d76e2a976b091f2fe7ba40f00394a2d5c5c64a",
+        }
+        for dgp_type, digest in expected.items():
+            frame = paper_base_dgp(n=2_300, type_=dgp_type, seed=123)
+            self.assertEqual(
+                list(frame.columns),
+                ["indiv_id", "firm_id", "year", "y", "negbin_y", "x1"],
+            )
+            self.assertEqual(_frame_hash(frame), digest)
+
+    def test_base_cache_rejects_an_extra_column(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dgp = BaseDGP(Path(tmpdir), "simple")
+            with patch("builtins.print"):
+                dataset = dgp.generate(n=2_300, n_iters=1, burn_in=0)[0]
+
+                with patch(
+                    "dgps.paper_base_dgp", side_effect=AssertionError("cache miss")
+                ):
+                    dgp.generate(n=2_300, n_iters=1, burn_in=0)
+
+                frame = pd.read_parquet(dataset.data_path)
+                frame["unused"] = 0
+                frame.to_parquet(dataset.data_path, index=False)
+                with patch("dgps.paper_base_dgp", wraps=paper_base_dgp) as generator:
+                    dgp.generate(n=2_300, n_iters=1, burn_in=0)
+            generator.assert_called_once()
+
+    def test_akm_paper_path_is_deterministic(self) -> None:
+        common = {
+            "n_workers": 100,
+            "n_firms": 20,
+            "n_time": 4,
+            "n_industries": 2,
+            "n_match_bins": 8,
+            "lambda_": 0.8,
+        }
+        cases = (
+            (
+                AKMConfig(**common, rho=20.0, delta=0.1),
+                "c026e83821a4e48924a8a13e06e4abf1f4f8918f4816daabc47ad04afd505b89",
+            ),
+            (
+                AKMConfig(**common, rho=1.0, delta=0.01),
+                "a0ccdf33ab1c7a6c982609bba6ed88eea989aaecae9fd82bfad2cc63f38f561b",
+            ),
+        )
+        for config, digest in cases:
+            frame = simulate_akm_panel(config, seed=123)
+            self.assertEqual(
+                list(frame.columns), ["indiv_id", "firm_id", "year", "x1", "y"]
+            )
+            self.assertEqual(_frame_hash(frame), digest)
+
     def test_ppml_uses_only_worker_firm_year_fixed_effects(self) -> None:
         self.assertEqual(len(FEPOIS_SPECS), 1)
         self.assertEqual(FEPOIS_SPECS[0].fe_cols, ["indiv_id", "year", "firm_id"])
