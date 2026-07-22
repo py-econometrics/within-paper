@@ -109,23 +109,42 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(document["tables"]["ols"]["rows"][0][2], "4.73s")
         self.assertEqual(document["tables"]["ols"]["rows"][1][2], "8.73s")
 
-    def test_large_hardness_blocks_use_arpack(self) -> None:
-        matrix = sp.eye(20_001, format="csr")
-        with patch(
-            "benchmarks.modular.compute_hardness.svds",
-            return_value=np.array([0.5, 1.0]),
-        ) as mocked_svds:
-            self.assertEqual(_component_rho(matrix), 0.25)
-        self.assertEqual(mocked_svds.call_args.kwargs["solver"], "arpack")
+    def test_complete_bipartite_graph_has_unit_gap(self) -> None:
+        # A complete bipartite graph is rank one, so its second singular value is
+        # exactly zero and the reported gap 1 - rho is exactly 1. This guards the
+        # synthetic-complete cell against the PROPACK spurious-value regression.
+        complete = sp.csr_matrix(np.ones((1000, 500)))
+        self.assertAlmostEqual(_component_rho(complete), 0.0, places=6)
 
-    def test_smaller_hardness_blocks_use_propack(self) -> None:
-        matrix = sp.eye(65, format="csr")
-        with patch(
-            "benchmarks.modular.compute_hardness.svds",
-            return_value=np.array([0.5, 1.0]),
-        ) as mocked_svds:
+    def test_very_large_block_uses_arpack_only(self) -> None:
+        # min-dim above PROPACK_MAX_MIN_DIM: ARPACK only, no PROPACK (which can
+        # terminate the interpreter on very large irregular blocks).
+        matrix = sp.eye(20_001, format="csr")
+        calls: list[str] = []
+
+        def fake_svds(*_args, **kwargs):
+            calls.append(kwargs["solver"])
+            return np.array([0.5, 1.0])
+
+        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
-        self.assertEqual(mocked_svds.call_args.kwargs["solver"], "propack")
+        self.assertEqual(calls, ["arpack"])
+
+    def test_sparse_block_falls_back_to_propack(self) -> None:
+        # A block too large to densify but within the PROPACK dimension budget
+        # tries ARPACK first and falls back to PROPACK on non-convergence.
+        matrix = sp.eye(5_000, format="csr")
+        calls: list[str] = []
+
+        def fake_svds(*_args, **kwargs):
+            calls.append(kwargs["solver"])
+            if kwargs["solver"] == "arpack":
+                raise RuntimeError("ARPACK did not converge")
+            return np.array([0.5, 1.0])
+
+        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+            self.assertEqual(_component_rho(matrix), 0.25)
+        self.assertEqual(calls, ["arpack", "propack"])
 
     def test_prose_values_select_the_named_backend_and_largest_metric(self) -> None:
         rows = [

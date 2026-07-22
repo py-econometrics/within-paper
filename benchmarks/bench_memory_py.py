@@ -31,7 +31,7 @@ if not getattr(fit, "convergence", getattr(fit, "_convergence", True)):
 elapsed = time.perf_counter() - t0
 divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
 rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // divisor
-print(f"{{size:<6}} {{dgp_type:<12}} {{backend:<10}} {{elapsed:>8.2f}}s  {{rss:>6}} MB")
+print(f"{{size:<6}} {{dgp_type:<12}} {{backend:<10}} {{elapsed:>8.2f}}s  {{rss:>6}} MiB")
 """.format(fml=FML)
 
 parser = argparse.ArgumentParser()

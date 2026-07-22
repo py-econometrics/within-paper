@@ -12,7 +12,7 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`synthetic-complete`], [0.76 (1.00)], [0.070s], [0.059s], [0.034s], [0.119s],
+  [`synthetic-complete`], [1.00 (1.00)], [0.070s], [0.059s], [0.034s], [0.119s],
   [`synthetic-uniform-easy`], [0.651 (1.00)], [0.112s], [0.138s], [0.063s], [0.108s],
   [`synthetic-uniform-hard`], [0.184 (1.00)], [0.293s], [0.349s], [0.243s], [0.861s],
   [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.880s], [1.23s], [0.395s], [0.462s],

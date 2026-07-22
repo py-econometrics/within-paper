@@ -133,7 +133,6 @@ def _result_from_dataset(
     elapsed: float | None,
     success: bool,
     error: str | None = None,
-    substeps: dict[str, float] | None = None,
     n_obs_override: int | None = None,
 ) -> FeolsResult:
     return FeolsResult(
@@ -149,7 +148,6 @@ def _result_from_dataset(
         time=elapsed,
         success=success,
         error=error,
-        substeps=substeps,
     )
 
 
@@ -341,8 +339,11 @@ def _parse_subprocess_output(
     backend: str,
     completed_process: subprocess.CompletedProcess[str],
 ) -> list[FeolsResult]:
+    # Index strictly by (dataset_id, iter_num). Both the feols/fepois and the
+    # Correia manifests emit one JSON line per trial with its iteration number,
+    # so a crashed run leaves the missing trials unmatched (and therefore failed)
+    # rather than reusing another trial's timing for a trial that never ran.
     parsed_by_key: dict[tuple[str, int | None], dict] = {}
-    parsed_by_id: dict[str, dict] = {}
 
     for line in completed_process.stdout.splitlines():
         payload = line.strip()
@@ -356,10 +357,9 @@ def _parse_subprocess_output(
         if isinstance(dataset_id, str):
             iter_num = _safe_cast(entry.get("iter_num"), int)
             parsed_by_key[(dataset_id, iter_num)] = entry
-            parsed_by_id[dataset_id] = entry
 
     # A4: partial-result warning
-    n_emitted = len(parsed_by_key) if parsed_by_key else len(parsed_by_id)
+    n_emitted = len(parsed_by_key)
     n_missing = len(datasets) - n_emitted
     if n_missing > 0 and completed_process.returncode == 0:
         warnings.warn(
@@ -381,8 +381,6 @@ def _parse_subprocess_output(
 
     for dataset in datasets:
         entry = parsed_by_key.get((dataset.dataset_id, dataset.iter_num))
-        if entry is None:
-            entry = parsed_by_id.get(dataset.dataset_id)
         if entry is None:
             missing_error = default_error or "No result emitted by subprocess backend."
             results.append(

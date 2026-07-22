@@ -27,12 +27,7 @@ except ImportError:
 
 
 def _serialize_result(result: FeolsResult) -> dict:
-    d = asdict(result)
-    substeps = d.pop("substeps", None)
-    if substeps:
-        for key, val in substeps.items():
-            d[f"substep_{key}"] = val
-    return d
+    return asdict(result)
 
 
 def _backend_slug(backend: str) -> str:
