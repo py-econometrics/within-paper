@@ -171,8 +171,6 @@ function main()
                 vcov_spec,
                 start=start,
                 maxiter=100,
-                maxiter_center=10000,
-                center_tol=1e-8,
                 separation=[:fe],
                 nthreads=julia_nthreads,
             )

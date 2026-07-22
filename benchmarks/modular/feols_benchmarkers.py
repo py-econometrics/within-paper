@@ -9,7 +9,7 @@ import sys
 import tempfile
 import time
 import warnings
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -193,44 +193,30 @@ def _read_data_columns(data_path: Path, columns: list[str]) -> pd.DataFrame:
     return pd.read_parquet(data_path, columns=columns)
 
 
-def _demeaner_from_backend(
-    backend: str,
-    fixef_maxiter: int | None = None,
-    fixef_tol: float | None = None,
-):
+def _demeaner_from_backend(backend: str):
     """Map a benchmark backend name to a typed demeaner configuration."""
     import pyfixest as pf
 
-    kwargs = {} if fixef_maxiter is None else {"fixef_maxiter": fixef_maxiter}
     if backend == "rust":
-        if fixef_tol is not None:
-            kwargs["fixef_tol"] = fixef_tol
-        return pf.MapDemeaner(**kwargs)
+        return pf.MapDemeaner()
 
-    # LsmrDemeaner has no single `fixef_tol`; it uses separate atol/btol.
-    if fixef_tol is not None:
-        kwargs["fixef_atol"] = fixef_tol
-        kwargs["fixef_btol"] = fixef_tol
     if backend == "within":
-        return pf.LsmrDemeaner(**kwargs)
+        return pf.LsmrDemeaner()
     if backend == "torch_cpu":
-        return pf.LsmrDemeaner(backend="torch", device="cpu", **kwargs)
+        return pf.LsmrDemeaner(backend="torch", device="cpu")
     if backend == "torch_mps":
-        return pf.LsmrDemeaner(
-            backend="torch", device="mps", precision="float32", **kwargs
-        )
+        return pf.LsmrDemeaner(backend="torch", device="mps", precision="float32")
     if backend == "torch_cuda":
-        return pf.LsmrDemeaner(backend="torch", device="cuda", **kwargs)
+        return pf.LsmrDemeaner(backend="torch", device="cuda")
     raise ValueError(f"Unknown demeaner backend: {backend!r}")
 
 
 class PyFeolsBenchmarkerFullApi:
     """Benchmark pf.feols() end-to-end using one configured demeaner backend."""
 
-    def __init__(self, name: str, demeaner_backend: str, **feols_kwargs):
+    def __init__(self, name: str, demeaner_backend: str):
         self._name = name
         self._demeaner_backend = demeaner_backend
-        self._feols_kwargs = feols_kwargs
 
     @property
     def name(self) -> str:
@@ -241,12 +227,7 @@ class PyFeolsBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        feols_kwargs = dict(self._feols_kwargs)
-        demeaner = _demeaner_from_backend(
-            self._demeaner_backend,
-            feols_kwargs.pop("fixef_maxiter", None),
-            feols_kwargs.pop("fixef_tol", None),
-        )
+        demeaner = _demeaner_from_backend(self._demeaner_backend)
 
         results: list[FeolsResult] = []
 
@@ -283,7 +264,6 @@ class PyFeolsBenchmarkerFullApi:
                         copy_data=False,
                         store_data=False,
                         demeaner=demeaner,
-                        **feols_kwargs,
                     )
                     if not _fit_converged(fit):
                         raise RuntimeError("PyFixest model returned without convergence")
@@ -422,12 +402,10 @@ class SubprocessFeolsBenchmarker:
         name: str,
         command_prefix: Sequence[str],
         script_path: Path,
-        extra_config: Mapping[str, object] | None = None,
     ):
         self._name = name
         self._command_prefix = tuple(command_prefix)
         self._script_path = script_path.resolve()
-        self._extra_config = dict(extra_config or {})
 
     @property
     def name(self) -> str:
@@ -465,7 +443,6 @@ class SubprocessFeolsBenchmarker:
                         # file-backed copy of each emitted result so buffered
                         # stdout cannot lose completed rows at process exit.
                         "result_log_path": str(result_log_path),
-                        **self._extra_config,
                     }
                 ),
                 encoding="utf-8",
@@ -529,7 +506,6 @@ class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
         self,
         name: str | Path | None = None,
         script_path: Path | None = None,
-        extra_config: Mapping[str, object] | None = None,
     ):
         if isinstance(name, Path):
             if script_path is not None:
@@ -542,7 +518,6 @@ class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
             name=name or "r.fixest",
             command_prefix=["Rscript"],
             script_path=(script_path or _SCRIPT_DIR / "feols_r.R"),
-            extra_config=extra_config,
         )
 
 
@@ -551,7 +526,6 @@ class JuliaFeolsBenchmarker(SubprocessFeolsBenchmarker):
         self,
         name: str | Path | None = None,
         script_path: Path | None = None,
-        extra_config: Mapping[str, object] | None = None,
     ):
         if isinstance(name, Path):
             if script_path is not None:
@@ -564,5 +538,4 @@ class JuliaFeolsBenchmarker(SubprocessFeolsBenchmarker):
             name=name or "julia.FixedEffectModels",
             command_prefix=["julia"],
             script_path=(script_path or _SCRIPT_DIR / "feols_julia.jl"),
-            extra_config=extra_config,
         )

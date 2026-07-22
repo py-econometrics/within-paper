@@ -22,27 +22,18 @@ class BenchmarkerBundle:
 
 def build_standard_feols_benchmarkers(
     *,
-    fixef_maxiter: int | None = None,
     include_pyfixest: bool = True,
     include_fixest: bool = True,
     include_julia: bool = True,
     include_torch: bool = True,
 ) -> BenchmarkerBundle:
     """Build the shared feols benchmark runner set used by modular benchmarks."""
-    pyfixest_kwargs = {}
-    if fixef_maxiter is not None:
-        pyfixest_kwargs["fixef_maxiter"] = fixef_maxiter
-
     pyfixest_benchmarkers = []
     if include_pyfixest:
         pyfixest_benchmarkers.extend(
             [
-                PyFeolsBenchmarkerFullApi(
-                    "pyfixest (within)", "within", **pyfixest_kwargs
-                ),
-                PyFeolsBenchmarkerFullApi(
-                    "pyfixest (rust-map)", "rust", **pyfixest_kwargs
-                ),
+                PyFeolsBenchmarkerFullApi("pyfixest (within)", "within"),
+                PyFeolsBenchmarkerFullApi("pyfixest (rust-map)", "rust"),
             ]
         )
 
@@ -58,7 +49,6 @@ def build_standard_feols_benchmarkers(
                 PyFeolsBenchmarkerFullApi(
                     "pyfixest (torch-cpu)",
                     "torch_cpu",
-                    **pyfixest_kwargs,
                 )
             )
             if availability.has_mps:
@@ -66,7 +56,6 @@ def build_standard_feols_benchmarkers(
                     PyFeolsBenchmarkerFullApi(
                         "pyfixest (torch-mps)",
                         "torch_mps",
-                        **pyfixest_kwargs,
                     )
                 )
             else:
@@ -80,7 +69,6 @@ def build_standard_feols_benchmarkers(
                     PyFeolsBenchmarkerFullApi(
                         "pyfixest (torch-cuda)",
                         "torch_cuda",
-                        **pyfixest_kwargs,
                     )
                 )
             else:
@@ -106,25 +94,20 @@ def build_standard_feols_benchmarkers(
 
 def build_standard_fepois_benchmarkers(
     *,
-    fixef_maxiter: int | None = None,
     include_pyfixest: bool = True,
     include_fixest: bool = True,
     include_julia: bool = True,
 ) -> BenchmarkerBundle:
     """Build the shared fepois benchmark runner set used by modular benchmarks."""
-    pyfixest_kwargs = {}
-    if fixef_maxiter is not None:
-        pyfixest_kwargs["fixef_maxiter"] = fixef_maxiter
-
     benchmarkers = []
     if include_pyfixest:
         benchmarkers.extend(
             [
                 PyFepoisBenchmarkerFullApi(
-                    "pyfixest (within)", "within", **pyfixest_kwargs
+                    "pyfixest (within)", "within", iwls_maxiter=100
                 ),
                 PyFepoisBenchmarkerFullApi(
-                    "pyfixest (rust-map)", "rust", **pyfixest_kwargs
+                    "pyfixest (rust-map)", "rust", iwls_maxiter=100
                 ),
             ]
         )

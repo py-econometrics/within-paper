@@ -68,9 +68,9 @@ def _setup_share(setup_wall: float, solve_wall: float) -> float:
     return setup_wall / total
 
 
-def _run_once(dgp: str, n_obs: int, k: int, iteration: int, tol: float, maxiter: int) -> dict:
+def _run_once(dgp: str, n_obs: int, k: int, iteration: int) -> dict:
     categories, rhs = _make_problem(dgp, n_obs, k, _seed_for(dgp, n_obs, iteration))
-    config = LsmrOptions(tol=tol, maxiter=maxiter)
+    config = LsmrOptions()
 
     gc.collect()
     t0 = time.perf_counter()
@@ -161,8 +161,6 @@ def main() -> None:
     parser.add_argument("--k", type=int, default=1)
     parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
     parser.add_argument("--runs", type=int, default=3)
-    parser.add_argument("--tol", type=float, default=1e-6)
-    parser.add_argument("--maxiter", type=int, default=100_000)
     parser.add_argument(
         "--out",
         type=Path,
@@ -180,7 +178,7 @@ def main() -> None:
                 f"k={args.k} run={iteration + 1}/{args.runs}",
                 flush=True,
             )
-            row = _run_once(dgp, args.n_obs, args.k, iteration, args.tol, args.maxiter)
+            row = _run_once(dgp, args.n_obs, args.k, iteration)
             rows.append(row)
             print(
                 "  setup={setup_wall_s:.3f}s solve-after-setup="

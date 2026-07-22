@@ -40,10 +40,10 @@ except ImportError:
 class PyFepoisBenchmarkerFullApi:
     """Benchmark pf.fepois() end-to-end using one configured demeaner backend."""
 
-    def __init__(self, name: str, demeaner_backend: str, **fepois_kwargs):
+    def __init__(self, name: str, demeaner_backend: str, *, iwls_maxiter: int):
         self._name = name
         self._demeaner_backend = demeaner_backend
-        self._fepois_kwargs = fepois_kwargs
+        self._iwls_maxiter = iwls_maxiter
 
     @property
     def name(self) -> str:
@@ -54,12 +54,7 @@ class PyFepoisBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        fepois_kwargs = dict(self._fepois_kwargs)
-        demeaner = _demeaner_from_backend(
-            self._demeaner_backend,
-            fepois_kwargs.pop("fixef_maxiter", None),
-            fepois_kwargs.pop("fixef_tol", None),
-        )
+        demeaner = _demeaner_from_backend(self._demeaner_backend)
 
         results: list[FeolsResult] = []
         all_cols = [spec.depvar, *spec.covariates, *spec.fe_cols]
@@ -91,7 +86,7 @@ class PyFepoisBenchmarkerFullApi:
                         copy_data=False,
                         store_data=False,
                         demeaner=demeaner,
-                        **fepois_kwargs,
+                        iwls_maxiter=self._iwls_maxiter,
                     )
                     if not _fit_converged(fit):
                         raise RuntimeError("PyFixest PPML model returned without convergence")
