@@ -177,21 +177,33 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["arpack"])
 
-    def test_sparse_block_falls_back_to_propack(self) -> None:
+    def test_sparse_block_uses_propack_first(self) -> None:
         # A block too large to densify but within the PROPACK dimension budget
-        # tries ARPACK first and falls back to PROPACK on non-convergence.
+        # takes the fast PROPACK path without invoking ARPACK.
         matrix = sp.eye(5_000, format="csr")
         calls: list[str] = []
 
         def fake_svds(*_args, **kwargs):
             calls.append(kwargs["solver"])
-            if kwargs["solver"] == "arpack":
-                raise RuntimeError("ARPACK did not converge")
             return np.array([0.5, 1.0])
 
         with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
-        self.assertEqual(calls, ["arpack", "propack"])
+        self.assertEqual(calls, ["propack"])
+
+    def test_sparse_block_falls_back_to_arpack(self) -> None:
+        matrix = sp.eye(5_000, format="csr")
+        calls: list[str] = []
+
+        def fake_svds(*_args, **kwargs):
+            calls.append(kwargs["solver"])
+            if kwargs["solver"] == "propack":
+                raise RuntimeError("PROPACK did not converge")
+            return np.array([0.5, 1.0])
+
+        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+            self.assertEqual(_component_rho(matrix), 0.25)
+        self.assertEqual(calls, ["propack", "arpack"])
 
     def test_prose_values_select_the_named_backend_and_largest_metric(self) -> None:
         rows = [

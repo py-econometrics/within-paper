@@ -86,18 +86,20 @@ def _top_two_singular_values(normalized: sp.csr_matrix) -> np.ndarray:
     Small blocks use an exact dense SVD, which is the only reliable option on
     rank-deficient spectra: the complete bipartite graph is rank one, so its
     second singular value is exactly zero, and the iterative solvers return
-    spurious nonzero values for it. Larger blocks use ARPACK, which is accurate
-    on well-separated spectra, and fall back to PROPACK for clustered spectra
-    (e.g. the path-like ``synthetic-zigzag`` graph) where ARPACK fails to
-    converge. PROPACK is only attempted below ``PROPACK_MAX_MIN_DIM`` because its
-    SciPy backend can terminate the interpreter on very large irregular blocks.
+    spurious nonzero values for it. Eligible sparse blocks use PROPACK first
+    because it is much faster on clustered spectra such as the path-like
+    ``synthetic-zigzag`` graph, with ARPACK as a fallback. Blocks above
+    ``PROPACK_MAX_MIN_DIM`` remain ARPACK-only because PROPACK's SciPy backend can
+    terminate the interpreter on very large irregular inputs.
     """
     rows, cols = normalized.shape
     if min(rows, cols) <= 64 or rows * cols <= DENSE_MAX_ENTRIES:
         return np.linalg.svd(normalized.toarray(), compute_uv=False)
-    solvers = ["arpack"]
-    if min(rows, cols) <= PROPACK_MAX_MIN_DIM:
-        solvers.append("propack")
+    solvers = (
+        ["propack", "arpack"]
+        if min(rows, cols) <= PROPACK_MAX_MIN_DIM
+        else ["arpack"]
+    )
     errors: list[str] = []
     for solver in solvers:
         try:
