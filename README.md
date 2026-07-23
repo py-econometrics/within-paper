@@ -11,13 +11,10 @@ see [REPRODUCING.md](REPRODUCING.md) for the required versions and packages.
 ```bash
 pixi install
 
-export BENCH_THREADS=10
-export JULIA_NUM_THREADS=10
-
 pixi run setup-julia-env
 pixi run check-external-runtimes
 pixi run fetch-correia
-pixi run reproduce-paper
+BENCH_THREADS=10 JULIA_NUM_THREADS=10 pixi run --locked reproduce-paper
 ```
 
 The thread settings apply to the R and Julia benchmarks. The paper's reference run used

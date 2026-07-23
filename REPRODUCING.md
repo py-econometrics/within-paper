@@ -90,7 +90,7 @@ produced the results.
 Run the benchmarks and compile the paper:
 
 ```bash
-BENCH_THREADS=10 JULIA_NUM_THREADS=10 pixi run reproduce-paper
+BENCH_THREADS=10 JULIA_NUM_THREADS=10 pixi run --locked reproduce-paper
 ```
 
 The inline environment settings make the command safe to paste into a new shell. The run
