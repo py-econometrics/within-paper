@@ -20,10 +20,9 @@ def base_dgp(
     max_k: int = 10,
     seed: int | None = None,
 ) -> pd.DataFrame:
-    """Generate the generic modular benchmark panel.
+    """Generate a simple or difficult panel for the main benchmark suite.
 
-    This DGP is kept for the main benchmark suite only. AKM benchmarks use the
-    standalone generator in ``akm_dgp.py``.
+    AKM benchmarks use the separate generator in ``akm_dgp.py``.
     """
     rng = np.random.default_rng(seed)
 
@@ -49,7 +48,7 @@ def base_dgp(
     elif type_ == "difficult":
         firm_id = np.tile(np.arange(1, nb_firm + 1), n_obs // nb_firm + 1)[:n_obs]
     else:
-        raise ValueError(f"Unknown type of dgp: {type_!r}")
+        raise ValueError(f"Unknown DGP type: {type_!r}")
 
     x = rng.standard_normal((n_obs, max_k))
     betas = 1.0 / np.arange(1, k + 1, dtype=float)
@@ -81,7 +80,7 @@ def base_dgp(
 
 
 def paper_base_dgp(n: int, type_: str, seed: int) -> pd.DataFrame:
-    """Generate the value-preserving, one-covariate paper input."""
+    """Generate the paper's one-covariate input without changing the seeded draws."""
     frame = base_dgp(
         n=n,
         type_=type_,

@@ -10,9 +10,9 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[FE], th[`fixest`], th[`rust-map`], th[`GLFEM.jl`], th[`within`]),
+  table.header(th[Design], th[FE], th[`rust-map`], th[`fixest`], th[`GLFEM.jl`], th[`within`]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [3], [5.69s], [10.0s], [8.65s], [8.67s],
-  [difficult (sparse graph)], [3], [324.3s], [failed (0/3)], [165.7s], [5.27s],
+  [simple (well-connected)], [3], [11.2s], [5.72s], [10.6s], [8.71s],
+  [difficult (near-nested)], [3], [failed (0/3)], [324.9s], [174.5s], [5.95s],
   table.hline(stroke: 0.8pt + table-rule),
 )

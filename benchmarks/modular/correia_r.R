@@ -35,7 +35,7 @@ for (entry in manifest) {
           fit <- feols(formula, data = df, nthreads = bench_threads)
         )
         if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
-          stop("fixest model returned without convergence")
+          stop("fixest model did not converge")
         }
       })[["elapsed"]])
     },

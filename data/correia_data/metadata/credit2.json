@@ -17,7 +17,7 @@
   ],
   "csv_bytes": 1652407,
   "csv_path": "datasets/credit2/data.csv",
-  "description": "A small borrower-period panel derived from the credit dataset. It is useful as a fast smoke test for HDFE implementations.",
+  "description": "Small borrower-period panel used for quick HDFE checks.",
   "download_placeholder": "",
   "edge_list": "build/edges/credit2.csv",
   "edges": 19094,

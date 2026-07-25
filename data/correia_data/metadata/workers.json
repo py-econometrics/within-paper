@@ -3,7 +3,7 @@
     "id3",
     "id4"
   ],
-  "benchmark_notes": "A large, realistic two-way firm-worker benchmark.",
+  "benchmark_notes": "Large two-way firm-worker benchmark.",
   "checksum_csv": "e9d7761470bfd1c07b8dc7919093c6f5022f7a9ff3c080db882e7d3a468fd611",
   "citation": "Regressors and outcome are synthetic benchmark variables.",
   "columns": [

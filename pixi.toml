@@ -7,28 +7,28 @@ version = "0.1.0"
 
 [tasks]
 compile = "typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
-check-external-runtimes ={ cmd = "python scripts/paper_results.py check-external-runtimes", description = "Check native R and Julia runtimes, packages, and locked Julia project" }
-setup-julia-env = { cmd = "python scripts/paper_results.py setup-julia-env", description = "Instantiate the tracked Julia package environment" }
+check-external-runtimes ={ cmd = "python scripts/paper_results.py check-external-runtimes", description = "Check installed R and Julia versions, packages, and thread counts" }
+setup-julia-env = { cmd = "python scripts/paper_results.py setup-julia-env", description = "Install Julia packages from the tracked project" }
 _julia-setup = { depends-on = ["setup-julia-env"], description = "Compatibility alias for Julia benchmark dependencies" }
-fetch-correia = { cmd = "python scripts/paper_results.py fetch-correia", description = "Download and checksum-verify the Correia HDFE CSV collection" }
-check-correia-data = { cmd = "python scripts/paper_results.py fetch-correia --offline", description = "Require a complete checksum-verified local Correia data collection" }
-archive-legacy-results = { cmd = "python scripts/paper_results.py archive-legacy-results", description = "Archive untracked generated results and figures before a clean run" }
+fetch-correia = { cmd = "python scripts/paper_results.py fetch-correia", description = "Download the Correia HDFE CSVs and verify their checksums" }
+check-correia-data = { cmd = "python scripts/paper_results.py fetch-correia --offline", description = "Verify the local Correia CSV collection without downloading" }
+archive-legacy-results = { cmd = "python scripts/paper_results.py archive-legacy-results", description = "Move untracked result files and figures to a dated archive" }
 agreement = { cmd = "python benchmarks/bench_agreement_py.py", depends-on = ["_julia-setup", "bench-generate-data"], description = "Run numerical agreement checks against PyFixest, R fixest, and FixedEffectModels.jl" }
 within-setup-cost = { cmd = "python benchmarks/bench_within_setup_cost.py", description = "Measure setup and solve time for the standalone within Python API" }
-test = { cmd = "python -m unittest discover -s tests -v", description = "Run benchmark-pipeline regression tests" }
-bench-generate-data = { cmd = "python benchmarks/bench_generate_data.py", description = "Generate one-covariate simple/difficult DGP parquet files (100k, 1m) used by the diagnostic benchmarks" }
-bench-memory = { cmd = "python benchmarks/bench_memory_py.py", depends-on = ["bench-generate-data"], description = "Peak-RSS and time benchmark for pyfixest MAP vs within backends (100k, 1m)" }
-bench-main = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_main.py", depends-on = ["_julia-setup"], description = "Run the paper OLS benchmark (10M observations, one covariate, and 3 FE)" }
+test = { cmd = "python -m unittest discover -s tests -v", description = "Run benchmark regression tests" }
+bench-generate-data = { cmd = "python benchmarks/bench_generate_data.py", description = "Generate the 100K and 1M one-covariate DGP files used by the agreement and memory checks" }
+bench-memory = { cmd = "python benchmarks/bench_memory_py.py", depends-on = ["bench-generate-data"], description = "Measure peak RSS and runtime for the PyFixest MAP and within backends (100K, 1M)" }
+bench-main = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_main.py", depends-on = ["_julia-setup"], description = "Run the 10M-observation OLS benchmark" }
 bench-fepois = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_fepois.py", depends-on = ["_julia-setup"], description = "Run the worker-firm-year PPML benchmark against fixest, GLFixedEffectModels.jl, and PyFixest fepois" }
-bench-akm-sweep = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_akm_sweep.py", depends-on = ["_julia-setup"], description = "Run the AKM sweep modular benchmark (sorting, mobility)" }
-bench-correia = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_correia.py", depends-on = ["_julia-setup", "check-correia-data"], description = "Run the checksum-verified local Correia benchmark suite" }
-compute-hardness = { cmd = "python benchmarks/modular/compute_hardness.py", depends-on = ["bench-generate-data", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-correia"], description = "Compute singleton-pruned pairwise graph hardness for every paper dataset" }
-bench-modular-all = { depends-on = ["bench-main", "bench-fepois", "bench-akm-sweep"], description = "Run all modular benchmarks (main + fepois + AKM sweep)" }
+bench-akm-sweep = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_akm_sweep.py", depends-on = ["_julia-setup"], description = "Run the AKM mobility and sorting benchmarks" }
+bench-correia = { cmd = "JULIA_PROJECT=benchmarks/julia-env python benchmarks/modular/benchmark_correia.py", depends-on = ["_julia-setup", "check-correia-data"], description = "Run the local Correia benchmarks after checksum verification" }
+compute-hardness = { cmd = "python benchmarks/modular/compute_hardness.py", depends-on = ["bench-generate-data", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-correia"], description = "Compute pairwise spectral gaps after singleton pruning" }
+bench-modular-all = { depends-on = ["bench-main", "bench-fepois", "bench-akm-sweep"], description = "Run the OLS, PPML, and AKM benchmarks" }
 bench-all = { depends-on = ["bench-generate-data", "agreement", "within-setup-cost", "bench-memory", "bench-main", "bench-fepois", "bench-akm-sweep"], description = "Generate all synthetic data and run every benchmark" }
-reproduce-results = { cmd = "python scripts/paper_results.py collect", depends-on = ["check-external-runtimes", "bench-all", "bench-correia", "compute-hardness"], description = "Run every benchmark, compute hardness, and record the raw artifact manifest and environment" }
-render-paper-results = { cmd = "python scripts/paper_results.py render", description = "Render canonical paper results into Typst table fragments" }
-reproduce-paper = { cmd = "python scripts/paper_results.py render && python scripts/paper_results.py verify && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Reproduce results, verify their raw sources and paper inputs, and compile the PDF" }
-verify-paper-results = { cmd = "python scripts/paper_results.py verify", description = "Verify raw result hashes, code provenance, generated tables, and manuscript wiring" }
+reproduce-results = { cmd = "python scripts/paper_results.py collect", depends-on = ["check-external-runtimes", "bench-all", "bench-correia", "compute-hardness"], description = "Run every benchmark and save raw-file hashes and environment details" }
+render-paper-results = { cmd = "python scripts/paper_results.py render", description = "Write Typst tables from the paper result file" }
+reproduce-paper = { cmd = "python scripts/paper_results.py render && python scripts/paper_results.py verify && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Run benchmarks, verify results, and build the PDF" }
+verify-paper-results = { cmd = "python scripts/paper_results.py verify", description = "Verify result hashes, generated tables, and manuscript includes" }
 
 [dependencies]
 typst = ">=0.14.2,<0.15"

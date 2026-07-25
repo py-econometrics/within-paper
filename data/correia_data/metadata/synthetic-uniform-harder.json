@@ -1,8 +1,8 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "A hard benchmark for acceleration and sparse solver choices.",
+  "benchmark_notes": "The least connected of the three uniform-matching designs.",
   "checksum_csv": "87a1a14c70c8f902a54ba3a85fef4ca5534f606a0d200c02b9d11f853b72c5bd",
-  "citation": "Uniform random matching benchmark with the weakest uniform connectivity in this collection.",
+  "citation": "Uniform random-matching benchmark; least connected of the three designs.",
   "columns": [
     "id1",
     "id2",
@@ -12,7 +12,7 @@
   ],
   "csv_bytes": 22690569,
   "csv_path": "datasets/synthetic-uniform-harder/data.csv",
-  "description": "Uniform random matching synthetic benchmark with the weakest v1 uniform connectivity.",
+  "description": "Uniform random-matching benchmark with the weakest connectivity of the three uniform designs.",
   "download_placeholder": "",
   "edge_list": "build/edges/synthetic-uniform-harder.csv",
   "edges": 499997,

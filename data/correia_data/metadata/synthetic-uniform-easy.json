@@ -1,8 +1,8 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "Designed to be easy for iterative HDFE residualization.",
+  "benchmark_notes": "The most connected of the three uniform-matching designs.",
   "checksum_csv": "0d6da5863b61a7e3c8eddd9c256ea66469c77d06e1dc39bd5b44ae0e1d4a4aff",
-  "citation": "Uniform random matching benchmark with relatively easy connectivity.",
+  "citation": "Uniform random-matching benchmark with the strongest connectivity of the three designs.",
   "columns": [
     "id1",
     "id2",
@@ -12,7 +12,7 @@
   ],
   "csv_bytes": 20703815,
   "csv_path": "datasets/synthetic-uniform-easy/data.csv",
-  "description": "Uniform random matching synthetic benchmark with easy connectivity.",
+  "description": "Uniform random-matching benchmark with the strongest connectivity of the three designs.",
   "download_placeholder": "",
   "edge_list": "build/edges/synthetic-uniform-easy.csv",
   "edges": 475566,

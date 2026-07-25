@@ -18,7 +18,7 @@ function benchmark_threads()
     end
     actual = Threads.nthreads()
     if actual != requested
-        error("Julia started with $actual thread(s), but JULIA_NUM_THREADS=$requested; set it before Julia starts")
+        error("Julia is using $actual thread(s), but JULIA_NUM_THREADS=$requested. Set JULIA_NUM_THREADS before launching Julia.")
     end
     return actual
 end
@@ -175,7 +175,7 @@ function main()
                 nthreads=julia_nthreads,
             )
             if !model.converged
-                error("GLFixedEffectModels model returned without convergence")
+                error("GLFixedEffectModels model did not converge")
             end
             elapsed = time() - start_time
         catch e

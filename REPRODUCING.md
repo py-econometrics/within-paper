@@ -1,7 +1,7 @@
 # Reproducing the paper
 
-The paper reads its tables and result-dependent prose from generated Typst files. Do not
-edit files under `generated/` by hand; `pixi run render-paper-results` rewrites them from
+The paper imports its tables and numerical claims from generated Typst files. Do not edit
+`generated/` directly; `pixi run render-paper-results` rebuilds those files from
 `results/paper/benchmark_tables.json`.
 
 ## Install the runtimes
@@ -12,11 +12,11 @@ Install Pixi and create the Python/Typst environment:
 pixi install
 ```
 
-The benchmark suite uses native R and Julia on macOS. R is kept outside Pixi because the
-`fixest` benchmarks use its multicore runtime. Julia uses the project and manifest in
-`benchmarks/julia-env/`.
+The benchmark suite uses native R and Julia on macOS. Install R separately from Pixi
+because the `fixest` benchmarks use R's multicore runtime. Julia uses the project and
+manifest in `benchmarks/julia-env/`.
 
-Install the checked R package versions in your system R library:
+Install the R package versions used for the paper in your system R library:
 
 ```r
 install.packages("pak", repos = "https://cloud.r-project.org")
@@ -31,9 +31,9 @@ export BENCH_THREADS=10
 export JULIA_NUM_THREADS=10
 ```
 
-`BENCH_THREADS` controls the R `fixest` calls. Julia reads `JULIA_NUM_THREADS` only when
-the process starts. The R and Julia benchmark scripts stop if either value is missing or
-does not match the running process.
+`BENCH_THREADS` sets the thread count for R `fixest`. Julia reads `JULIA_NUM_THREADS`
+only at startup. The scripts stop if either variable is unset or the process starts with
+a different thread count.
 
 Install the Julia packages and check both external runtimes:
 
@@ -45,27 +45,26 @@ pixi run check-external-runtimes
 The check reports the R and Julia versions, package versions, and active thread counts.
 Run it before starting the long benchmarks.
 
-The setup-cost benchmark uses the `within-py` package locked by Pixi. Developers may set
-`WITHIN_REPO` for an explicit local checkout, but paper-result collection rejects that
-override.
+The setup-cost benchmark uses the Pixi-locked `within-py` package. Developers can point
+`WITHIN_REPO` to a local checkout, but `collect` rejects paper runs with that override.
 
-All regressions reported in the paper use `x1` as their only slope covariate. The PPML
-benchmark absorbs worker, firm, and year fixed effects. The DGP, sample size, number of
-fixed effects, and software backend change across the other experiments.
+Every reported regression has one slope covariate, `x1`. PPML absorbs worker, firm, and
+year effects. The other experiments vary the DGP, sample size, fixed-effect count, and
+backend.
 
 ## Download the Correia data
 
-The synthetic benchmark tasks create deterministic local inputs. The Correia HDFE CSV files
-are larger and are not tracked by Git. Download and checksum them with:
+The synthetic benchmarks generate their inputs locally. The Correia HDFE CSV files are
+downloaded separately and are not tracked by Git:
 
 ```bash
 pixi run fetch-correia
 ```
 
-The command reads the manifests under `data/correia_data/metadata/`, downloads each
-archive, checks the archive and extracted CSV hashes, and writes the CSVs to
-`data/correia_data/`. It is safe to rerun. To check files that are already present without
-using the network:
+`fetch-correia` reads the manifests under `data/correia_data/metadata/`, downloads the
+archives, verifies the archive and CSV hashes, and writes the CSVs to
+`data/correia_data/`. Use `--offline` to verify files already on disk without network
+access:
 
 ```bash
 pixi run python scripts/paper_results.py fetch-correia --offline
@@ -73,8 +72,8 @@ pixi run python scripts/paper_results.py fetch-correia --offline
 
 ## Run everything
 
-Old raw results can accidentally be mistaken for the current run. Move them to a dated
-local archive first if you want a clean result directory:
+`collect` reads every raw result file in the active directories, so archive old files
+before a new run:
 
 ```bash
 pixi run archive-legacy-results
@@ -83,9 +82,8 @@ pixi run archive-legacy-results
 The command moves untracked result CSVs, run metadata, and benchmark figures to
 `results/legacy/`. It does not remove generated input data or tracked files.
 
-Commit all tracked benchmark and documentation changes before starting the paper run.
-Collection refuses a dirty worktree so the provenance record can identify the code that
-produced the results.
+Commit benchmark and documentation changes first. `collect` stops if tracked files differ
+from the recorded commit.
 
 Run the benchmarks and compile the paper:
 
@@ -93,10 +91,10 @@ Run the benchmarks and compile the paper:
 BENCH_THREADS=10 JULIA_NUM_THREADS=10 pixi run --locked reproduce-paper
 ```
 
-The inline environment settings make the command safe to paste into a new shell. The run
-includes the AKM, OLS, Correia, PPML, memory, numerical-agreement, setup-cost, and graph-
-hardness benchmarks. The hard synthetic cases take several hours, and the Correia data
-requires substantial disk space.
+The command sets both thread counts for this invocation, so no prior `export` is needed.
+It runs the AKM, OLS, Correia, PPML, memory, numerical-agreement, and setup-cost
+benchmarks, then computes the spectral gaps. The hard synthetic cases take several
+hours, and the Correia CSVs use about 600 MB of disk space.
 
 Once the Pixi, R, and Julia packages and the Correia files are installed, the benchmark
 suite does not need network access.
@@ -110,30 +108,27 @@ pixi run compile
 pixi run verify-paper-results
 ```
 
-`reproduce-results` runs the benchmarks and writes the paper's table data. The raw timing
-CSVs live under `benchmarks/results/` and `results/runs/latest/`; they are intentionally
-ignored by Git. `collect` records their paths and SHA-256 hashes, along with the runtime
-and package versions, code fingerprint, and imported package locations in
-`results/runs/latest/provenance.json`.
+`reproduce-results` runs the benchmarks and writes the table data. Raw timing CSVs are
+stored in `benchmarks/results/` and `results/runs/latest/` and are ignored by Git.
+`collect` saves their paths and hashes, runtime and package versions, code hash, and
+package locations in `results/runs/latest/provenance.json`.
 
-`render-paper-results` updates the tracked Typst fragments. `verify-paper-results`
-reconstructs the tables from the raw CSVs, checks their recorded hashes and code
-fingerprint, resolves every claim-registry source, checks that every generated table is
-included by the manuscript, and rejects missing or incomplete trials. `reproduce-paper`
-runs the same check before compiling the PDF.
+`render-paper-results` updates the tracked Typst files. `verify-paper-results` rebuilds
+the tables, validates the saved hashes and code version, checks that each registered
+source exists and each generated table is included in the manuscript, and rejects
+missing trials. `reproduce-paper` runs the same check before compiling the PDF.
 
-Each locally reproduced timing cell must contain three attempted trials. A normal cell is
-their median. If only some trials converge, the table shows the median of those trials and
-the successful count, such as `(2/3)`. If none converge, the table records `failed (0/3)`.
-Both are valid measured outcomes; an absent or incomplete trial set fails verification.
-The CUDA cells are a documented exception: `results/external/cuda.json` retains legacy
-values from the PyFixest benchmark suite whose exact hardware, trial, and run metadata are
-unavailable. They are indicative only and cannot be reproduced on the reference machine.
+Each locally reproduced timing cell contains three attempted trials. If all three
+converge, the cell reports their median. If one or two converge, it reports their median
+and the count, such as `(2/3)`. If none converge, it reports `failed (0/3)`. Verification
+accepts non-convergence only when all three attempts are recorded; missing trials fail
+verification. The legacy CUDA timings are exempt because their hardware and trial
+metadata are unavailable. They cannot be reproduced on the reference machine and should
+not be compared with its CPU timings.
 
 ## Compare results
 
-Coefficient and graph-diagnostic results should agree to their reported precision. Timing
-and peak-RSS measurements depend on the machine and current system load. Apart from the
-legacy CUDA cells described above, the values in the paper come from the recorded Apple M4
-ten-core run; a run on other hardware can reproduce the experiment without reproducing the
-same number of seconds.
+Coefficient and graph diagnostics should match to the reported precision. Runtime and
+peak RSS vary with hardware and system load. Except for the legacy CUDA cells, the paper
+reports measurements from a ten-core Apple M4 run. Other hardware will produce different
+timings.

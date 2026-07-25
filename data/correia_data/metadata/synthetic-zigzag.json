@@ -1,8 +1,8 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "Small but intentionally pathological for convergence.",
+  "benchmark_notes": "Small path graph with slow iterative convergence.",
   "checksum_csv": "6cfa5ff32286f98530fd027a190d8d357d068c718e2a2dbbe4b3448bcdabb424",
-  "citation": "Synthetic path-like matching benchmark designed to be small but difficult.",
+  "citation": "Synthetic path-matching benchmark.",
   "columns": [
     "id1",
     "id2",
@@ -12,7 +12,7 @@
   ],
   "csv_bytes": 419932,
   "csv_path": "datasets/synthetic-zigzag/data.csv",
-  "description": "A small synthetic graph designed to create a path-like hard connectivity pattern.",
+  "description": "Small synthetic path graph.",
   "download_placeholder": "",
   "edge_list": "build/edges/synthetic-zigzag.csv",
   "edges": 10000,

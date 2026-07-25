@@ -72,6 +72,12 @@ def _run_once(dgp: str, n_obs: int, k: int, iteration: int) -> dict:
     categories, rhs = _make_problem(dgp, n_obs, k, _seed_for(dgp, n_obs, iteration))
     config = LsmrOptions()
 
+    # Warm the allocator, memory pages, and lazy initialization before timing.
+    # Otherwise setup alone bears these one-time costs and its reported share can
+    # exceed one. The discarded one-shot solve warms both setup and solve paths.
+    _ = solve_batch(categories, rhs, config)
+    del _
+
     gc.collect()
     t0 = time.perf_counter()
     solver = Solver(categories)

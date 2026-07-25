@@ -21,19 +21,17 @@ The thread settings apply to the R and Julia benchmarks. The paper's reference r
 all ten CPU cores of an Apple M4 Mac mini. `check-external-runtimes` prints the thread
 counts seen by `fixest` and Julia and stops if they do not match the requested values.
 
-`reproduce-paper` runs the benchmark suite, computes the graph diagnostics, updates the
-generated Typst tables and prose values, checks that the required results are present,
-and builds `graph_preconditioner_hdfe.pdf`. A full run takes several hours. The benchmark
-regressions use one slope covariate (`x1`); the PPML benchmark absorbs worker, firm, and
-year fixed effects, while sample sizes and fixed-effect structures vary in other
-experiments.
+`reproduce-paper` runs the benchmarks, computes the graph diagnostics, regenerates the
+Typst tables and numerical values used in the text, verifies the results, and builds
+`graph_preconditioner_hdfe.pdf`. A full run takes several hours. Every benchmark
+regression has one slope covariate (`x1`). PPML absorbs worker, firm, and year effects;
+the other experiments vary the sample size and fixed-effect structure.
 
-The reference machine has no NVIDIA GPU, so the CUDA cells retain legacy values from the
-PyFixest benchmark suite. Exact CUDA hardware and run metadata are unavailable; these
-values are indicative only and are not compared quantitatively with the local CPU results.
-Every other paper cell is expected to come from the local pipeline; `verify-paper-results`
-treats a missing or incomplete local cell as an error. A complete set of non-converged MAP
-trials is retained as a measured result.
+The CUDA entries come from an older PyFixest benchmark run because the reference machine
+has no NVIDIA GPU. That run did not record its hardware or software setup, so do not
+compare these values with the local CPU timings. Every non-CUDA cell must come from a
+local run. If all three MAP trials reach the iteration limit, the cell reads
+`failed (0/3)`.
 
 To move old untracked results out of the active result directories before a new run:
 

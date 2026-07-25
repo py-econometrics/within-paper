@@ -38,7 +38,7 @@ except ImportError:
 
 
 class PyFepoisBenchmarkerFullApi:
-    """Benchmark pf.fepois() end-to-end using one configured demeaner backend."""
+    """Benchmark one pf.fepois() call with the selected demeaning backend."""
 
     def __init__(self, name: str, demeaner_backend: str, *, iwls_maxiter: int):
         self._name = name
@@ -89,7 +89,7 @@ class PyFepoisBenchmarkerFullApi:
                         iwls_maxiter=self._iwls_maxiter,
                     )
                     if not _fit_converged(fit):
-                        raise RuntimeError("PyFixest PPML model returned without convergence")
+                        raise RuntimeError("PyFixest PPML model did not converge")
                 elapsed = time.perf_counter() - t0
 
                 result = _result_from_dataset(

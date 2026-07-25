@@ -10,7 +10,7 @@ Parquet2 = "98572fba-bba0-415d-956f-fa77e587d26d"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
 
 [sources]
-# The corresponding git trees are pinned by Manifest.toml. Do not add a branch
-# here: resolving `master` at benchmark time makes published timings drift.
+# Manifest.toml pins the Git revisions. Do not track `master` here; it may point
+# to different code on a later run.
 FixedEffectModels = {url = "https://github.com/FixedEffects/FixedEffectModels.jl"}
 GLFixedEffectModels = {url = "https://github.com/jmboehm/GLFixedEffectModels.jl"}

@@ -1,6 +1,6 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "Stresses iterative methods more than the easy uniform case.",
+  "benchmark_notes": "Uniform matching with weaker connectivity than the easy case.",
   "checksum_csv": "315b7115808b5d388edb92dd10f35595b602d40ef7723d791b4e5ee339d11e37",
   "citation": "Uniform random matching benchmark with weaker connectivity.",
   "columns": [
