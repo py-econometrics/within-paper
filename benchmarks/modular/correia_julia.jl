@@ -13,7 +13,7 @@ function benchmark_threads()
     end
     actual = Threads.nthreads()
     if actual != requested
-        error("Julia started with $actual thread(s), but JULIA_NUM_THREADS=$requested; set it before Julia starts")
+        error("Julia is using $actual thread(s), but JULIA_NUM_THREADS=$requested. Set JULIA_NUM_THREADS before launching Julia.")
     end
     return actual
 end
@@ -48,7 +48,7 @@ function main()
             start_time = time()
             model = reg(df, formula; nthreads=julia_nthreads, progress_bar=false)
             if hasproperty(model, :converged) && !getproperty(model, :converged)
-                error("FixedEffectModels model returned without convergence")
+                error("FixedEffectModels model did not converge")
             end
             elapsed = time() - start_time
         catch e

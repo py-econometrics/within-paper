@@ -5,7 +5,7 @@
     "results/external/cuda.json"
   ],
   "external_source_notes": {
-    "results/external/cuda.json": "Legacy PyFixest benchmark-suite values retained as indicative only; exact run provenance is unavailable."
+    "results/external/cuda.json": "Historical values from the PyFixest benchmark suite; the original run metadata is unavailable."
   },
   "claims": [
     {
@@ -80,7 +80,15 @@
         "results/runs/latest/within_setup_cost.csv",
         "results/runs/latest/within_setup_cost_summary.csv"
       ],
-      "note": "Supplies the reusable-solver setup and solve prose values."
+      "note": "Source for the setup and solve times cited in the manuscript."
+    },
+    {
+      "id": "zigzag-callout",
+      "table": "correia_synthetic",
+      "sources": [
+        "benchmarks/results/correia-benchmarks.csv"
+      ],
+      "note": "Source for the synthetic-zigzag within and FEM.jl times cited in the manuscript."
     }
   ]
 }

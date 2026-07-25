@@ -27,7 +27,7 @@ def build_standard_feols_benchmarkers(
     include_julia: bool = True,
     include_torch: bool = True,
 ) -> BenchmarkerBundle:
-    """Build the shared feols benchmark runner set used by modular benchmarks."""
+    """Create the enabled feols benchmark backends."""
     pyfixest_benchmarkers = []
     if include_pyfixest:
         pyfixest_benchmarkers.extend(
@@ -41,7 +41,7 @@ def build_standard_feols_benchmarkers(
         availability = detect_torch_runtime_availability()
         if not availability.has_torch:
             print(
-                "[bench] skipping torch benchmarkers: torch is not installed",
+                "[bench] skipping Torch backends: Torch is not installed",
                 flush=True,
             )
         else:
@@ -60,7 +60,7 @@ def build_standard_feols_benchmarkers(
                 )
             else:
                 print(
-                    "[bench] skipping torch-mps benchmarker: MPS unavailable",
+                    "[bench] skipping torch-mps: MPS unavailable",
                     flush=True,
                 )
 
@@ -73,7 +73,7 @@ def build_standard_feols_benchmarkers(
                 )
             else:
                 print(
-                    "[bench] skipping torch-cuda benchmarker: CUDA unavailable",
+                    "[bench] skipping torch-cuda: CUDA unavailable",
                     flush=True,
                 )
 
@@ -84,10 +84,7 @@ def build_standard_feols_benchmarkers(
         benchmarkers.append(JuliaFeolsBenchmarker("FEM.jl (lsmr)"))
 
     if not benchmarkers:
-        raise ValueError(
-            "No benchmarkers available after applying include flags and runtime "
-            "availability checks."
-        )
+        raise ValueError("No requested benchmark backend is available.")
 
     return BenchmarkerBundle(benchmarkers=benchmarkers)
 
@@ -98,7 +95,7 @@ def build_standard_fepois_benchmarkers(
     include_fixest: bool = True,
     include_julia: bool = True,
 ) -> BenchmarkerBundle:
-    """Build the shared fepois benchmark runner set used by modular benchmarks."""
+    """Create the enabled fepois benchmark backends."""
     benchmarkers = []
     if include_pyfixest:
         benchmarkers.extend(
@@ -117,8 +114,6 @@ def build_standard_fepois_benchmarkers(
         benchmarkers.append(GLFixedEffectModelsBenchmarker("glfixedeffectmodels.jl"))
 
     if not benchmarkers:
-        raise ValueError(
-            "No benchmarkers available after applying include flags."
-        )
+        raise ValueError("No requested benchmark backend is available.")
 
     return BenchmarkerBundle(benchmarkers=benchmarkers)

@@ -1,6 +1,6 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "Best-case connectivity; alternating projections converge almost immediately.",
+  "benchmark_notes": "Complete bipartite graph used as the well-connected benchmark.",
   "checksum_csv": "0a923318a37ac1bc21b7703dfef09dd052d26895d9bb7e1525ab518d2c9705d1",
   "citation": "Synthetic benchmark designed for complete bipartite two-way fixed effects.",
   "columns": [

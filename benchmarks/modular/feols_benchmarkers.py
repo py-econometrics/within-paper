@@ -45,7 +45,7 @@ def _trim_process_memory(demeaner_backend: str) -> None:
 
 @dataclass(frozen=True)
 class TorchRuntimeAvailability:
-    """Runtime availability of optional torch benchmark targets."""
+    """Availability of the optional Torch backends."""
 
     has_torch: bool
     has_mps: bool
@@ -53,7 +53,7 @@ class TorchRuntimeAvailability:
 
 
 def detect_torch_runtime_availability() -> TorchRuntimeAvailability:
-    """Detect whether torch and optional accelerator backends are available."""
+    """Return the available Torch backends."""
     try:
         import torch
     except ImportError:
@@ -85,7 +85,7 @@ def _dgp_width(datasets: list[BenchmarkDataset]) -> int:
 
 
 class _TablePrinter:
-    """Formats benchmark tables with dynamic DGP column width."""
+    """Format benchmark tables with a DGP column wide enough for the labels."""
 
     def __init__(self, dgp_w: int):
         self._w = dgp_w
@@ -212,7 +212,7 @@ def _demeaner_from_backend(backend: str):
 
 
 class PyFeolsBenchmarkerFullApi:
-    """Benchmark pf.feols() end-to-end using one configured demeaner backend."""
+    """Benchmark one pf.feols() call with the selected demeaning backend."""
 
     def __init__(self, name: str, demeaner_backend: str):
         self._name = name
@@ -266,7 +266,7 @@ class PyFeolsBenchmarkerFullApi:
                         demeaner=demeaner,
                     )
                     if not _fit_converged(fit):
-                        raise RuntimeError("PyFixest model returned without convergence")
+                        raise RuntimeError("PyFixest model did not converge")
                 elapsed = time.perf_counter() - t0
 
                 result = _result_from_dataset(
@@ -338,17 +338,16 @@ def _parse_subprocess_output(
             iter_num = _safe_cast(entry.get("iter_num"), int)
             parsed_by_key[(dataset_id, iter_num)] = entry
 
-    # A4: partial-result warning
+    # Warn when a successful subprocess omits one or more datasets.
     n_emitted = len(parsed_by_key)
     n_missing = len(datasets) - n_emitted
     if n_missing > 0 and completed_process.returncode == 0:
         warnings.warn(
-            f"Subprocess emitted results for {n_emitted}/{len(datasets)} datasets"
+            f"Subprocess returned results for {n_emitted}/{len(datasets)} datasets"
         )
 
     stderr_text = (completed_process.stderr or "").strip()
-    # Keep a subprocess failure informative without placing an unbounded log in
-    # every failed CSV row.
+    # Store only the final 4,000 characters of stderr in each failed CSV row.
     if len(stderr_text) > 4_000:
         stderr_text = stderr_text[-4_000:]
     if completed_process.returncode != 0:
@@ -362,7 +361,7 @@ def _parse_subprocess_output(
     for dataset in datasets:
         entry = parsed_by_key.get((dataset.dataset_id, dataset.iter_num))
         if entry is None:
-            missing_error = default_error or "No result emitted by subprocess backend."
+            missing_error = default_error or "The subprocess returned no result for this dataset."
             results.append(
                 _result_from_dataset(
                     dataset,
@@ -439,9 +438,8 @@ class SubprocessFeolsBenchmarker:
                         "fe_cols": spec.fe_cols,
                         "vcov": spec.vcov,
                         "vcov_type": _normalize_vcov(spec.vcov),
-                        # Julia PPML can run for several minutes. Retain a
-                        # file-backed copy of each emitted result so buffered
-                        # stdout cannot lose completed rows at process exit.
+                        # Julia PPML can run for several minutes. Write each result
+                        # to a file in case the process exits before flushing stdout.
                         "result_log_path": str(result_log_path),
                     }
                 ),

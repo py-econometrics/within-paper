@@ -1,6 +1,6 @@
 {
   "additional_identifier_columns": [],
-  "benchmark_notes": "A difficult real graph with slow convergence in the old benchmarks.",
+  "benchmark_notes": "Firm-director graph with slow convergence in earlier benchmark runs.",
   "checksum_csv": "4bc0f720acf6d8c416bc7cdd35bace7c358ca442305259ae299ad977e10a0fa7",
   "citation": "Identifiers are anonymized; regressors and outcome are synthetic benchmark variables.",
   "columns": [

@@ -7,7 +7,7 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class BenchmarkDataset:
-    """High-level dataset descriptor shared across benchmark backends."""
+    """Dataset passed to each benchmark backend."""
 
     dataset_id: str
     data_path: Path
@@ -31,7 +31,7 @@ class DataGeneratorProtocol(Protocol):
 
 @dataclass(frozen=True)
 class FeolsSpec:
-    """Specification for a full feols pipeline benchmark."""
+    """Settings for one feols call."""
 
     depvar: str
     covariates: list[str]
@@ -57,7 +57,7 @@ class FeolsSpec:
 
 @dataclass(frozen=True)
 class FeolsResult:
-    """Result row for a full feols pipeline benchmark."""
+    """Result from one feols call."""
 
     source_dataset_id: str
     source_k: int | None

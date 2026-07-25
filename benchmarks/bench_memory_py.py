@@ -37,7 +37,7 @@ print(f"{{size:<6}} {{dgp_type:<12}} {{backend:<10}} {{elapsed:>8.2f}}s  {{rss:>
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--out", type=Path, default=Path("results/runs/latest/memory.csv"),
-    help="Structured result CSV written in addition to the console table.",
+    help="Also write the results to this CSV.",
 )
 args = parser.parse_args()
 rows = []

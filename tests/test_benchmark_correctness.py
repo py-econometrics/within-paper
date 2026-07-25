@@ -250,15 +250,14 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertNotIn("result_ols_gpu_vs_fem", manuscript)
 
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
-        # A complete bipartite graph is rank one, so its second singular value is
-        # exactly zero and the reported gap 1 - rho is exactly 1. This guards the
-        # synthetic-complete cell against the PROPACK spurious-value regression.
+        # A complete bipartite graph has rank one, so its second singular value is
+        # zero and the gap is one. This catches spurious nonzero values from PROPACK.
         complete = sp.csr_matrix(np.ones((1000, 500)))
         self.assertAlmostEqual(_component_rho(complete), 0.0, places=6)
 
     def test_very_large_block_uses_arpack_only(self) -> None:
-        # min-dim above PROPACK_MAX_MIN_DIM: ARPACK only, no PROPACK (which can
-        # terminate the interpreter on very large irregular blocks).
+        # Above PROPACK_MAX_MIN_DIM, use only ARPACK; SciPy's PROPACK
+        # implementation can terminate on very large irregular blocks.
         matrix = sp.eye(20_001, format="csr")
         calls: list[str] = []
 
@@ -271,8 +270,8 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(calls, ["arpack"])
 
     def test_sparse_block_uses_propack_first(self) -> None:
-        # A block too large to densify but within the PROPACK dimension budget
-        # takes the fast PROPACK path without invoking ARPACK.
+        # This block is too large for dense SVD but small enough for PROPACK.
+        # A successful PROPACK call should not fall back to ARPACK.
         matrix = sp.eye(5_000, format="csr")
         calls: list[str] = []
 
@@ -300,12 +299,12 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
 
     def test_prose_values_select_the_named_backend_and_largest_metric(self) -> None:
         rows = [
-            ["#agreement-simple", "`fixest`", "", "", "$1.1 times 10^(-14)$"],
-            ["#agreement-difficult", "`fixest`", "", "", "$1.9 times 10^(-7)$"],
+            ["#agreement-simple", "`fixest`", "", "$1.1 times 10^(-14)$"],
+            ["#agreement-difficult", "`fixest`", "", "$1.9 times 10^(-7)$"],
         ]
-        self.assertEqual(_numeric_cell(rows[0][4]), 1.1e-14)
+        self.assertEqual(_numeric_cell(rows[0][3]), 1.1e-14)
         self.assertEqual(
-            _largest_backend_metric(rows, "fixest", 4), "$1.9 times 10^(-7)$"
+            _largest_backend_metric(rows, "fixest", 3), "$1.9 times 10^(-7)$"
         )
 
     def test_component_share_ignores_scientific_exponent(self) -> None:

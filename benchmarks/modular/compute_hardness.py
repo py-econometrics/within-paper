@@ -1,9 +1,9 @@
-"""Compute the pairwise graph-hardness diagnostics used in the paper.
+"""Compute the pairwise spectral gaps used in the paper.
 
 Derived from PyFixest commit f671ec83 (``data hardness checks``). For each
 fixed-effect pair, the script removes singleton observations as the estimator
-does, finds bipartite connected components, and reports the component with the
-largest nontrivial MAP contraction factor ``rho = sigma_2(H)^2``.
+does, finds the bipartite connected components, and reports the component with
+the largest nontrivial MAP contraction factor ``rho = sigma_2(H)^2``.
 """
 
 from __future__ import annotations
@@ -34,10 +34,7 @@ DATA_DIR = ROOT / "benchmarks" / "data"
 MEMORY_DATA_DIR = ROOT / "data"
 DEFAULT_OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 PROPACK_MAX_MIN_DIM = 20_000
-# Materialize a dense SVD whenever the normalized block has at most this many
-# entries. Dense SVD is exact and, unlike the iterative solvers, resolves
-# rank-deficient spectra correctly (the complete bipartite graph is rank one, so
-# its second singular value is exactly zero and its gap is exactly 1).
+# Use dense SVD when the normalized block has at most this many entries.
 DENSE_MAX_ENTRIES = 1_000_000
 CORREIA_DATASETS = (
     "credit2", "credit", "soccer", "synthetic-complete",
@@ -84,14 +81,11 @@ def _factorize(values: np.ndarray) -> tuple[np.ndarray, int]:
 def _top_two_singular_values(normalized: sp.csr_matrix) -> np.ndarray:
     """Return the two largest singular values of a normalized bipartite block.
 
-    Small blocks use an exact dense SVD, which is the only reliable option on
-    rank-deficient spectra: the complete bipartite graph is rank one, so its
-    second singular value is exactly zero, and the iterative solvers return
-    spurious nonzero values for it. Eligible sparse blocks use PROPACK first
-    because it is much faster on clustered spectra such as the path-like
-    ``synthetic-zigzag`` graph, with ARPACK as a fallback. Blocks above
-    ``PROPACK_MAX_MIN_DIM`` remain ARPACK-only because PROPACK's SciPy backend can
-    terminate the interpreter on very large irregular inputs.
+    Iterative solvers can report a nonzero second singular value for rank-deficient
+    matrices; it should be zero for a complete bipartite graph. For larger blocks
+    below ``PROPACK_MAX_MIN_DIM``, try PROPACK first and fall back to ARPACK. Above
+    that limit, skip PROPACK because SciPy's implementation can terminate the
+    process on very large irregular inputs.
     """
     rows, cols = normalized.shape
     if min(rows, cols) <= 64 or rows * cols <= DENSE_MAX_ENTRIES:
@@ -192,7 +186,9 @@ def enumerate_datasets() -> list[DatasetSpec]:
                 )
             )
     for family in ("simple", "difficult"):
-        path = DATA_DIR / f"{family}_1000000_k1_iter_1.parquet"
+        # The OLS runtime table times the 10M designs, so its gap diagnostic is
+        # computed on the same 10M graphs rather than a 1M proxy.
+        path = DATA_DIR / f"{family}_10000000_k1_iter_1.parquet"
         if path.exists():
             specs.append(DatasetSpec(path.stem, "fixest-dgp", path, ("indiv_id", "firm_id", "year"), _read_parquet))
         for label, n_obs in (("100k", 100_000), ("1m", 1_000_000)):
@@ -209,7 +205,7 @@ def enumerate_datasets() -> list[DatasetSpec]:
                 )
     ids = [spec.dataset_id for spec in specs]
     if len(ids) != len(set(ids)):
-        raise RuntimeError("Hardness dataset identifiers are not unique")
+        raise RuntimeError("Dataset IDs for the spectral-gap calculation are not unique")
     return specs
 
 
@@ -250,7 +246,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--keep-singletons", action="store_true")
-    parser.add_argument("--datasets", nargs="*", help="Optional dataset IDs to compute")
+    parser.add_argument("--datasets", nargs="*", help="Dataset IDs to compute (default: all)")
     args = parser.parse_args()
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -260,7 +256,7 @@ def main() -> None:
         specs = [spec for spec in specs if spec.dataset_id in selected]
         missing = sorted(selected - {spec.dataset_id for spec in specs})
         if missing:
-            raise SystemExit("Unknown or unavailable hardness datasets: " + ", ".join(missing))
+            raise SystemExit("Unknown dataset IDs or missing input files: " + ", ".join(missing))
     results = compute(specs, args.keep_singletons)
     results.to_csv(output, index=False)
     print(f"[hardness] wrote {output}")

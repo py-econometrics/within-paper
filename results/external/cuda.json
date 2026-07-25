@@ -5,7 +5,7 @@
   "exact_run_provenance_available": false,
   "cross_machine_comparison_allowed": false,
   "local_reproducible": false,
-  "provenance_note": "Exact accelerator, host, software-environment, trial, and run metadata are unavailable.",
+  "provenance_note": "The original record does not identify the accelerator, host, software versions, or individual trials.",
   "measurements": [
     {
       "table": "ols",

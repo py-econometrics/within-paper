@@ -3,7 +3,7 @@
     "ruc",
     "t"
   ],
-  "benchmark_notes": "A comparatively well-connected real panel; useful for baseline timing.",
+  "benchmark_notes": "Well-connected borrower-period graph used for baseline timings.",
   "checksum_csv": "70df7d1d9182f47c24a295dd1c5d06d5fb20e60ebb82eabe3efbfa06b4f9c67e",
   "citation": "Identifiers are anonymized; regressors and outcome are synthetic benchmark variables.",
   "columns": [

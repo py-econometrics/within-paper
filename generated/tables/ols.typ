@@ -12,7 +12,7 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`], th[`torch-cuda`]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [0.857 (1.00)], [2.50s], [2.71s], [2.15s], [13.0s], [4.73s],
-  [difficult (sparse graph)], [$1.67 times 10^(-5)$ (1.00)], [331.7s], [71.6s], [26.9s], [4.73s], [8.73s],
+  [simple (well-connected)], [0.857 (1.00)], [2.29s], [2.65s], [2.20s], [12.0s], [4.73s],
+  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [347.9s], [71.8s], [28.8s], [4.37s], [8.73s],
   table.hline(stroke: 0.8pt + table-rule),
 )

@@ -97,7 +97,7 @@ for (idx in seq_along(manifest)) {
         suppressMessages(
           fit <- fepois(formula, data = df, vcov = vcov_arg, nthreads = bench_threads, glm.iter = 100)
         )
-        if (!isTRUE(fit$convStatus)) stop("fixest PPML model returned without convergence")
+        if (!isTRUE(fit$convStatus)) stop("fixest PPML model did not converge")
       })[["elapsed"]])
     },
     error = function(e) {

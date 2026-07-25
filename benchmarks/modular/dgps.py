@@ -51,10 +51,9 @@ AKM_DGP_SCHEMA = pa.schema(
 
 
 def _generator_source_hash(source: str) -> str:
-    """Digest one DGP source so only that generator's cache is invalidated.
+    """Hash a DGP source file so a code change invalidates only its cache.
 
-    Hashing only the parameter JSON would let a changed generator silently reuse
-    stale Parquet inputs while provenance attributes them to the current code.
+    A parameter-only hash could reuse stale Parquet files after the generator changed.
     """
     source_path = Path(__file__).parent / source
     return hashlib.sha256(source_path.read_bytes()).hexdigest()[:16]
@@ -306,7 +305,7 @@ def _get_akm_scenarios(
     scenario_names = names or [scenario.name for scenario in scenario_defs]
     unknown = sorted(set(scenario_names) - set(scenario_map))
     if unknown:
-        raise ValueError(f"Unknown AKM sweep scenario(s): {', '.join(unknown)}")
+        raise ValueError(f"Unknown AKM benchmark scenarios: {', '.join(unknown)}")
 
     return [
         AKMSweepDGP(
