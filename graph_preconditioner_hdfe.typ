@@ -128,14 +128,14 @@
 
 = Introduction
 
-Fixed-effect regressions are ubiquitous in applied econometrics. Roughly
-half of published research in top economics and finance journals mentions
-"fixed effects" @goldsmith2026tracking. They appear throughout applied
-economics: labor economists use worker and firm fixed effects to separate
-worker heterogeneity from firm wage premia; health economists study
-physician practice styles with individual-physician and region fixed
-effects in mover designs; and education researchers study models with
-school, student, teacher, or student-teacher fixed effects.
+Fixed-effect regressions are ubiquitous in applied econometrics with
+roughly half of published research in top economics and finance journals
+mentioning "fixed effects" @goldsmith2026tracking. Labor economists use
+worker and firm fixed effects to separate worker heterogeneity from firm
+wage premia; health economists study physician practice styles with
+individual-physician and region fixed effects in mover designs; and
+education researchers study models with school, student, teacher, or
+student-teacher fixed effects.
 
 The standard computational starting point for estimating these regressions
 efficiently is the Frisch-Waugh-Lovell (FWL) theorem @frisch1933
@@ -154,18 +154,23 @@ acceleration.
 
 MAP cycles over the fixed-effect dimensions and, for each variable of
 interest, subtracts the mean within every level of the current dimension.
-Because demeaning along one dimension changes the group means for the other
-dimensions, the procedure repeats these cycles until convergence. In other
-words, MAP residualizes with respect to one fixed effect at a time but does
-not directly exploit the overlap between fixed effects. In a worker-firm
-panel, for example, low worker mobility between firms can make some
-directions in the worker-firm fixed-effect design nearly collinear,
-adversely affecting MAP's convergence. We show that this problem is related
-to the pattern and frequency with which levels of different fixed-effect
-dimensions occur together. For each pair of fixed-effect dimensions, the
-levels of those dimensions form the two vertex sets of a weighted bipartite
-graph. An edge connects two levels when they occur in the same observation,
-and its weight records their number of joint occurrences.
+Because demeaning along one fixed-effect dimension (for example workers)
+changes the group means for the other dimensions (for example firms or
+years), the procedure repeats these cycles until convergence. In other
+words, MAP residualizes with respect to one fixed-effect dimension at a
+time but does not directly exploit the co-occurrence of levels of different
+fixed-effect dimensions. In a worker-firm panel, for example, low worker
+mobility between firms can make some directions in the worker-firm
+fixed-effect structure nearly collinear, adversely affecting MAP's
+convergence.
+
+We show that this problem is related to the connectivity of the graph
+formed by the fixed effects: The levels of a pair of fixed-effect
+dimensions, for example workers and firms, are the vertices of a bipartite
+graph where two vertices are connected if there is an observation taking on
+the respective fixed-effect levels (for example, a worker working at a
+particular firm). The bipartite graph is weighted by the number of
+occurrences of a given pair of fixed-effect levels.
 
 In this paper, we use these pairwise bipartite graphs to construct an
 additive Schwarz preconditioner for LSMR @fong2011, a Krylov least-squares
@@ -176,21 +181,19 @@ Krylov iteration without changing the least-squares solution.#footnote[The
   @fixedeffectmodels, uses the same Krylov solver but only with diagonal
   preconditioning. Diagonal preconditioning ignores the off-diagonal
   co-occurrence structure; our contribution is the preconditioner, not the
-  use of LSMR.]
-
-Algebraically, each off-diagonal block of the fixed-effect Gramian records
-the edge weights of one pairwise bipartite graph. When combined with the
-corresponding diagonal count blocks and subjected to a sign flip for one
-fixed-effect dimension, the resulting pair block is the Laplacian of that
-graph @correia2017. We use sparse approximate Cholesky factorizations
-@spielman2014 @gao2025 to obtain efficient approximate solves for these
-pairwise Laplacians and combine their corrections in the Schwarz
-preconditioner.
+  use of LSMR.] Algebraically, each off-diagonal block of the fixed-effect
+Gramian records the edge weights of one pairwise bipartite graph. When
+combined with the corresponding diagonal count blocks and subjected to a
+sign flip for one fixed-effect dimension, the resulting pair block is a
+graph Laplacian @correia2017. We use sparse approximate Cholesky
+factorizations @spielman2014 @gao2025 to obtain efficient approximate
+solves for these pairwise Laplacians and combine their corrections in the
+Schwarz preconditioner.
 
 In our benchmarks, graph preconditioning is substantially faster than MAP
 on poorly connected designs. On well-connected designs, however, its setup
-cost outweighs the iteration savings, and MAP and diagonally preconditioned
-Krylov methods are faster.
+time can dominate total runtime in which case MAP and diagonally
+preconditioned Krylov methods are faster.
 
 The rest of the paper is organized as follows. Section 2 sets up the
 fixed-effect absorption problem, and Section 3 introduces the AKM @akm1999
