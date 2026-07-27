@@ -326,10 +326,11 @@ of the fixed-effect graph.
 
 = The Graph Structure of the Gramian <sec:gramian>
 
-The bipartite graph of worker and firm connections introduced in Section 3
-has an algebraic representation in the block structure of the Gramian
-$G = D' W D$ @correia2017. Suppose that the columns of $D$ are ordered as
-worker levels, firm levels, and year levels. Then
+The bipartite graph of worker and firm connections introduced in @sec:akm
+is represented algebraically in the block structure of the Gramian
+$G = D' W D$ derived in @eq:fwl-normal @correia2017. Suppose that the
+columns of $D$ are ordered as worker levels, firm levels, and year levels.
+Then, the Gramian has the block structure
 
 $
   G = mat(
@@ -337,24 +338,20 @@ $
     C_(W F)', G_(F F), C_(F Y);
     C_(W Y)', C_(F Y)', G_(Y Y)
   ).
-$
+$<eq:gramian-blocks>
 
 The #dg[diagonal blocks] $#dg[$G_(W W)$]$, $#dg[$G_(F F)$]$, and
-$#dg[$G_(Y Y)$]$ contain weighted counts for workers, firms, and years. An
-observation belongs to one level of each factor, so these blocks are
-diagonal; solving them requires only division by group counts.
+$#dg[$G_(Y Y)$]$ contain the weighted counts for each worker, firm, and
+year, respectively. Because one observation belongs to exactly one level of
+each fixed-effect dimension, these blocks are diagonal and solving them
+only requires division by weighted group counts. The #cr[off-diagonal
+  blocks] are cross-tabulations: the worker-firm block $#cr[$C_(W F)$]$
+records how often worker $i$ is observed at firm $j$ with analogous
+interpretations for the worker-year block $#cr[$C_(W Y)$]$ and the
+firm-year block $#cr[$C_(F Y)$]$.
 
-
-The #cr[off-diagonal blocks] are cross-tabulations: the worker-firm block
-$#cr[$C_(W
-F)$]$ records how often worker $i$ is observed at firm $j$, and the
-worker-year and firm-year blocks have analogous interpretations.
-
-As a small example, we construct a worker-firm panel and populate its
-Gramian. For simplicity, we ignore any regression weights and set $W = I$.
-
-#align(center)[
-  #table(
+#figure(
+  table(
     columns: (0.45fr, 0.8fr, 0.7fr, 0.7fr, 0.7fr),
     stroke: 0.35pt + table-light-rule,
     inset: (x: 5pt, y: 3.8pt),
@@ -369,8 +366,17 @@ Gramian. For simplicity, we ignore any regression weights and set $W = I$.
     [5], [$W_3$], [$F_2$], [$Y_1$], [5.0],
     [6], [$W_3$], [$F_2$], [$Y_2$], [4.5],
     table.hline(stroke: 0.8pt + table-rule),
-  )
-]
+  ),
+  caption: [Synthetic worker-firm panel],
+)<tab:example>
+
+As an instructive example, we construct a small synthetic worker-firm panel
+in @tab:example and populate its Gramian $G$. Throughout the example, we
+assume an unweighted regression with $W = I$. @fig-toy-projection
+illustrates the bipartite worker-firm graph of this panel. Worker $W_1$ is
+observed at two firms $F_1$ and $F_2$, creating a link between them, while
+workers $W_2$ and $W_3$ are each observed at a single firm. In AKM terms,
+$W_1$ is a mover and $W_2$ and $W_3$ are stayers.
 
 #figure(
   image(solver-img("toy_worker_firm_projection.svg"), width: 50%),
@@ -378,13 +384,11 @@ Gramian. For simplicity, we ignore any regression weights and set $W = I$.
     mover; workers $W_2$ and $W_3$ are stayers.],
 ) <fig-toy-projection>
 
-@fig-toy-projection plots the worker-firm projection of this panel. Worker
-$W_1$ is observed at both $F_1$ and $F_2$ and creates a link between the
-two firms; in AKM terms, $W_1$ is a mover. Worker $W_2$ stays at $F_1$ for
-two periods, and $W_3$ stays at $F_2$ for two periods. Both are stayers.
 
-The diagonal blocks are count matrices. In this example, each worker is
-observed twice, each firm three times, and each year three times, so
+Because the regression is unweighted, $W=I$, the diagonal blocks of the
+Gramian in @eq:gramian-blocks are simple counts. @tab:example shows that
+each worker is observed twice, each firm three times, and each year three
+times, so that
 
 $
   G_(W W) = mat(2, 0, 0; 0, 2, 0; 0, 0, 2), quad
@@ -392,8 +396,8 @@ $
   G_(Y Y) = mat(3, 0; 0, 3).
 $
 
-The off-diagonal blocks are cross-tabulations between factors. The
-worker-firm block is
+The off-diagonal blocks are cross-tabulations between fixed-effect
+dimensions. The worker-firm block is
 
 $
   C_(W F) = mat(
@@ -424,12 +428,9 @@ $
   ).
 $
 
-Firm $F_1$ appears twice in year $Y_1$ and once in year $Y_2$; firm $F_2$
-has the opposite pattern. Combining the diagonal count blocks and the
-off-diagonal cross-tabulation blocks yields the full Gramian.
-
-With column order $(W_1, W_2, W_3, F_1, F_2, Y_1, Y_2)$, the full Gramian
-is
+Firm $F_1$ appears twice in year $Y_1$ and once in year $Y_2$, and firm
+$F_2$ has the opposite pattern. With column order
+$(W_1, W_2, W_3, F_1, F_2, Y_1, Y_2)$, the full Gramian is
 
 $
   G = mat(
@@ -444,20 +445,18 @@ $
   ).
 $
 
-The worker-firm submatrix stores the bipartite graph algebraically. The
-diagonal entries are worker and firm counts, and the entries of $C_(W F)$
-are edge multiplicities between workers and firms. After flipping the sign
-of $C_(W F)$, this submatrix is a graph Laplacian: its off-diagonal entries
-are non-positive, and every row sums to zero because each diagonal count
-cancels the off-diagonal observation counts in the same row. For a worker,
-the diagonal entry is the number of observations for that worker, while the
-off-diagonal entries show how those observations are distributed across
-firms; firm rows have the analogous interpretation with observations summed
-over workers.
-
-
+The submatrix comprising the worker-worker, worker-firm, and firm-firm
+blocks algebraically represents the bipartite graph formed by the worker
+and firm fixed effects. The diagonal entries are worker and firm counts,
+and the entries of $C_(W F)$ are edge multiplicities between workers and
+firms. After flipping the sign of $C_(W F)$, the worker-firm submatrix is
+the graph Laplacian of the bipartite graph
 $
   L_(W F) = mat(
+    G_(W W), -C_(W F);
+    -C_(W F)', G_(F F);
+  )
+  = mat(
     augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
     2, 0, 0, -1, -1;
     0, 2, 0, -2, 0;
@@ -466,12 +465,19 @@ $
     -1, 0, -2, 0, 3
   ).
 $
+The off-diagonal entries of $L_(W F)$ are non-positive, and every row sums
+to zero because each diagonal count cancels the off-diagonal observation
+counts in the same row. For a worker, the diagonal entry is the number of
+observations for that worker, while the off-diagonal entries show how those
+observations are distributed across firms. Firm rows have the analogous
+interpretation with observations summed over workers.
 
-The same Laplacian construction applies to any pair of fixed effects, and
-the preconditioner of Section 6 builds on these pairwise Laplacians. Before
-turning to it, however, we introduce the method of alternating projections,
-which avoids forming the full Gramian $G$ by working only on the diagonal
-worker, firm, and year blocks.
+
+The graph Laplacian can be constructed similarly for any pair of
+fixed-effect dimensions which we will use to construct a preconditioner in
+@sec:schwarz-preconditioner. First, however, we discuss the method of
+alternating projections, which avoids forming the full Gramian $G$ and only
+uses the diagonal worker, firm, and year blocks.
 
 
 = Alternating Projections and Graph Connectivity <sec:map-connectivity>
