@@ -9,7 +9,12 @@
   number-align: center,
 )
 #set text(font: "Libertinus Serif", size: 10.6pt)
-#set par(justify: true, leading: 1.06em, spacing: 1.12em)
+#set par(
+  justify: true,
+  leading: 1.06em,
+  spacing: 1.12em,
+  first-line-indent: 1em,
+)
 #set heading(numbering: "1.")
 #set math.equation(numbering: "(1)")
 #set figure(gap: 0.95em)
