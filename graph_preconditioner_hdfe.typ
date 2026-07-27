@@ -98,20 +98,18 @@
     #text(size: 9.6pt)[
       #text(weight: "bold")[Abstract.] The Method of Alternating
       Projections (MAP) is the de facto standard algorithm for estimating
-      high-dimensional fixed-effect regressions. We relate MAP's
-      convergence to the connectivity of the weighted bipartite graph
-      associated with each pair of fixed-effect dimensions. MAP is
-      generally fast but can converge slowly on poorly connected graphs, as
-      in matched employer-employee panels with low worker mobility. We
-      propose a graph-preconditioned Krylov solver with attractive
-      convergence properties when the pairwise fixed-effect graphs poorly
-      connected. Our preconditioner exploits that, after a sign change,
-      each pairwise block of the fixed-effect Gramian is the weighted
-      bipartite Laplacian of the bipartite graph which admits a sparse
-      approximate Cholesky factorizations. We show that graph
-      preconditioning can substantially improve convergence on poorly
-      connected fixed-effect graphs, although its setup cost can outweigh
-      the iteration savings on well-connected graphs.
+      high-dimensional fixed-effect regressions. Although MAP is often
+      fast, it can converge slowly when the fixed-effect structure is
+      poorly connected, as in matched employer-employee panels with low
+      worker mobility between firms. We relate MAP's convergence to the
+      connectivity of the weighted bipartite graph formed by the levels of
+      a pair of fixed-effect dimensions and propose a novel
+      graph-preconditioned Krylov solver. Our preconditioner is constructed
+      from sparse approximate Cholesky factorizations of the weighted
+      bipartite graph Laplacian associated with each pair of fixed-effect
+      dimensions. We show that graph preconditioning can substantially
+      improve convergence on poorly connected fixed-effect graphs but that
+      its setup time can dominate total runtime on well-connected graphs.
     ]
   ]
 ]
