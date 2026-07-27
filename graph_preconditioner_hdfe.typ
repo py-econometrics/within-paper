@@ -84,7 +84,7 @@
 
   #v(0.65em)
   #text(size: 10.5pt)[Alexander Fischer#footnote[trivago] and Kristof
-    Schröder#footnote[appliedAI Institute for Europe gGmbH]]
+    Schröder#footnote[appliedAI Institute for Europe GmbH]]
 
   #v(0.4em)
   #text(size: 9.5pt)[Draft: June 2026]
@@ -200,87 +200,90 @@ on poorly connected designs. On well-connected designs, however, its setup
 time can dominate total runtime in which case MAP and diagonally
 preconditioned Krylov methods are faster.
 
-The rest of the paper is organized as follows. Section 2 sets up the
-fixed-effect absorption problem, and Section 3 introduces the AKM @akm1999
-model as our running example. Section 4 develops the graph structure of the
-fixed-effect Gramian, and Section 5 connects this structure to the
-convergence behavior of MAP. Section 6 builds up the graph preconditioner,
-starting from a general discussion of preconditioning and culminating in
-the construction of the graph-based preconditioner. Section 7 reports
-benchmarks on runtime, memory, and numerical equivalence; Section 8
-describes the software implementation of the new algorithm; and Section 9
-concludes.
+The rest of the paper is organized as follows. @sec:absorbing sets up the
+fixed-effect absorption problem, and @sec:akm introduces the AKM @akm1999
+model as our running example. @sec:gramian develops the graph structure of
+the fixed-effect Gramian, and @sec:map-connectivity connects this structure
+to the convergence behavior of MAP. @sec:schwarz-preconditioner builds up
+the graph preconditioner, starting from a general discussion of
+preconditioning and culminating in the construction of the graph-based
+preconditioner. Section 7 reports benchmarks on runtime, memory, and
+numerical equivalence; Section 8 describes the software implementation of
+the new algorithm; and Section 9 concludes.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for
   this operation: "absorbing fixed effects", "demeaning", "residualizing",
   or applying the "within transformation". We use these terms
-  interchangeably throughout.]
+  interchangeably throughout.]<sec:absorbing>
 
 We focus on the linear model
 
-$ y = X beta + D alpha + epsilon, $
+$ y = X beta + D alpha + epsilon, $<eq:model>
 
-where $X$ contains the regressors of interest, $D$ is the fixed-effect
-design matrix, and $alpha$ collects the fixed-effect coefficients. In
-high-dimensional applications $D$ may have hundreds of thousands or
+where $X$ denotes a set of covariates and $D$ is the fixed-effect design
+matrix given by
+$
+  D_(i j) = cases(
+    1 & "if observation" i "belongs to fixed-effect level" j",",
+    0 & "otherwise.",
+  )
+$
+In high-dimensional applications, $D$ may have hundreds of thousands or
 millions of columns, and forming or inverting the full system in
-$[X quad D]$ might prove computationally infeasible. Fortunately, via the
-Frisch-Waugh-Lovell (FWL) theorem, we can compute $hat(beta)$ without ever
-forming $[X quad D]$ or inverting its cross product.
+$[X quad D]$ might prove computationally infeasible.
 
-FWL reduces the computation of $hat(beta)$ to two steps. In step one, we
-residualize the outcome and each covariate against the fixed effects: we
-regress $y$ on $D$ and keep the residual $tilde(y)$, and we do the same for
-every column of $X$. Denoting $M_D$ as the linear operator that sends a
-variable to this residual, so that $tilde(y) = M_D y$ and
-$tilde(X) = M_D X$, the coefficient of interest is recovered by regressing
-the residualized outcome on the residualized covariates,
+Fortunately, the Frisch-Waugh-Lovell (FWL) theorem @frisch1933 @lovell1963
+allows us to estimate $beta$ in two tractable steps without forming
+$[X quad D]$ or inverting its cross product. First, the outcome and each
+covariate are residualized against the fixed effects by regressing $y$ and
+each column of $X$ on $D$. Second, the residualized outcome $tilde(y)$ is
+regressed on the residualized covariates $tilde(X)$. The FWL theorem
+implies that the resulting slope of this regression equals the coefficient
+$beta$ of the full model @eq:model.
 
+To fix notation, we denote by $M_D$ the linear operator that maps a
+variable to its residual when regressed on the fixed effects $D$, i.e.,
+$tilde(y) = M_D y$ and $tilde(X) = M_D X$. The coefficient of interest
+$beta$ is then recovered by regressing the residualized outcome on the
+residualized regressors
 $
   tilde(y) = M_D y, quad tilde(X) = M_D X, quad
   hat(beta) = (tilde(X)' W tilde(X))^(-1) tilde(X)' W tilde(y),
 $
-
-where $W$ is a diagonal matrix of weights. With one covariate, the
-procedure consists of three regressions: $y$ on $D$, $x$ on $D$, and
-$tilde(y)$ on $tilde(x)$. FWL implies that the slope in the last regression
-equals the coefficient on $x$ in the full regression of $y$ on $x$ and $D$.
-
-The residualization step is the weighted least-squares projection of the
-outcome and each covariate in $X$ onto the column space of the fixed-effect
-dummy matrix $D$. For a right-hand side $mu$, either $y$ or one column of
-$X$, we solve
+where $W$ is a diagonal matrix of weights. The residualization step is the
+weighted least-squares projection of the outcome and each covariate in $X$
+onto the column space of the fixed-effect design matrix $D$. For a
+right-hand side $mu$, i.e., the outcome $y$ or a column of $X$, we solve
 
 $ hat(alpha)_mu in arg min_alpha || D alpha - mu ||_W^2, $ <eq:demean-ls>
 
-and the residual is $tilde(mu) = mu - D hat(alpha)_mu$. The first-order
-condition for @eq:demean-ls,
+The first-order condition for @eq:demean-ls,
+$D' W (D hat(alpha)_mu - mu) = 0$, can be written as
+
 
 $
-  D' W (D hat(alpha)_mu - mu) = 0, quad "equivalently" quad
   G hat(alpha)_mu = D' W mu, quad G = D' W D,
 $ <eq:fwl-normal>
+where $G$ is the fixed-effect Gramian. Solving @eq:fwl-normal for
+$hat(alpha)_mu$, we obtain the residualized right-hand side as
+$tilde(mu) = mu - D hat(alpha)_mu$.#footnote[
+  With a full set of fixed-effect dummies, the columns of $D$ are linearly
+  dependent and $hat(alpha)_mu$ is not unique. To report individual fixed
+  effects, one must choose a normalization, usually by dropping reference
+  categories. The normalization does not change the fitted value, the
+  residual, or the FWL slope. Throughout, inverses are taken after
+  normalizing each connected component.] We note that each FWL
+residualization uses the same fixed-effect Gramian $G$, and only the
+right-hand side $mu$ changes as we move from the outcome to the covariates.
+The cost of residualization therefore depends on the structure of the
+Gramian $G$.
 
-determines the fitted value $D hat(alpha)_mu$ and the residual $tilde(mu)$,
-even though $hat(alpha)_mu$ itself is not unique. With a full set of
-fixed-effect dummies, the columns of $D$ are linearly dependent. To report
-individual fixed effects, one must choose a normalization, usually by
-dropping reference categories. The normalization does not change the fitted
-value, the residual, or the FWL slope.#footnote[
-  Throughout, inverses are taken after normalizing each connected
-  component.]
+We illustrate this structure with the AKM worker-firm model in the next
+section before explaining the graph interpretation of the fixed-effect
+Gramian $G$ in @sec:gramian and how it governs MAP convergence in
+@sec:map-connectivity.
 
-Each FWL residualization uses the same coefficient matrix $G$; only the
-right-hand side changes as we move from the outcome to the covariates. The
-cost of residualization therefore depends on the structure of the Gramian
-$G$. In the next section, we illustrate this structure with the AKM
-worker-firm model and explain why fixed-effect designs have a direct graph
-interpretation. Sections 5--6 then return to the algorithms and show how
-the structure of the Gramian and its associated graph governs MAP
-convergence, and explain how we use it to construct the factor-pair Schwarz
-preconditioner.
-
-= A Running Example: The AKM Model
+= A Running Example: The AKM Model <sec:akm>
 
 The AKM model of #cite(<akm1999>, form: "prose") introduces the worker-firm
 setting used throughout the paper. It separates persistent worker
@@ -327,7 +330,8 @@ such cross-firm comparisons the data contain, especially across otherwise
 different firms, the easier it is to identify worker and firm premia. In
 the graph, these moves are exactly the edges that connect firms; additional
 moves of workers across firms add worker-firm links to the graph.
-= The Graph Structure of the Gramian
+
+= The Graph Structure of the Gramian <sec:gramian>
 
 The bipartite graph of worker and firm connections introduced in Section 3
 has an algebraic representation in the block structure of the Gramian
@@ -477,7 +481,7 @@ which avoids forming the full Gramian $G$ by working only on the diagonal
 worker, firm, and year blocks.
 
 
-= Alternating Projections and Graph Connectivity
+= Alternating Projections and Graph Connectivity <sec:map-connectivity>
 
 The workhorse algorithm for multi-way fixed effects is the Method of
 Alternating Projections (MAP), also referred to as iterative demeaning or
@@ -579,7 +583,7 @@ worker-firm example of Section 4, the gap is $1/3$.#footnote[In that
   has eigenvalues $1$ and $2/3$. After dropping the unit eigenvalue,
   $rho_(W F) = 2/3$ and the gap is $1/3$.]
 
-= The Factor-Pair Schwarz Preconditioner
+= The Factor-Pair Schwarz Preconditioner <sec:schwarz-preconditioner>
 
 == Preconditioners
 
