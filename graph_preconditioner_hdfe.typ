@@ -131,7 +131,7 @@
   #text(size: 9.1pt)[#strong[JEL codes:] C55; C63; C81; C87; J31]
 ]
 
-= Introduction
+= Introduction <sec:introduction>
 
 Fixed-effect regressions are ubiquitous in applied econometrics with
 roughly half of published research in top economics and finance journals
@@ -227,7 +227,7 @@ $
     1 & "if observation" i "belongs to fixed-effect level" j",",
     0 & "otherwise.",
   )
-$
+$<eq:fixed-effect-design-matrix>
 In high-dimensional applications, $D$ may have hundreds of thousands or
 millions of columns, and forming or inverting the full system in
 $[X quad D]$ might prove computationally infeasible.
@@ -482,105 +482,165 @@ uses the diagonal worker, firm, and year blocks.
 
 = Alternating Projections and Graph Connectivity <sec:map-connectivity>
 
-The workhorse algorithm for multi-way fixed effects is the Method of
-Alternating Projections (MAP), also referred to as iterative demeaning or
-the "zig-zag" algorithm @guimaraes2010 @gaure2013. Many packages employ MAP
-or its variants, frequently combined with accelerations @berge2018
-@correia2017, such as the Irons-Tuck extrapolation used by `fixest`
-@irons1969 @berge2026fixest. Sections 3 and 4 introduced the fixed-effect
-graph and its algebra; this section turns to MAP itself and shows how that
-graph geometry governs its convergence rate.
+The workhorse algorithm for high-dimensional fixed-effect regressions is
+the Method of Alternating Projections (MAP), also referred to as iterative
+demeaning or the "zig-zag" algorithm @guimaraes2010 @gaure2013. Many
+packages employ MAP or its variants, frequently combined with accelerations
+@berge2018 @correia2017, such as the Irons-Tuck extrapolation used by
+`fixest` @irons1969 @berge2026fixest. MAP solves the FWL residualization
+problem by iterating over one fixed-effect dimension at a time. For
+example, in the AKM model of @sec:akm, MAP first subtracts worker means
+from the current residual, then firm means from the updated residual, then
+year means, and repeats until convergence is reached.
 
-MAP solves the FWL residualization problem by iterating over one fixed
-effect at a time. In the worker-firm-year model, MAP first subtracts worker
-means from the current residual, then firm means from the updated residual,
-then year means, and so on until convergence.
-
-We write the FWL normal equations (see @eq:fwl-normal) in block form with
-$D = [D_W quad D_F quad D_Y]$ as
-
+To relate MAP's convergence to the connectivity of the fixed-effect graph,
+we discuss the FWL normal equations presented in @eq:fwl-normal. We start
+with the case of the AKM model where the fixed-effect design matrix becomes
+$D = [D_W quad D_F quad D_Y]$ for worker, firm, and year fixed effects.
+@eq:fwl-normal can then be written as
 $
   mat(
     G_(W W), C_(W F), C_(W Y);
     C_(W F)', G_(F F), C_(F Y);
     C_(W Y)', C_(F Y)', G_(Y Y)
   ) mat(alpha_W; alpha_F; alpha_Y)
-  = mat(D_W' W mu; D_F' W mu; D_Y' W mu).
+  = mat(D_W' W mu; D_F' W mu; D_Y' W mu),
 $
 
-Equivalently,
+or, equivalently,
 
-$ G_(W W) alpha_W + C_(W F) alpha_F + C_(W Y) alpha_Y = D_W' W mu, $
-
-$ C_(W F)' alpha_W + G_(F F) alpha_F + C_(F Y) alpha_Y = D_F' W mu, $
-
-$ C_(W Y)' alpha_W + C_(F Y)' alpha_F + G_(Y Y) alpha_Y = D_Y' W mu. $
+$
+    G_(W W) alpha_W + C_(W F) alpha_F + C_(W Y) alpha_Y & = D_W' W mu, \
+   C_(W F)' alpha_W + G_(F F) alpha_F + C_(F Y) alpha_Y & = D_F' W mu, \
+  C_(W Y)' alpha_W + C_(F Y)' alpha_F + G_(Y Y) alpha_Y & = D_Y' W mu.
+$<eq:fwl-normal-akm>
 
 Each equation can be rearranged to express one block of effects conditional
-on the others. Using $C_(W F) = D_W' W D_F$ and $C_(W Y) = D_W' W D_Y$ to
-factor $D_W' W$ out of the right-hand side, the first equation becomes
+on the others. For example, using $C_(W F) = D_W' W D_F$ and
+$C_(W Y) = D_W' W D_Y$, we can substitute $D_W' W$ in @eq:fwl-normal-akm
+and obtain
 
-$ G_(W W) alpha_W = D_W' W (mu - D_F alpha_F - D_Y alpha_Y). $
+$ alpha_W = G_(W W)^(-1)D_W' W (mu - D_F alpha_F - D_Y alpha_Y). $
 
 Because $G_(W W)$ is a diagonal matrix whose entries are workers' total
 observation weights, solving for $alpha_W$ divides each worker's weighted
-partial residual by its total observation weight. We apply the same
-rearrangement to the second equation to obtain the firm equation
+partial residual by its total observation weight.
 
-$ G_(F F) alpha_F = D_F' W (mu - D_W alpha_W - D_Y alpha_Y), $
+For a general fixed-effect model with $q=1,\ldots, Q$ fixed-effect
+dimensions, MAP updates the coefficient vector $alpha_q^((k+1))$ of
+fixed-effect dimension $q$ at iteration $k+1$ using the Gauss-Seidel
+algorithm @guimaraes2010 according to
+$
+  alpha_q^((k+1)) & =
+  G_(q q)^(-1) D_q' W
+  (mu - sum_(s=1)^(q-1) D_s alpha_s^((k+1)) - sum_(s=q+1)^Q D_s alpha_s^((k))).
+$<eq:map-iteration>
+Note that the cross-tabulation blocks $C_(q s) = D_q' W D_s$ are never used
+directly in @eq:map-iteration and enter in MAP only indirectly through the
+propagation of the error across the different fixed-effect dimensions. To
+see this, let $hat(alpha) = (hat(alpha)_1, ..., hat(alpha)_Q)$ be a
+solution to @eq:fwl-normal and define the coefficient error at iteration
+$k$ as $e_q^((k)) = alpha_q^((k)) - hat(alpha)_q$. Subtracting the solution
+$hat(alpha)$ from @eq:map-iteration yields
+$
+  e_q^((k+1))
+  = -G_(q q)^(-1) (
+    sum_(s=1)^(q-1) C_(q s) e_s^((k+1))
+    + sum_(s=q+1)^Q C_(q s) e_s^((k))
+  ).
+$<eq:map-error-propagation>
+Define the degree-scaled errors
+$tilde(e)_q^((k)) = G_(q q)^(1/2) e_q^((k))$ and the degree-normalized
+cross-tabulations
+$
+  H_(q s) = G_(q q)^(-1/2) C_(q s) G_(s s)^(-1/2).
+$<eq:degree-normalized-cross-tabulation>
+Then, @eq:map-error-propagation can be written as
+$
+  tilde(e)_q^((k+1))
+  = -sum_(s=1)^(q-1) H_(q s) tilde(e)_s^((k+1))
+  -sum_(s=q+1)^Q H_(q s) tilde(e)_s^((k)).
+$
+The degree-normalized cross-tabulations $H_(q s)$
+(@eq:degree-normalized-cross-tabulation[]) appear as the off-diagonal
+blocks of the normalized graph Laplacian
+$
+  cal(L)_(q s) & = mat(
+                   G_(q q)^(-1/2), 0;
+                   0, G_(s s)^(-1/2)
+                 ) L_(q s) mat(
+                   G_(q q)^(-1/2), 0;
+                   0, G_(s s)^(-1/2)
+                 ) \
+               & = mat(
+                   G_(q q)^(-1/2), 0;
+                   0, G_(s s)^(-1/2)
+                 ) mat(
+                   G_(q q), -C_(q s);
+                   -C_(q s)', G_(s s);
+                 )
+                 mat(
+                   G_(q q)^(-1/2), 0;
+                   0, G_(s s)^(-1/2)
+                 ) \
+               & = mat(
+                   I, -H_(q s);
+                   -H_(q s)', I
+                 ),
+$<eq:cross-tabulation-and-laplacian>
+where $L_(q s)$ is the graph Laplacian of the bipartite graph formed by the
+fixed-effect dimensions $q$ and $s$.
 
-and the year equation is analogous. Because $G_(W W)$, $G_(F F)$, and
-$G_(Y Y)$ are all diagonal, each of the three equations is solved by
-computing a weighted group mean in a single pass over observations.
+The connectivity of the bipartite graph formed by a pair of fixed-effect
+dimensions therefore governs the speed of convergence of MAP. To see this,
+note that the second-smallest eigenvalue of the normalized graph Laplacian
+$lambda_2(cal(L)_(q s))$ measures graph connectivity#footnote[it is zero if
+  the graph is disconnected and is small when the graph consists of nearly
+  disconnected subgraphs joined only by narrow bridges
+  @chung1997] and that, within each connected component, the block
+structure in @eq:cross-tabulation-and-laplacian implies that
+$lambda_2 (cal(L)_(q s))$ are related to the second-largest singular value
+of the degree-normalized cross-tabulation $sigma_2 (H_(q s))$ via
+$
+  lambda_2 (cal(L)_(q s)) = 1 - sigma_2 (H_(q s)).
+$
+The largest nontrivial singular value of the degree-normalized cross
+tabulation $sigma_2(H_(q s))$ provides a measure of worst-case convergence
+of MAP. Indeed, for a model containing only two fixed-effect dimensions $q$
+and $s$, the MAP error update (@eq:map-error-propagation[]) becomes
+$
+  tilde(e)_q^((k+1)) & = -H_(q s) tilde(e)_s^((k)), \
+  tilde(e)_s^((k+1)) & = H_(q s)' H_(q s) tilde(e)_s^((k)).
+$
+Consequently, the error component of $tilde(e)_s^((k+1))$ in the direction
+of the singular vector associated with $sigma_2(H_(q s))$ shrinks with
+$sigma_2(H_(q s))^2$ in the worst case. In other words, a poorly connected
+graph implies that $lambda_2(cal(L)_(q s))$ is small and $sigma_2(H_(q s))$
+is close to one, so that the error component potentially shrinks slowly in
+each MAP iteration. This leads us to define the spectral gap
+$
+  gamma_(q s) = 1 - sigma_2 (H_(q s))^2,
+$
+as a simple diagnostic for MAP convergence.#footnote[When the graph has
+  more than one connected component, we compute the gap on each component
+  and report the smallest, together with its observation share.] With more
+than two fixed-effect dimensions, the full error propagation also depends
+on the remaining dimensions and their update order, so $gamma_(q s)$ is a
+pairwise diagnostic but does not fully describe MAP's convergence rate.
 
-MAP uses this diagonal structure iteratively. Holding the other effects
-fixed, it updates the worker effects from the current partial residual,
-then repeats the same step for firms and years. Each sweep therefore cycles
-through the fixed-effect dimensions, subtracting the weighted group mean of
-the current partial residual for the factor being updated.
-
-The cross-tabulation blocks $C_(W F)$, $C_(W Y)$, and $C_(F Y)$ enter the
-algorithm only indirectly. For instance, the worker update is computed from
-the partial residual $mu - D_F alpha_F - D_Y alpha_Y$, while the firm
-update is computed from $mu - D_W alpha_W - D_Y alpha_Y$. Worker-firm,
-worker-year, and firm-year links are thus not solved as coupled
-subproblems; their effect propagates through the residual that one block
-update transmits to the next.
-
-This strategy is effective when the graph is well connected. In a
-high-mobility worker-firm panel, many workers move across firms, so that
-worker and firm effects can be compared through many overlapping employment
-histories. A high wage at one firm can then be related to wages earned by
-the same workers at other firms, and a worker update rapidly alters the
-information available to the next firm update, and vice versa.
-
-When mobility is sparse, sorting is strong, or one factor is nearly nested
-in another, MAP may require many sweeps because mover comparisons enter
-only through repeated residual updates. Each sweep is cheap: the diagonal
-block solves are one-pass group means.
-
-The same graph perspective gives a simple diagnostic for MAP difficulty in
-a fixed-effect structure. For any pair of fixed effects $(q,r)$, we form
-the normalized cross-tabulation
-$H_(q r) = G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2)$ and let
-$rho_(q r) = sigma_2(H_(q r))^2$ be the square of its largest nontrivial
-singular value, equivalently the largest nontrivial eigenvalue of
-$H_(q r)' H_(q r)$. Within a connected component, the largest singular
-value is always one, regardless of how well connected the component is. We
-use the next-largest singular value and report the spectral gap
-$1 - rho_(q r)$ in the benchmarks below. This gap measures how well
-connected the factor-pair graph is.#footnote[When the graph has more than
-  one connected component, we compute the gap on each component and report
-  the smallest, together with its observation share.] Gaps near zero signal
-sparse mobility or near-nesting, the settings in which MAP converges
-slowly; larger gaps indicate better connected factor-pair graphs. For the
-worker-firm example of Section 4, the gap is $1/3$.#footnote[In that
-  example, $G_(W W) = "diag"(2,2,2)$, $G_(F F) = "diag"(3,3)$, and
-  $C_(W F) = mat(1, 1; 2, 0; 0, 2)$, so
-  $H_(W F) = G_(W W)^(-1/2) C_(W F) G_(F F)^(-1/2) = 1 / sqrt(6) mat(1, 1; 2, 0; 0, 2)$.
-  The graph is connected, and $H_(W F)' H_(W F) = 1 / 6 mat(5, 1; 1, 5)$
-  has eigenvalues $1$ and $2/3$. After dropping the unit eigenvalue,
-  $rho_(W F) = 2/3$ and the gap is $1/3$.]
+For the worker-firm example discussed in @sec:gramian, the gap is $1/3$.
+Indeed, the diagonal blocks are $G_(W W) = "diag"(2,2,2)$,
+$G_(F F) = "diag"(3,3)$, and the cross-tabulation is
+$
+  C_(W F) = mat(1, 1; 2, 0; 0, 2),
+$
+so that
+$
+  H_(W F) = G_(W W)^(-1/2) C_(W F) G_(F F)^(-1/2) = 1 / sqrt(6) mat(1, 1; 2, 0; 0, 2).
+$
+The graph is connected, and $H_(W F)' H_(W F) = 1 / 6 mat(5, 1; 1, 5)$ has
+eigenvalues $1$ and $2/3$, hence $sigma_2(H_(W F)) = sqrt(2/3)$ and
+$gamma_(W F) = 1 - sigma_2(H_(W F))^2 = 1/3$.
 
 = The Factor-Pair Schwarz Preconditioner <sec:schwarz-preconditioner>
 
