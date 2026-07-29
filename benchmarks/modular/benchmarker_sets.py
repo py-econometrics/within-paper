@@ -8,6 +8,13 @@ from feols_benchmarkers import (
     PyFeolsBenchmarkerFullApi,
     detect_torch_runtime_availability,
 )
+from fepois_benchmarkers import (
+    FixestFepoisBenchmarker,
+    GLFixedEffectModelsBenchmarker,
+    PyFepoisBenchmarkerFullApi,
+)
+
+
 @dataclass(frozen=True)
 class BenchmarkerBundle:
     benchmarkers: list
@@ -80,6 +87,38 @@ def build_standard_feols_benchmarkers(
         raise ValueError(
             "No benchmarkers available after applying include flags and runtime "
             "availability checks."
+        )
+
+    return BenchmarkerBundle(benchmarkers=benchmarkers)
+
+
+def build_standard_fepois_benchmarkers(
+    *,
+    include_pyfixest: bool = True,
+    include_fixest: bool = True,
+    include_julia: bool = True,
+) -> BenchmarkerBundle:
+    """Build the shared fepois benchmark runner set used by modular benchmarks."""
+    benchmarkers = []
+    if include_pyfixest:
+        benchmarkers.extend(
+            [
+                PyFepoisBenchmarkerFullApi(
+                    "pyfixest (within)", "within", iwls_maxiter=100
+                ),
+                PyFepoisBenchmarkerFullApi(
+                    "pyfixest (rust-map)", "rust", iwls_maxiter=100
+                ),
+            ]
+        )
+    if include_fixest:
+        benchmarkers.append(FixestFepoisBenchmarker("fixest-fepois"))
+    if include_julia:
+        benchmarkers.append(GLFixedEffectModelsBenchmarker("glfixedeffectmodels.jl"))
+
+    if not benchmarkers:
+        raise ValueError(
+            "No benchmarkers available after applying include flags."
         )
 
     return BenchmarkerBundle(benchmarkers=benchmarkers)
