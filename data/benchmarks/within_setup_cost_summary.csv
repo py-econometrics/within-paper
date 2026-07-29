@@ -1,3 +1,0 @@
-dgp,n_obs,k,n_rhs,n_runs,all_converged_reused,all_converged_oneshot,median_setup_wall_s,median_solve_after_setup_wall_s,median_full_oneshot_wall_s,median_setup_share_of_full,median_reused_result_time_total_s,median_oneshot_result_time_total_s,median_max_iterations_reused,median_max_iterations_oneshot,median_max_residual_reused,median_max_residual_oneshot
-simple,10000000,1,2,3,True,True,5.763922291000199,1.5149454589991365,7.72210774999985,0.7451269647202998,1.464722084,7.651696459,8.0,8.0,8.709036551459689e-07,8.709036552132044e-07
-difficult,10000000,1,2,3,True,True,0.39627966599800857,0.9975581250000687,1.355166792000091,0.29242132284922606,0.957714959,1.299041917,20.0,20.0,6.884577456765298e-07,6.884577446180718e-07
