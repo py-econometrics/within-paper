@@ -28,8 +28,8 @@ class TimingTests(unittest.TestCase):
     def test_backend_order_is_seeded(self) -> None:
         self.assertEqual(randomized_order(["a", "b", "c"], 12), randomized_order(["a", "b", "c"], 12))
 
-    def test_complete_bipartite_graph_has_unit_spectral_correlation(self) -> None:
-        self.assertAlmostEqual(_component_rho(sp.csr_matrix([[1, 1], [1, 1]])), 1.0)
+    def test_complete_bipartite_graph_has_zero_second_singular_value(self) -> None:
+        self.assertAlmostEqual(_component_rho(sp.csr_matrix([[1, 1], [1, 1]])), 0.0)
 
 
 if __name__ == "__main__":
