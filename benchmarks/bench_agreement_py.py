@@ -15,11 +15,14 @@ The script has two layers:
 Runs on 100k simple and difficult DGPs.
 """
 
+import csv
 import json
+import os
 import shutil
 import subprocess
 import tempfile
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
 
 import numpy as np
@@ -28,10 +31,12 @@ import pyfixest as pf
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 JULIA_ENV = SCRIPT_DIR / "julia-env"
-FML = "y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 | indiv_id + firm_id + year"
+FML = "y ~ x1 | indiv_id + firm_id + year"
 DEPVAR = "y"
-COVARIATES = [f"x{i}" for i in range(1, 11)]
+COVARIATES = ["x1"]
 FE_COLS = ["indiv_id", "firm_id", "year"]
+OUTPUT_PATH = Path(os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.csv"))
+OUTPUT_ROWS: list[dict[str, object]] = []
 
 
 def _run_json_subprocess(command: list[str], config: dict) -> dict:
@@ -53,7 +58,21 @@ def _run_json_subprocess(command: list[str], config: dict) -> dict:
 
 
 def _coef_dict(names, coefficients) -> dict[str, float]:
-    return {str(name): float(value) for name, value in zip(names, coefficients)}
+    # jsonlite's auto_unbox serializes one-element vectors as scalars. The
+    # one-covariate benchmark therefore returns "x1" and 1.23 from R, whereas
+    # Julia returns one-element arrays. Normalize both payload shapes.
+    name_values = [names] if isinstance(names, str) else list(names)
+    coefficient_values = (
+        list(coefficients)
+        if isinstance(coefficients, Iterable) and not isinstance(coefficients, (str, bytes))
+        else [coefficients]
+    )
+    if len(name_values) != len(coefficient_values):
+        raise ValueError("coefficient names and values have different lengths")
+    return {
+        str(name): float(value)
+        for name, value in zip(name_values, coefficient_values, strict=True)
+    }
 
 
 def _external_coefficients(
@@ -130,6 +149,8 @@ for dgp_type in ["simple", "difficult"]:
                            copy_data=False, store_data=True)
         fit_cg = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust-cg",
                           copy_data=False, store_data=True)
+    if not fit_map.convergence or not fit_cg.convergence:
+        raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
 
     # Coefficient differences
     coef_map = np.asarray(fit_map.coef())
@@ -182,6 +203,18 @@ for dgp_type in ["simple", "difficult"]:
         except ValueError as exc:
             print(f"{'':<12} {backend:<20} {coefficients.get('x1', np.nan):>14.8f} {f'SKIP ({exc})':>28}")
             continue
+        OUTPUT_ROWS.append(
+            {
+                "dgp": dgp_type,
+                "model_k": 1,
+                "backend": backend,
+                "x1": coefficients.get("x1", np.nan),
+                "avg_abs_diff": avg_diff,
+                "max_abs_diff": max_diff,
+                "success": True,
+                "error": "",
+            }
+        )
         print(
             f"{'':<12} {backend:<20} "
             f"{_format_float(coefficients.get('x1')):>14} "
@@ -206,3 +239,23 @@ for dgp_type in ["simple", "difficult"]:
             f"{_format_float(coefficient_sets.get('FixedEffectModels', {}).get(term)):>18}"
         )
     print()
+
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+with OUTPUT_PATH.open("w", newline="") as handle:
+    writer = csv.DictWriter(
+        handle,
+        fieldnames=[
+            "dgp",
+            "model_k",
+            "backend",
+            "x1",
+            "avg_abs_diff",
+            "max_abs_diff",
+            "success",
+            "error",
+        ],
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    writer.writerows(OUTPUT_ROWS)
+print(f"Wrote {OUTPUT_PATH}")
