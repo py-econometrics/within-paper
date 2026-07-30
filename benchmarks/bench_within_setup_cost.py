@@ -15,50 +15,28 @@ The default scale matches the standard synthetic benchmark in the paper:
 from __future__ import annotations
 
 import argparse
-import csv
 import gc
-import os
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
-
 ROOT = Path(__file__).resolve().parents[1]
-FE_COLS = ["indiv_id", "firm_id", "year"]
+sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
 
+from experiment import (  # noqa: E402
+    SampleSpec,
+    add_repo_paths,
+    clear_sample_cache,
+    load_sample,
+    write_rows,
+)
 
-def _add_repo_paths() -> None:
-    within_repo_value = os.environ.get("WITHIN_REPO")
-    if within_repo_value:
-        source_path = Path(within_repo_value).expanduser().resolve() / "python"
-        if not source_path.exists():
-            raise FileNotFoundError(f"WITHIN_REPO has no Python package directory: {source_path}")
-        sys.path.insert(0, str(source_path))
-    sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
+add_repo_paths()
 
-
-_add_repo_paths()
-
-from dgp_functions import base_dgp  # noqa: E402
 import within  # noqa: E402
 from within import LsmrOptions, Solver, solve_batch  # noqa: E402
-
-
-def _seed_for(dgp: str, n_obs: int, iteration: int) -> int:
-    dgp_offset = {"simple": 0, "difficult": 1}[dgp]
-    return n_obs * 100 + iteration * 17 + dgp_offset + 42
-
-
-def _make_problem(dgp: str, n_obs: int, k: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    df = base_dgp(n=n_obs, type_=dgp, k=k, max_k=k, seed=seed)
-    categories = np.asfortranarray(df[FE_COLS].to_numpy(dtype=np.uint32) - 1)
-    rhs_cols = ["y", *[f"x{i}" for i in range(1, k + 1)]]
-    rhs = np.asfortranarray(df[rhs_cols].to_numpy(dtype=np.float64))
-    del df
-    gc.collect()
-    return categories, rhs
 
 
 def _setup_share(setup_wall: float, solve_wall: float) -> float:
@@ -68,9 +46,17 @@ def _setup_share(setup_wall: float, solve_wall: float) -> float:
     return setup_wall / total
 
 
-def _run_once(dgp: str, n_obs: int, k: int, iteration: int, tol: float, maxiter: int) -> dict:
-    categories, rhs = _make_problem(dgp, n_obs, k, _seed_for(dgp, n_obs, iteration))
-    config = LsmrOptions(tol=tol, maxiter=maxiter)
+def _run_once(dgp: str, n_obs: int, k: int, iteration: int) -> dict:
+    # One fixed sample per design; repetitions must not redraw it.
+    sample = load_sample(SampleSpec(design=dgp, n_obs=n_obs, k=k))
+    categories, rhs = sample.categories, sample.rhs
+    config = LsmrOptions()
+
+    # Warm the allocator, memory pages, and lazy initialization before timing.
+    # Otherwise setup alone bears these one-time costs and its reported share can
+    # exceed one. The discarded one-shot solve warms both setup and solve paths.
+    _ = solve_batch(categories, rhs, config)
+    del _
 
     gc.collect()
     t0 = time.perf_counter()
@@ -107,7 +93,7 @@ def _run_once(dgp: str, n_obs: int, k: int, iteration: int, tol: float, maxiter:
         "all_converged_reused": all(reused.converged),
         "all_converged_oneshot": all(oneshot.converged),
     }
-    del categories, rhs, solver, reused, oneshot
+    del solver, reused, oneshot
     gc.collect()
     return row
 
@@ -147,13 +133,6 @@ def _median_rows(rows: list[dict]) -> list[dict]:
     return summary
 
 
-def _write_csv(path: Path, rows: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -161,8 +140,6 @@ def main() -> None:
     parser.add_argument("--k", type=int, default=1)
     parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
     parser.add_argument("--runs", type=int, default=3)
-    parser.add_argument("--tol", type=float, default=1e-6)
-    parser.add_argument("--maxiter", type=int, default=100_000)
     parser.add_argument(
         "--out",
         type=Path,
@@ -180,7 +157,7 @@ def main() -> None:
                 f"k={args.k} run={iteration + 1}/{args.runs}",
                 flush=True,
             )
-            row = _run_once(dgp, args.n_obs, args.k, iteration, args.tol, args.maxiter)
+            row = _run_once(dgp, args.n_obs, args.k, iteration)
             rows.append(row)
             print(
                 "  setup={setup_wall_s:.3f}s solve-after-setup="
@@ -189,10 +166,10 @@ def main() -> None:
                 flush=True,
             )
 
-    _write_csv(args.out, rows)
+    write_rows(args.out, rows)
     summary_path = args.out.with_name(args.out.stem + "_summary.csv")
     summary = _median_rows(rows)
-    _write_csv(summary_path, summary)
+    write_rows(summary_path, summary)
 
     print("\nMedian summary")
     for row in summary:
