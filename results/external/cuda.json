@@ -1,7 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "source": "legacy PyFixest benchmark suite",
+  "status": "indicative_only",
+  "exact_run_provenance_available": false,
+  "cross_machine_comparison_allowed": false,
   "local_reproducible": false,
-  "reason": "The reference Apple M4 benchmark machine has no NVIDIA CUDA device.",
+  "provenance_note": "The original record does not identify the accelerator, host, software versions, or individual trials.",
   "measurements": [
     {
       "table": "ols",
