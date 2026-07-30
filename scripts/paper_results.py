@@ -33,6 +33,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# The timing rules live with the benchmark harness that produces the numbers,
+# not beside the renderer that formats them, so that "median over converged
+# trials, failures kept in the denominator" has one implementation rather than
+# one per consumer. The module is standard-library only, which is what lets
+# this script keep running before the Pixi environment exists; a test pins
+# that property.
+sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
+from timing import summarize_times  # noqa: E402
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
@@ -40,9 +48,12 @@ RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXTERNAL_RESULTS_PATH = ROOT / "results" / "external" / "cuda.json"
 CORREIA_DIR = ROOT / "data" / "correia_data"
 EXPECTED_TRIALS = 3
+# The legacy CUDA timings are quoted only in Appendix C, never in a main
+# runtime table, so they resolve to generated prose values rather than to a
+# table cell. They moved out of the OLS table when the appendix was written.
 EXPECTED_EXTERNAL_CUDA_TARGETS = {
-    ("ols", "simple", "torch-cuda"),
-    ("ols", "difficult", "torch-cuda"),
+    ("simple", "torch-cuda"),
+    ("difficult", "torch-cuda"),
 }
 RAW_GLOBS = (
     "benchmarks/results/*.csv",
@@ -345,6 +356,11 @@ def _table_fragment(name: str, table: dict) -> str:
 
 
 def render(args: argparse.Namespace) -> None:
+    # Synchronize before rendering so that a table fragment can never be built
+    # from a result file that is older than the raw benchmark output beside it.
+    # Rendering used to read the stored document as-is, which made every table
+    # correct only until the next benchmark run.
+    _synchronize_canonical_tables()
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
     prose = document.get("prose", {})
@@ -409,7 +425,11 @@ def render(args: argparse.Namespace) -> None:
         "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
         # The limitations section names the regime where the method loses, so
         # those numbers have to move with the run like every other quoted value.
+        **_scaling_prose_values(),
+        **_ppml_reuse_prose_values(),
+        **_gap_prose_values(),
         "result_ols_simple_within": ols_simple[5],
+        "result_ols_simple_rust_map": ols_simple[2],
         "result_ols_simple_best_alternative": _format_seconds(
             min(
                 value
@@ -460,6 +480,11 @@ def render(args: argparse.Namespace) -> None:
             float(prose["zigzag_fem_s"]), float(prose["zigzag_within_s"])
         ),
     }
+    # Values synchronized straight into the result file, such as the legacy CUDA
+    # timings of Appendix C, are published without further formatting.
+    prose_values.update(
+        {name: value for name, value in prose.items() if name.startswith("result_")}
+    )
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
     print(f"[render] wrote {len(tables)} table fragments to {destination}")
@@ -678,11 +703,12 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
         return "incomplete"
     if not summarized and not _cell_is_complete(candidates):
         return "incomplete"
+    summary = summarize_times(values, n_attempted=total)
     if successful == 0:
         return f"failed (0/{total})"
-    if not values:
+    if summary.median_s is None:
         return "incomplete"
-    rendered = _format_seconds(float(median(values)))
+    rendered = _format_seconds(summary.median_s)
     if successful < total:
         return f"{rendered} ({successful}/{total})"
     return rendered
@@ -945,6 +971,125 @@ def _synchronize_setup_cost(document: dict) -> int:
     return changed
 
 
+def _scaling_prose_values() -> dict[str, str]:
+    """Quoted numbers from the factor-scaling and amortization sweeps."""
+    values: dict[str, str] = {}
+    runs = ROOT / "results" / "runs" / "latest"
+
+    scaling = runs / "factor_scaling.csv"
+    if scaling.exists():
+        with scaling.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        by_q: dict[int, list[dict]] = {}
+        for row in rows:
+            by_q.setdefault(int(row["n_factors"]), []).append(row)
+        if 2 in by_q and 5 in by_q:
+            def med(q: int, field: str) -> float:
+                return float(median(float(r[field]) for r in by_q[q]))
+
+            values["result_qscale_setup_ratio"] = _format_ratio(med(5, "setup_s"), med(2, "setup_s"))
+            values["result_qscale_solve_ratio"] = _format_ratio(med(5, "solve_s"), med(2, "solve_s"))
+            values["result_qscale_setup_share_q5"] = f"{med(5, 'setup_share'):.0%}"
+            values["result_qscale_iters_q2"] = f"{med(2, 'iterations_max'):.0f}"
+            values["result_qscale_iters_q5"] = f"{med(5, 'iterations_max'):.0f}"
+
+    amort = runs / "amortization.csv"
+    if amort.exists():
+        with amort.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        def total(k: int, name: str) -> float | None:
+            picked = [
+                float(r["total_s"])
+                for r in rows
+                if int(r["k_rhs"]) == k and r["preconditioner"] == name
+            ]
+            return float(median(picked)) if picked else None
+
+        for k in (1, 25):
+            diagonal, additive = total(k, "diagonal"), total(k, "additive")
+            if diagonal and additive:
+                values[f"result_amortize_ratio_k{k}"] = _format_ratio(diagonal, additive)
+    return values
+
+
+def _gap_prose_values() -> dict[str, str]:
+    """Publish the worker-firm gap of the difficult design at each measured size.
+
+    Connectivity is size-dependent, so any claim about the difficult design has
+    to name its sample size. Quoting these from one place keeps the sizes in the
+    prose tied to the hardness table.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "hardness.csv"
+    if not path.exists():
+        return {}
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    labels = {100_000: "100k", 1_000_000: "1m", 10_000_000: "10m"}
+    values: dict[str, str] = {}
+    for row in rows:
+        if (
+            "difficult" not in row["dataset_id"]
+            or row["fe_a"] != "indiv_id"
+            or row["fe_b"] != "firm_id"
+        ):
+            continue
+        label = labels.get(int(row["n_obs"]))
+        if label is None:
+            continue
+        values[f"result_gap_difficult_{label}"] = _format_typst_scientific(
+            float(row["one_minus_rho"])
+        )
+    return values
+
+
+def _ppml_reuse_prose_values() -> dict[str, str]:
+    """Quoted numbers from the IRLS preconditioner-reuse experiment."""
+    path = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
+    if not path.exists():
+        return {}
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+
+    values: dict[str, str] = {}
+    for design in ("simple", "difficult"):
+        group = [row for row in rows if row.get("dgp") == design]
+        rebuilt = next(
+            (r for r in group if str(r["rebuild_each_step"]).lower() in {"true", "1"}),
+            None,
+        )
+        reused = next(
+            (
+                r
+                for r in group
+                if r["preconditioner"] == "additive"
+                and str(r["rebuild_each_step"]).lower() not in {"true", "1"}
+            ),
+            None,
+        )
+        if rebuilt is None or reused is None:
+            continue
+        values[f"result_ppml_reuse_speedup_{design}"] = _format_ratio(
+            float(reused["total_s"]), float(rebuilt["total_s"])
+        )
+        values[f"result_ppml_rebuild_outer_{design}"] = str(
+            int(float(rebuilt["outer_iterations"]))
+        )
+        values[f"result_ppml_rebuild_inner_{design}"] = f"{int(float(rebuilt['inner_iterations_sum'])):,}"
+        values[f"result_ppml_rebuild_total_{design}"] = _format_seconds(
+            float(rebuilt["total_s"])
+        )
+        deviations = [
+            abs(float(r["deviance"]) / float(rebuilt["deviance"]) - 1.0)
+            for r in group
+            if r is not rebuilt
+        ]
+        if deviations:
+            values[f"result_ppml_reuse_deviance_gap_{design}"] = (
+                _format_typst_scientific(max(deviations))
+            )
+    return values
+
+
 def _synchronize_accuracy_frontier(document: dict) -> int:
     """Fill the frontier table from the tolerance sweep.
 
@@ -991,6 +1136,182 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
     return len(rendered)
 
 
+def _synchronize_ppml_inner_outer(document: dict) -> int:
+    """Fill the PPML table separating outer IRLS steps from inner LSMR work.
+
+    A common outer iteration cap is not a common accuracy condition, so the
+    table reports whether the outer loop converged rather than only how many
+    steps it took.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
+    table = document["tables"].get("ppml_inner_outer")
+    if table is None or not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+
+    rendered: list[list[str]] = []
+    for design in ("simple", "difficult"):
+        first = True
+        for row in [r for r in rows if r.get("dgp") == design]:
+            converged = str(row.get("outer_converged", "")).lower() in {"true", "1"}
+            steps = row.get("outer_iterations", "")
+            rendered.append(
+                [
+                    design if first else "",
+                    f"`{row['preconditioner']}`",
+                    "yes" if str(row.get("rebuild_each_step", "")).lower() in {"true", "1"} else "no",
+                    steps if converged else f"{steps} (capped)",
+                    f"{int(float(row['inner_iterations_sum'])):,}".replace(",", "#h(0.18em)"),
+                    _format_seconds(float(row["total_s"])),
+                ]
+            )
+            first = False
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
+def _synchronize_factor_scaling(document: dict) -> int:
+    """Fill the table of setup and solve cost as the factor count grows.
+
+    Q enters the construction through the Q(Q-1)/2 pair enumeration, so this is
+    the axis on which the Schwarz preconditioner is most exposed, and every
+    other experiment in the paper holds it at three.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "factor_scaling.csv"
+    table = document["tables"].get("factor_scaling")
+    if table is None or not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+
+    by_q: dict[int, list[dict]] = {}
+    for row in rows:
+        by_q.setdefault(int(row["n_factors"]), []).append(row)
+
+    rendered = []
+    for n_factors in sorted(by_q):
+        group = by_q[n_factors]
+
+        def med(field: str) -> float:
+            return float(median(float(item[field]) for item in group))
+
+        rendered.append(
+            [
+                str(n_factors),
+                str(n_factors * (n_factors - 1) // 2),
+                f"{med('setup_s'):.3f}",
+                f"{med('solve_s'):.3f}",
+                f"{med('setup_share'):.0%}",
+                f"{med('iterations_max'):.0f}",
+            ]
+        )
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
+def _synchronize_amortization(document: dict) -> int:
+    """Fill the table of total time against the number of right-hand sides.
+
+    The break-even is read off the measurements rather than from a closed form,
+    because marginal solve cost is not exactly linear in K.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "amortization.csv"
+    table = document["tables"].get("amortization")
+    if table is None or not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+
+    def med(k: int, name: str, field: str) -> float | None:
+        picked = [
+            float(item[field])
+            for item in rows
+            if int(item["k_rhs"]) == k and item["preconditioner"] == name
+        ]
+        return float(median(picked)) if picked else None
+
+    rendered = []
+    for k in sorted({int(item["k_rhs"]) for item in rows}):
+        diagonal, additive = med(k, "diagonal", "total_s"), med(k, "additive", "total_s")
+        if diagonal is None or additive is None:
+            continue
+        rendered.append(
+            [
+                str(k),
+                f"{diagonal:.2f}",
+                f"{additive:.2f}",
+                f"{diagonal / additive:.1f}x",
+                f"{additive / k:.3f}",
+            ]
+        )
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
+ITERATION_COLUMNS = (
+    ("map", "map-sweep"),
+    ("within-off", "lsmr-iteration"),
+    ("within-diagonal", "lsmr-iteration"),
+    ("within-additive", "lsmr-iteration"),
+)
+
+
+def _synchronize_iterations(document: dict) -> int:
+    """Fill the iteration-count table, in each solver's own unit.
+
+    A MAP sweep is a full pass over the absorbed factors; an LSMR iteration is
+    one application of the operator and its transpose. The two are never added
+    or plotted on one axis, so the table records which unit each column is in
+    and the median is taken within a column only.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "within_preconditioners.csv"
+    table = document["tables"].get("iterations")
+    if table is None or not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rendered = _iteration_rows(list(csv.DictReader(handle)))
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
+def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
+    """One row per design, one column per solver, each in its own unit."""
+    designs: list[str] = []
+    for row in rows:
+        if row["design"] not in designs:
+            designs.append(row["design"])
+
+    rendered: list[list[str]] = []
+    for design in designs:
+        cells = [design]
+        for label, _unit in ITERATION_COLUMNS:
+            trials = [r for r in rows if r["design"] == design and r["solver_label"] == label]
+            counts = [
+                float(r["iterations_max"]) for r in trials if r.get("iterations_max", "")
+            ]
+            if not counts:
+                # A solver with no rows is absent, not zero: the run that
+                # produced this file may predate the column.
+                cells.append("#miss")
+                continue
+            # A capped cell keeps its count and says so. Dropping it would make
+            # a solver that never converged look like the fastest one.
+            capped = any(r.get("censoring") == "capped" for r in trials)
+            value = f"{median(counts):.0f}"
+            cells.append(f"{value} (capped)" if capped else value)
+        rendered.append(cells)
+    return rendered
+
+
 def _synchronize_zigzag(document: dict) -> int:
     """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
 
@@ -1025,7 +1346,7 @@ def _synchronize_zigzag(document: dict) -> int:
 
 def _validate_external_results(external: dict) -> list[dict]:
     required_metadata = {
-        "schema_version": 2,
+        "schema_version": 3,
         "source": "legacy PyFixest benchmark suite",
         "status": "indicative_only",
         "exact_run_provenance_available": False,
@@ -1051,7 +1372,7 @@ def _validate_external_results(external: dict) -> list[dict]:
     for measurement in measurements:
         if not isinstance(measurement, dict):
             raise ValueError("Each external CUDA measurement must be an object")
-        target = tuple(measurement.get(field) for field in ("table", "row", "backend"))
+        target = tuple(measurement.get(field) for field in ("design", "backend"))
         if not all(isinstance(value, str) for value in target):
             raise ValueError("External CUDA targets must use string identifiers")
         targets.append(target)
@@ -1071,28 +1392,27 @@ def _validate_external_results(external: dict) -> list[dict]:
     if set(targets) != EXPECTED_EXTERNAL_CUDA_TARGETS:
         raise ValueError(
             "External CUDA measurements must contain exactly the simple and difficult "
-            "OLS torch-cuda targets"
+            "torch-cuda designs"
         )
     return measurements
 
 
 def _synchronize_external_results(document: dict) -> int:
+    """Publish the legacy CUDA timings as prose values for Appendix C.
+
+    They are deliberately not written into a runtime table. The run recorded
+    neither hardware nor package versions, so placing it in a column next to
+    reproducible timings would invite exactly the comparison the appendix says
+    cannot be made.
+    """
     measurements = _validate_external_results(_read_json(EXTERNAL_RESULTS_PATH))
+    prose = document.setdefault("prose", {})
     changed = 0
     for measurement in measurements:
-        table_name = measurement["table"]
-        row_name = measurement["row"]
-        backend = measurement["backend"]
-        table = document["tables"][table_name]
-        headers = [_clean_cell(cell) for cell in table["header"]]
-        try:
-            column = headers.index(backend)
-            row = next(item for item in table["rows"] if item[0].split()[0] == row_name)
-        except (ValueError, StopIteration) as exc:
-            raise ValueError(f"External result target not found: {measurement}") from exc
+        key = f"result_cuda_{measurement['design']}"
         rendered = _format_seconds(float(measurement["time_s"]))
-        if row[column] != rendered:
-            row[column] = rendered
+        if prose.get(key) != rendered:
+            prose[key] = rendered
             changed += 1
     return changed
 
@@ -1193,6 +1513,10 @@ def _synchronize_canonical_tables(
     changed += _synchronize_agreement(document)
     changed += _synchronize_setup_cost(document)
     changed += _synchronize_accuracy_frontier(document)
+    changed += _synchronize_ppml_inner_outer(document)
+    changed += _synchronize_iterations(document)
+    changed += _synchronize_factor_scaling(document)
+    changed += _synchronize_amortization(document)
     changed += _synchronize_zigzag(document)
     changed += _synchronize_external_results(document)
     if write:
