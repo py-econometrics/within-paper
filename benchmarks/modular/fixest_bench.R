@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+# Benchmark driver for R fixest, for both the linear and the Poisson model.
+#
+# The two used to be separate scripts that differed in four lines: which fit
+# function to call, and how strict the convergence check is. Everything else,
+# the config parsing, the manifest loop, the JSON record, and the progress
+# table, was duplicated, so a fix to the protocol had to be made twice.
+#
+# `model` in the config selects the family. It defaults to feols so an older
+# config still runs.
+
 suppressPackageStartupMessages({
   library(arrow)
   library(fixest)
@@ -10,7 +20,6 @@ bench_threads <- suppressWarnings(as.integer(Sys.getenv("BENCH_THREADS", unset =
 if (is.na(bench_threads) || bench_threads < 1) stop("BENCH_THREADS must be set to a positive integer")
 setFixest_nthreads(bench_threads)
 if (getFixest_nthreads() != bench_threads) stop("fixest did not accept BENCH_THREADS")
-message(sprintf("[bench] r.fixest using %d thread(s)", getFixest_nthreads()))
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 1) {
@@ -23,6 +32,12 @@ formula_str <- config$formula
 fe_cols <- unlist(config$fe_cols, use.names = FALSE)
 n_fe <- length(fe_cols)
 vcov_type <- config$vcov_type
+model <- if (is.null(config$model)) "feols" else config$model
+if (!model %in% c("feols", "fepois")) {
+  stop(sprintf("Unknown model %s; expected feols or fepois", model))
+}
+
+message(sprintf("[bench] r.fixest using %d thread(s)", getFixest_nthreads()))
 
 # Parse normalized vcov_type: "iid", "hetero", or "cluster:<colname>"
 if (startsWith(vcov_type, "cluster:")) {
@@ -33,6 +48,25 @@ if (startsWith(vcov_type, "cluster:")) {
 }
 
 formula <- as.formula(formula_str)
+
+# Fit one model and check convergence.
+#
+# The two families differ in how much a missing convStatus is allowed to mean.
+# feols does not always populate it, so absence is treated as success. fepois
+# is IRLS and always sets it, so absence there means the fit did not report
+# convergence and must not be recorded as a success.
+fit_once <- function(df) {
+  if (model == "fepois") {
+    fit <- fepois(formula, data = df, vcov = vcov_arg, nthreads = bench_threads, glm.iter = 100)
+    if (!isTRUE(fit$convStatus)) stop("fixest PPML model returned without convergence")
+  } else {
+    fit <- feols(formula, data = df, vcov = vcov_arg, nthreads = bench_threads)
+    if (!is.null(fit$convStatus) && !isTRUE(fit$convStatus)) {
+      stop("fixest model returned without convergence")
+    }
+  }
+  fit
+}
 
 # table formatting helpers
 fmt_time <- function(t) {
@@ -66,7 +100,7 @@ print_row <- function(dgp, n_obs, n_fe, times) {
 }
 
 # main loop
-message(sprintf("\n  r.fixest (fepois)"))
+message(sprintf("\n  r.fixest (%s)", model))
 print_header()
 
 prev_dgp <- NULL
@@ -94,10 +128,7 @@ for (idx in seq_along(manifest)) {
     {
       df <- as.data.frame(read_parquet(entry$data_path))
       elapsed <- unname(system.time({
-        suppressMessages(
-          fit <- fepois(formula, data = df, vcov = vcov_arg, nthreads = bench_threads, glm.iter = 100)
-        )
-        if (!isTRUE(fit$convStatus)) stop("fixest PPML model returned without convergence")
+        suppressMessages(fit <- fit_once(df))
       })[["elapsed"]])
     },
     error = function(e) {

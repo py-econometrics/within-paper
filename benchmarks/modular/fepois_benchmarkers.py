@@ -147,7 +147,8 @@ class FixestFepoisBenchmarker(SubprocessFeolsBenchmarker):
         super().__init__(
             name=name or "r.fixest (fepois)",
             command_prefix=["Rscript"],
-            script_path=(script_path or _SCRIPT_DIR / "fepois_r.R"),
+            script_path=(script_path or _SCRIPT_DIR / "fixest_bench.R"),
+            model="fepois",
         )
 
 

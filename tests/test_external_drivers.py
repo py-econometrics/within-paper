@@ -52,7 +52,9 @@ def _sample(n: int = 400, seed: int = 7) -> pd.DataFrame:
     )
 
 
-def _run_driver(script: str, depvar: str, tmpdir: Path) -> list[dict]:
+def _run_driver(
+    script: str, depvar: str, tmpdir: Path, *, model: str = "feols"
+) -> list[dict]:
     """Run one driver over a one-entry manifest and return its emitted records."""
     frame = _sample()
     data_path = tmpdir / "sample.parquet"
@@ -76,6 +78,7 @@ def _run_driver(script: str, depvar: str, tmpdir: Path) -> list[dict]:
         "vcov": "iid",
         "vcov_type": "iid",
         "result_log_path": str(tmpdir / "results.jsonl"),
+        "model": model,
     }
     config_path = tmpdir / "config.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
@@ -121,7 +124,7 @@ class RDriverContractTests(unittest.TestCase):
     @unittest.skipUnless(HAS_R, "Rscript not installed")
     def test_feols_driver_emits_the_protocol_record(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            records = _run_driver("feols_r.R", "y", Path(tmp))
+            records = _run_driver("fixest_bench.R", "y", Path(tmp))
         self.assertEqual(len(records), 1)
         record = records[0]
         self.assertLessEqual(REQUIRED_FIELDS, set(record))
@@ -134,7 +137,9 @@ class RDriverContractTests(unittest.TestCase):
     @unittest.skipUnless(HAS_R, "Rscript not installed")
     def test_fepois_driver_emits_the_protocol_record(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            records = _run_driver("fepois_r.R", "negbin_y", Path(tmp))
+            records = _run_driver(
+                "fixest_bench.R", "negbin_y", Path(tmp), model="fepois"
+            )
         self.assertEqual(len(records), 1)
         record = records[0]
         self.assertLessEqual(REQUIRED_FIELDS, set(record))
@@ -150,7 +155,7 @@ class RDriverContractTests(unittest.TestCase):
             config.write_text("{}", encoding="utf-8")
             env = {k: v for k, v in os.environ.items() if k != "BENCH_THREADS"}
             proc = subprocess.run(
-                ["Rscript", str(DRIVERS / "feols_r.R"), str(config)],
+                ["Rscript", str(DRIVERS / "fixest_bench.R"), str(config)],
                 capture_output=True,
                 text=True,
                 env=env,
