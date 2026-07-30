@@ -42,13 +42,15 @@ from benchmarks.modular.benchmarker_sets import (
     require_multiple_absorbed_factors,
 )
 from benchmarks.modular.feols_benchmarkers import (
+    _as_bool,
+    _external_eta,
+)
+from benchmarks.modular.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
-    _as_bool,
     _demeaner_from_backend,
-    _external_eta,
 )
 from benchmarks.modular.experiment import (
     FE_COLS,

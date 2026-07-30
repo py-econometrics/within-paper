@@ -6,9 +6,11 @@ from pathlib import Path
 import pandas as pd
 
 from benchmarks.modular.feols_benchmarkers import (
+    PyFeolsBenchmarkerFullApi,
+)
+from benchmarks.modular.subprocess_backend import (
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
-    PyFeolsBenchmarkerFullApi,
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks

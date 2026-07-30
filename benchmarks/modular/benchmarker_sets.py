@@ -4,14 +4,18 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from benchmarks.modular.feols_benchmarkers import (
+    PyFeolsBenchmarkerFullApi,
+    detect_torch_runtime_availability,
+)
+from benchmarks.modular.subprocess_backend import (
+    FixestFeolsBenchmarker,
+    JuliaFeolsBenchmarker,
+)
+from benchmarks.modular.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
-    FixestFeolsBenchmarker,
-    JuliaFeolsBenchmarker,
-    PyFeolsBenchmarkerFullApi,
-    detect_torch_runtime_availability,
 )
 from benchmarks.modular.fepois_benchmarkers import (
     FixestFepoisBenchmarker,

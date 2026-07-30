@@ -6,8 +6,7 @@ import warnings
 import pandas as pd
 
 from benchmarks.modular.feols_benchmarkers import (
-    JuliaFeolsBenchmarker,
-    SubprocessFeolsBenchmarker,
+    _TablePrinter,
     _beta_x1,
     _demeaner_from_backend,
     _dgp_width,
@@ -15,11 +14,14 @@ from benchmarks.modular.feols_benchmarkers import (
     _group_key,
     _preconditioner_build_s,
     _read_data_columns,
-    _retained_rows,
     _result_from_dataset,
-    _SCRIPT_DIR,
-    _TablePrinter,
+    _retained_rows,
     _trim_process_memory,
+)
+from benchmarks.modular.subprocess_backend import (
+    _SCRIPT_DIR,
+    JuliaFeolsBenchmarker,
+    SubprocessFeolsBenchmarker,
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 class PyFepoisBenchmarkerFullApi:
