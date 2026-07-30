@@ -4,7 +4,6 @@ Runs each (size, dgp, backend) combo in a subprocess for clean peak-RSS numbers.
 """
 
 import argparse
-import csv
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +12,7 @@ FML = "y ~ x1 | indiv_id + firm_id + year"
 
 SCRIPT = """\
 import resource, sys, time, warnings, gc
+from benchmarks.modular.results import write_rows
 import pandas as pd
 import pyfixest as pf
 
@@ -87,9 +87,5 @@ for size in ["100k", "1m"]:
             if proc.stderr.strip():
                 print(proc.stderr.strip(), file=sys.stderr)
 
-args.out.parent.mkdir(parents=True, exist_ok=True)
-with args.out.open("w", newline="") as handle:
-    writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
-    writer.writeheader()
-    writer.writerows(rows)
+write_rows(args.out, rows)
 print(f"Wrote {args.out}")

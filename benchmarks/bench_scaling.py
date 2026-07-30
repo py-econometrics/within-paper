@@ -25,17 +25,16 @@ from __future__ import annotations
 
 import argparse
 import gc
-import time
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.timing import timed
 from benchmarks.modular.experiment import (
     RunRecord,
     SampleSpec,
-    add_repo_paths,
     load_sample,
     preconditioner_config,
     sample_hash,
@@ -75,16 +74,13 @@ def _timed_solve(categories, rhs, preconditioner: str, options) -> dict:
 
     warm = solve_batch(categories, rhs, options, preconditioner=config)
     del warm
-    gc.collect()
+    with timed() as setup:
+        solver = Solver(categories, preconditioner=config)
+    setup_s = setup.seconds
 
-    start = time.perf_counter()
-    solver = Solver(categories, preconditioner=config)
-    setup_s = time.perf_counter() - start
-
-    gc.collect()
-    start = time.perf_counter()
-    result = solver.solve_batch(rhs, options)
-    solve_s = time.perf_counter() - start
+    with timed() as solve:
+        result = solver.solve_batch(rhs, options)
+    solve_s = solve.seconds
 
     iterations = list(result.iterations)
     converged = list(result.converged)

@@ -16,16 +16,15 @@ from __future__ import annotations
 
 import argparse
 import gc
-import time
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.timing import timed
 from benchmarks.modular.experiment import (
     SampleSpec,
-    add_repo_paths,
     clear_sample_cache,
     load_sample,
     write_rows,
@@ -55,20 +54,17 @@ def _run_once(dgp: str, n_obs: int, k: int, iteration: int) -> dict:
     _ = solve_batch(categories, rhs, config)
     del _
 
-    gc.collect()
-    t0 = time.perf_counter()
-    solver = Solver(categories)
-    setup_wall = time.perf_counter() - t0
+    with timed() as setup:
+        solver = Solver(categories)
+    setup_wall = setup.seconds
 
-    gc.collect()
-    t0 = time.perf_counter()
-    reused = solver.solve_batch(rhs, config)
-    solve_wall = time.perf_counter() - t0
+    with timed() as solve:
+        reused = solver.solve_batch(rhs, config)
+    solve_wall = solve.seconds
 
-    gc.collect()
-    t0 = time.perf_counter()
-    oneshot = solve_batch(categories, rhs, config)
-    full_wall = time.perf_counter() - t0
+    with timed() as full:
+        oneshot = solve_batch(categories, rhs, config)
+    full_wall = full.seconds
 
     row = {
         "dgp": dgp,
