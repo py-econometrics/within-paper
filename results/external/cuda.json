@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "source": "legacy PyFixest benchmark suite",
   "status": "indicative_only",
   "exact_run_provenance_available": false,
@@ -8,14 +8,12 @@
   "provenance_note": "The original record does not identify the accelerator, host, software versions, or individual trials.",
   "measurements": [
     {
-      "table": "ols",
-      "row": "simple",
+      "design": "simple",
       "backend": "torch-cuda",
       "time_s": 4.73
     },
     {
-      "table": "ols",
-      "row": "difficult",
+      "design": "difficult",
       "backend": "torch-cuda",
       "time_s": 8.73
     }

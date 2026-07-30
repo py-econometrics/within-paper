@@ -1,127 +1,155 @@
 {
-  "schema_version": 1,
-  "source_of_truth": "results/paper/benchmark_tables.json",
-  "external_sources": [
-    "results/external/cuda.json"
-  ],
-  "external_source_notes": {
-    "results/external/cuda.json": "Historical values from the PyFixest benchmark suite; the original run metadata is unavailable."
-  },
   "claims": [
     {
       "id": "accuracy-frontier-table",
-      "table": "accuracy_frontier",
       "sources": [
         "results/runs/latest/accuracy_frontier.csv"
-      ]
+      ],
+      "table": "accuracy_frontier"
     },
     {
       "id": "agreement-table",
-      "table": "agreement",
       "sources": [
         "results/runs/latest/agreement.csv"
-      ]
+      ],
+      "table": "agreement"
     },
     {
       "id": "akm-mobility-table",
-      "table": "akm_mobility",
       "sources": [
         "benchmarks/results/feols_akm_sweep__*.csv",
         "results/runs/latest/hardness.csv"
-      ]
+      ],
+      "table": "akm_mobility"
     },
     {
       "id": "akm-sorting-table",
-      "table": "akm_sorting",
       "sources": [
         "benchmarks/results/feols_akm_sweep__*.csv",
         "results/runs/latest/hardness.csv"
-      ]
+      ],
+      "table": "akm_sorting"
+    },
+    {
+      "id": "amortization-table",
+      "sources": [
+        "results/runs/latest/amortization.csv"
+      ],
+      "table": "amortization"
     },
     {
       "id": "correia-real-table",
-      "table": "correia_real",
       "sources": [
         "benchmarks/results/correia-benchmarks.csv",
         "benchmarks/results/correia-benchmarks-raw__*.csv",
         "results/runs/latest/hardness.csv"
-      ]
+      ],
+      "table": "correia_real"
     },
     {
       "id": "correia-synthetic-table",
-      "table": "correia_synthetic",
       "sources": [
         "benchmarks/results/correia-benchmarks.csv",
         "benchmarks/results/correia-benchmarks-raw__*.csv",
         "results/runs/latest/hardness.csv"
-      ]
+      ],
+      "table": "correia_synthetic"
+    },
+    {
+      "id": "factor-scaling-table",
+      "sources": [
+        "results/runs/latest/factor_scaling.csv"
+      ],
+      "table": "factor_scaling"
     },
     {
       "id": "headline-gap-runtime-figure",
-      "table": "__figure_gap_runtime",
       "sources": [
         "results/runs/latest/gap_runtime_analysis.json",
         "figures/results/gap_runtime.svg"
-      ]
+      ],
+      "table": "__figure_gap_runtime"
+    },
+    {
+      "id": "iterations-table",
+      "sources": [
+        "results/runs/latest/within_preconditioners.csv"
+      ],
+      "table": "iterations"
     },
     {
       "id": "mechanism-mobility-table",
-      "table": "mechanism_mobility",
       "sources": [
         "benchmarks/results/feols_akm_sweep__*.csv",
         "results/runs/latest/hardness.csv",
         "results/runs/latest/pilot_calibration.json"
-      ]
+      ],
+      "table": "mechanism_mobility"
     },
     {
       "id": "mechanism-sorting-table",
-      "table": "mechanism_sorting",
       "sources": [
         "benchmarks/results/feols_akm_sweep__*.csv",
         "results/runs/latest/hardness.csv",
         "results/runs/latest/pilot_calibration.json"
-      ]
+      ],
+      "table": "mechanism_sorting"
     },
     {
       "id": "memory-table",
-      "table": "memory",
       "sources": [
         "results/runs/latest/memory.csv",
         "results/runs/latest/hardness.csv"
-      ]
+      ],
+      "table": "memory"
     },
     {
       "id": "ols-table",
-      "table": "ols",
       "sources": [
         "benchmarks/results/feols_bench__*.csv",
         "results/runs/latest/hardness.csv",
         "results/external/cuda.json"
-      ]
+      ],
+      "table": "ols"
+    },
+    {
+      "id": "ppml-inner-outer-table",
+      "sources": [
+        "results/runs/latest/ppml_inner_outer.csv"
+      ],
+      "table": "ppml_inner_outer"
     },
     {
       "id": "ppml-table",
-      "table": "ppml",
       "sources": [
         "benchmarks/results/fepois_bench__*.csv"
-      ]
+      ],
+      "table": "ppml"
     },
     {
       "id": "within-setup-cost",
-      "table": "ols",
+      "note": "Source for the setup and solve times cited in the manuscript.",
       "sources": [
         "results/runs/latest/within_setup_cost.csv",
         "results/runs/latest/within_setup_cost_summary.csv"
       ],
-      "note": "Source for the setup and solve times cited in the manuscript."
+      "table": "ols"
     },
     {
       "id": "zigzag-callout",
-      "table": "correia_synthetic",
+      "note": "Source for the synthetic-zigzag within and FEM.jl times cited in the manuscript.",
       "sources": [
         "benchmarks/results/correia-benchmarks.csv"
       ],
-      "note": "Source for the synthetic-zigzag within and FEM.jl times cited in the manuscript."
+      "table": "correia_synthetic"
     }
-  ]
+  ],
+  "external_source_notes": {
+    "results/external/cuda.json": "Historical values from the PyFixest benchmark suite; the original run metadata is unavailable."
+  },
+  "external_sources": [
+    "results/external/cuda.json"
+  ],
+  "schema_version": 1,
+  "source_of_truth": "results/paper/benchmark_tables.json"
 }
