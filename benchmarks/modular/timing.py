@@ -5,11 +5,10 @@ timings that differ by tens of milliseconds. Three trials cannot support that,
 and "median among converged trials" over three trials is a selected estimator:
 a cell reported as 52.4s (1/3) is the best of three by construction.
 
-This module holds the rules and the summary statistics, and it is the only
-place they are implemented: the table renderer in scripts/paper_results.py and
-the pooled gap diagnostic both call ``summarize_times`` rather than repeating
-the median-over-converged rule. Keep this module standard-library only, because
-the renderer must import it before the Pixi environment exists.
+This module holds the rules and the summary statistics. Wiring the adaptive
+repetition count into the harness additionally requires the aggregation in
+scripts/paper_results.py to stop assuming exactly three trials with distinct
+iter_num values; see the open items in PROTOCOL.md.
 """
 
 from __future__ import annotations

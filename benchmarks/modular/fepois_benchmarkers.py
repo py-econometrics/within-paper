@@ -9,11 +9,14 @@ try:
     from .feols_benchmarkers import (
         JuliaFeolsBenchmarker,
         SubprocessFeolsBenchmarker,
+        _beta_x1,
         _demeaner_from_backend,
         _dgp_width,
         _fit_converged,
         _group_key,
+        _preconditioner_build_s,
         _read_data_columns,
+        _retained_rows,
         _result_from_dataset,
         _SCRIPT_DIR,
         _TablePrinter,
@@ -24,11 +27,14 @@ except ImportError:
     from feols_benchmarkers import (
         JuliaFeolsBenchmarker,
         SubprocessFeolsBenchmarker,
+        _beta_x1,
         _demeaner_from_backend,
         _dgp_width,
         _fit_converged,
         _group_key,
+        _preconditioner_build_s,
         _read_data_columns,
+        _retained_rows,
         _result_from_dataset,
         _SCRIPT_DIR,
         _TablePrinter,
@@ -38,12 +44,22 @@ except ImportError:
 
 
 class PyFepoisBenchmarkerFullApi:
-    """Benchmark pf.fepois() end-to-end using one configured demeaner backend."""
+    """Benchmark one pf.fepois() call with the selected demeaning backend."""
 
-    def __init__(self, name: str, demeaner_backend: str, *, iwls_maxiter: int):
+    def __init__(
+        self,
+        name: str,
+        demeaner_backend: str,
+        *,
+        iwls_maxiter: int,
+        tol: float | None = None,
+        maxiter: int | None = None,
+    ):
         self._name = name
         self._demeaner_backend = demeaner_backend
         self._iwls_maxiter = iwls_maxiter
+        self._tol = tol
+        self._maxiter = maxiter
 
     @property
     def name(self) -> str:
@@ -54,7 +70,9 @@ class PyFepoisBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        demeaner = _demeaner_from_backend(self._demeaner_backend)
+        demeaner = _demeaner_from_backend(
+            self._demeaner_backend, tol=self._tol, maxiter=self._maxiter
+        )
 
         results: list[FeolsResult] = []
         all_cols = [spec.depvar, *spec.covariates, *spec.fe_cols]
@@ -89,9 +107,15 @@ class PyFepoisBenchmarkerFullApi:
                         iwls_maxiter=self._iwls_maxiter,
                     )
                     if not _fit_converged(fit):
-                        raise RuntimeError("PyFixest PPML model returned without convergence")
+                        raise RuntimeError("PyFixest PPML model did not converge")
                 elapsed = time.perf_counter() - t0
 
+                # Outer IRLS and per-step inner LSMR counts are not exposed on
+                # the public PyFixest model. Record what is available and mark
+                # the missing iteration fields explicitly so the paper does not
+                # invent them. Standalone within PPML diagnostics fill the gap.
+                deviance = getattr(fit, "deviance", None)
+                loglik = getattr(fit, "_loglik", None)
                 result = _result_from_dataset(
                     dataset,
                     spec,
@@ -99,6 +123,15 @@ class PyFepoisBenchmarkerFullApi:
                     elapsed=elapsed,
                     success=True,
                     n_obs_override=n_obs_for_result,
+                    outer_iterations=None,
+                    inner_iterations_sum=None,
+                    inner_iterations_max=None,
+                    preconditioner_build_s=_preconditioner_build_s(fit),
+                    deviance=float(deviance) if deviance is not None else None,
+                    loglik=float(loglik) if loglik is not None else None,
+                    beta_x1=_beta_x1(fit),
+                    n_retained=_retained_rows(fit),
+                    censoring="none",
                 )
             except Exception as exc:
                 result = _result_from_dataset(

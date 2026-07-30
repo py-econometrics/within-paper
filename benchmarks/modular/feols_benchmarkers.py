@@ -18,8 +18,10 @@ import pandas as pd
 
 try:
     from .interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+    from .timing import repetitions_for_runtime
 except ImportError:
     from interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+    from timing import repetitions_for_runtime
 
 _MIN_DGP_WIDTH = 16
 
@@ -45,7 +47,7 @@ def _trim_process_memory(demeaner_backend: str) -> None:
 
 @dataclass(frozen=True)
 class TorchRuntimeAvailability:
-    """Runtime availability of optional torch benchmark targets."""
+    """Availability of the optional Torch backends."""
 
     has_torch: bool
     has_mps: bool
@@ -53,7 +55,7 @@ class TorchRuntimeAvailability:
 
 
 def detect_torch_runtime_availability() -> TorchRuntimeAvailability:
-    """Detect whether torch and optional accelerator backends are available."""
+    """Return the available Torch backends."""
     try:
         import torch
     except ImportError:
@@ -85,7 +87,7 @@ def _dgp_width(datasets: list[BenchmarkDataset]) -> int:
 
 
 class _TablePrinter:
-    """Formats benchmark tables with dynamic DGP column width."""
+    """Format benchmark tables with a DGP column wide enough for the labels."""
 
     def __init__(self, dgp_w: int):
         self._w = dgp_w
@@ -134,6 +136,7 @@ def _result_from_dataset(
     success: bool,
     error: str | None = None,
     n_obs_override: int | None = None,
+    **diagnostics,
 ) -> FeolsResult:
     return FeolsResult(
         source_dataset_id=dataset.dataset_id,
@@ -148,7 +151,40 @@ def _result_from_dataset(
         time=elapsed,
         success=success,
         error=error,
+        **diagnostics,
     )
+
+
+def _preconditioner_build_s(fit) -> float | None:
+    """Read preconditioner setup time when PyFixest exposes it."""
+    pc = getattr(fit, "preconditioner", None)
+    if pc is None:
+        return None
+    value = getattr(pc, "build_time_seconds", None)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _beta_x1(fit) -> float | None:
+    try:
+        coef = fit.coef()
+        names = [str(name) for name in list(getattr(fit, "_coefnames", []) or [])]
+        if hasattr(coef, "tolist"):
+            values = list(coef.tolist())
+        else:
+            values = list(coef)
+        values = [float(v) for v in values]
+        if "x1" in names:
+            return values[names.index("x1")]
+        if len(values) == 1:
+            return values[0]
+    except Exception:
+        return None
+    return None
 
 
 def _safe_cast(val, type_fn):
@@ -172,6 +208,19 @@ def _as_bool(value, *, default: bool) -> bool:
     return bool(value)
 
 
+def _retained_rows(fit) -> int | None:
+    """Rows the backend kept after singleton dropping.
+
+    Recorded per trial because a comparison across backends is only a
+    comparison if they retained the same sample.
+    """
+    value = getattr(fit, "_N", None)
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _fit_converged(fit) -> bool:
     """Read the convergence flag exposed by current PyFixest models."""
     return bool(getattr(fit, "convergence", getattr(fit, "_convergence", True)))
@@ -193,15 +242,103 @@ def _read_data_columns(data_path: Path, columns: list[str]) -> pd.DataFrame:
     return pd.read_parquet(data_path, columns=columns)
 
 
-def _demeaner_from_backend(backend: str):
-    """Map a benchmark backend name to a typed demeaner configuration."""
+# Solver settings are pinned here rather than left to package defaults, so that
+# an upstream default change cannot silently alter a published timing. The MAP
+# and LSMR numbers are not comparable to each other: the two monitor different
+# convergence quantities. See PROTOCOL.md, section 5.
+MAP_SETTINGS = {
+    "backend": "rust",
+    "fixef_tol": 1e-6,
+    "fixef_maxiter": 10_000,
+}
+
+# PyFixest passes max(fixef_atol, fixef_btol) to the within backend, so the two
+# must be set explicitly and equally or the effective tolerance is whichever
+# default happens to be larger.
+LSMR_SETTINGS = {
+    "backend": "within",
+    "fixef_atol": 1e-8,
+    "fixef_btol": 1e-8,
+    "fixef_maxiter": 1_000,
+}
+
+WITHIN_PRECONDITIONERS = ("off", "diagonal", "additive")
+
+# pf.LsmrDemeaner(preconditioner="auto") resolves to "additive" for the within
+# backend. Naming it here keeps the `within` benchmark label pinned to a
+# specific preconditioner even if that resolution changes upstream.
+DEFAULT_WITHIN_PRECONDITIONER = "additive"
+
+# Frozen by the 100K calibration pilot on 2026-07-26 (PROTOCOL.md section 5).
+# The LSMR stopping rule bounds a relative normal-equation residual recovered
+# from the bidiagonalization scalars, which is a different number from the
+# externally recomputed eta. At the package default of 1e-8 the achieved eta
+# runs from 2.4e-8 to 1.6e-6, so no configuration clears Gate A. 1e-12 is the
+# loosest tolerance at which all three clear it on both pilot designs, and it
+# is what the mechanism ablation uses so its iteration counts are compared at
+# matched accuracy rather than at matched nominal tolerance.
+MECHANISM_LSMR_TOL = 1e-12
+MECHANISM_MAP_TOL = 1e-10
+
+# The ablation also equalizes the iteration budget. The package defaults give
+# MAP 10,000 iterations and LSMR 1,000, and at 1M the first ablation run showed
+# what that asymmetry does: within-off failed 30 of 33 trials, every one of them
+# at 1,000 iterations, while rust-map was allowed ten times as many. "Removing
+# the preconditioner does not by itself remove the slow directions" cannot rest
+# on a censoring that the budget produced, so the mechanism arm gets MAP's cap
+# and a run that still fails to converge fails on its own merits.
+MECHANISM_MAXITER = 10_000
+
+
+def _demeaner_from_backend(
+    backend: str, *, tol: float | None = None, maxiter: int | None = None
+):
+    """Map a benchmark backend name to a typed demeaner configuration.
+
+    Recognised names:
+
+    - ``rust``: unaccelerated Rust MAP.
+    - ``within-off`` / ``within-diagonal`` / ``within-additive``: LSMR with the
+      named preconditioner, for the same-code mechanism ablation.
+    - ``within``: alias for the documented default, so that existing result
+      files and table labels keep working.
+    - ``torch_cpu`` / ``torch_mps`` / ``torch_cuda``: the Torch LSMR backends,
+      which carry their own built-in diagonal preconditioner.
+
+    ``tol`` and ``maxiter`` override the pinned stopping rule. Cross-package
+    tables leave both unset so that each package runs at its documented default;
+    the mechanism ablation sets them so every configuration is compared at
+    matched accuracy under one iteration budget.
+    """
     import pyfixest as pf
 
     if backend == "rust":
-        return pf.MapDemeaner()
+        settings = dict(MAP_SETTINGS)
+        if tol is not None:
+            settings["fixef_tol"] = tol
+        if maxiter is not None:
+            settings["fixef_maxiter"] = maxiter
+        return pf.MapDemeaner(**settings)
 
     if backend == "within":
-        return pf.LsmrDemeaner()
+        backend = f"within-{DEFAULT_WITHIN_PRECONDITIONER}"
+
+    if backend.startswith("within-"):
+        preconditioner = backend[len("within-") :]
+        if preconditioner not in WITHIN_PRECONDITIONERS:
+            raise ValueError(
+                f"Unknown within preconditioner {preconditioner!r}; "
+                f"expected one of {WITHIN_PRECONDITIONERS}"
+            )
+        settings = dict(LSMR_SETTINGS)
+        if tol is not None:
+            # Both must move together: PyFixest passes their maximum through.
+            settings["fixef_atol"] = tol
+            settings["fixef_btol"] = tol
+        if maxiter is not None:
+            settings["fixef_maxiter"] = maxiter
+        return pf.LsmrDemeaner(preconditioner=preconditioner, **settings)
+
     if backend == "torch_cpu":
         return pf.LsmrDemeaner(backend="torch", device="cpu")
     if backend == "torch_mps":
@@ -212,11 +349,23 @@ def _demeaner_from_backend(backend: str):
 
 
 class PyFeolsBenchmarkerFullApi:
-    """Benchmark pf.feols() end-to-end using one configured demeaner backend."""
+    """Benchmark one pf.feols() call with the selected demeaning backend."""
 
-    def __init__(self, name: str, demeaner_backend: str):
+    def __init__(
+        self,
+        name: str,
+        demeaner_backend: str,
+        *,
+        tol: float | None = None,
+        maxiter: int | None = None,
+        repetitions: int | None = None,
+    ):
         self._name = name
         self._demeaner_backend = demeaner_backend
+        self._tol = tol
+        self._maxiter = maxiter
+        # None selects the count from the first trial's runtime.
+        self._repetitions = repetitions
 
     @property
     def name(self) -> str:
@@ -227,7 +376,9 @@ class PyFeolsBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        demeaner = _demeaner_from_backend(self._demeaner_backend)
+        demeaner = _demeaner_from_backend(
+            self._demeaner_backend, tol=self._tol, maxiter=self._maxiter
+        )
 
         results: list[FeolsResult] = []
 
@@ -250,56 +401,103 @@ class PyFeolsBenchmarkerFullApi:
                 df = _read_data_columns(dataset.data_path, all_cols)
                 n_obs_for_result = len(df)
 
-                t0 = time.perf_counter()
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message=r"\d+ singleton fixed effect\(s\) dropped from the model\.",
-                        category=UserWarning,
-                    )
-                    fit = pf.feols(
-                        fml=spec.formula,
-                        data=df,
-                        vcov=spec.vcov,
-                        copy_data=False,
-                        store_data=False,
-                        demeaner=demeaner,
-                    )
-                    if not _fit_converged(fit):
-                        raise RuntimeError("PyFixest model returned without convergence")
-                elapsed = time.perf_counter() - t0
+                # One timed fit first, then as many more as the R1/R2/R3 rule
+                # asks for at that runtime. The data frame is read once and
+                # reused, so every repetition runs on one fixed sample rather
+                # than a fresh draw (PROTOCOL.md sections 2 and 4).
+                trials: list[tuple[float | None, object | None, str | None]] = []
+                dataset_results: list[FeolsResult] = []
+                planned = 1
+                while len(trials) < planned:
+                    try:
+                        t0 = time.perf_counter()
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings(
+                                "ignore",
+                                message=r"\d+ singleton fixed effect\(s\) dropped from the model\.",
+                                category=UserWarning,
+                            )
+                            fit = pf.feols(
+                                fml=spec.formula,
+                                data=df,
+                                vcov=spec.vcov,
+                                copy_data=False,
+                                store_data=False,
+                                demeaner=demeaner,
+                            )
+                            if not _fit_converged(fit):
+                                raise RuntimeError("PyFixest model did not converge")
+                        elapsed = time.perf_counter() - t0
+                        trials.append((elapsed, fit, None))
+                    except Exception as exc:  # noqa: BLE001 - recorded, not raised
+                        trials.append((None, None, str(exc)))
+                        # A failing cell is not worth repeating; one attempt is
+                        # enough to record the failure, and the burn-in already
+                        # paid the setup cost.
+                        planned = len(trials)
+                        break
+                    if len(trials) == 1:
+                        planned = (
+                            self._repetitions
+                            if self._repetitions is not None
+                            else repetitions_for_runtime(elapsed)
+                        )
 
-                result = _result_from_dataset(
-                    dataset,
-                    spec,
-                    backend=self.name,
-                    elapsed=elapsed,
-                    success=True,
-                    n_obs_override=n_obs_for_result,
-                )
+                for repetition, (elapsed, fit, error) in enumerate(trials):
+                    if error is None:
+                        result = _result_from_dataset(
+                            dataset,
+                            spec,
+                            backend=self.name,
+                            elapsed=elapsed,
+                            success=True,
+                            n_obs_override=n_obs_for_result,
+                            repetition=repetition,
+                            n_planned=planned,
+                            n_retained=_retained_rows(fit),
+                        )
+                    else:
+                        result = _result_from_dataset(
+                            dataset,
+                            spec,
+                            backend=self.name,
+                            elapsed=None,
+                            success=False,
+                            error=error,
+                            n_obs_override=n_obs_for_result,
+                            repetition=repetition,
+                            n_planned=planned,
+                        )
+                    results.append(result)
+                    dataset_results.append(result)
             except Exception as exc:
-                result = _result_from_dataset(
-                    dataset,
-                    spec,
-                    backend=self.name,
-                    elapsed=None,
-                    success=False,
-                    error=str(exc),
-                    n_obs_override=n_obs_for_result,
-                )
+                dataset_results = [
+                    _result_from_dataset(
+                        dataset,
+                        spec,
+                        backend=self.name,
+                        elapsed=None,
+                        success=False,
+                        error=str(exc),
+                        n_obs_override=n_obs_for_result,
+                        n_planned=1,
+                    )
+                ]
+                results.extend(dataset_results)
             finally:
                 del df
                 _trim_process_memory(self._demeaner_backend)
 
-            results.append(result)
-
-            if result.iter_type != "burnin":
-                key = _group_key(result)
-                if prev_key is not None and key != prev_key and group_buf:
-                    tbl.print_row(group_buf)
-                    group_buf = []
-                group_buf.append(result)
-                prev_key = key
+            # Every repetition reaches the printer, so the live min/median/max
+            # shows the spread the repetition rule exists to measure.
+            for result in dataset_results:
+                if result.iter_type != "burnin":
+                    key = _group_key(result)
+                    if prev_key is not None and key != prev_key and group_buf:
+                        tbl.print_row(group_buf)
+                        group_buf = []
+                    group_buf.append(result)
+                    prev_key = key
 
         if group_buf:
             tbl.print_row(group_buf)
@@ -338,17 +536,16 @@ def _parse_subprocess_output(
             iter_num = _safe_cast(entry.get("iter_num"), int)
             parsed_by_key[(dataset_id, iter_num)] = entry
 
-    # A4: partial-result warning
+    # Warn when a successful subprocess omits one or more datasets.
     n_emitted = len(parsed_by_key)
     n_missing = len(datasets) - n_emitted
     if n_missing > 0 and completed_process.returncode == 0:
         warnings.warn(
-            f"Subprocess emitted results for {n_emitted}/{len(datasets)} datasets"
+            f"Subprocess returned results for {n_emitted}/{len(datasets)} datasets"
         )
 
     stderr_text = (completed_process.stderr or "").strip()
-    # Keep a subprocess failure informative without placing an unbounded log in
-    # every failed CSV row.
+    # Store only the final 4,000 characters of stderr in each failed CSV row.
     if len(stderr_text) > 4_000:
         stderr_text = stderr_text[-4_000:]
     if completed_process.returncode != 0:
@@ -362,7 +559,7 @@ def _parse_subprocess_output(
     for dataset in datasets:
         entry = parsed_by_key.get((dataset.dataset_id, dataset.iter_num))
         if entry is None:
-            missing_error = default_error or "No result emitted by subprocess backend."
+            missing_error = default_error or "The subprocess returned no result for this dataset."
             results.append(
                 _result_from_dataset(
                     dataset,
@@ -439,9 +636,8 @@ class SubprocessFeolsBenchmarker:
                         "fe_cols": spec.fe_cols,
                         "vcov": spec.vcov,
                         "vcov_type": _normalize_vcov(spec.vcov),
-                        # Julia PPML can run for several minutes. Retain a
-                        # file-backed copy of each emitted result so buffered
-                        # stdout cannot lose completed rows at process exit.
+                        # Julia PPML can run for several minutes. Write each result
+                        # to a file in case the process exits before flushing stdout.
                         "result_log_path": str(result_log_path),
                     }
                 ),

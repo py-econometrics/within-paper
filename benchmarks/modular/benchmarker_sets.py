@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from feols_benchmarkers import (
+    MECHANISM_LSMR_TOL,
+    MECHANISM_MAP_TOL,
+    MECHANISM_MAXITER,
+    WITHIN_PRECONDITIONERS,
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
     PyFeolsBenchmarkerFullApi,
@@ -20,105 +25,147 @@ class BenchmarkerBundle:
     benchmarkers: list
 
 
-def build_standard_feols_benchmarkers(
-    *,
-    include_pyfixest: bool = True,
-    include_fixest: bool = True,
-    include_julia: bool = True,
-    include_torch: bool = True,
-) -> BenchmarkerBundle:
-    """Build the shared feols benchmark runner set used by modular benchmarks."""
-    pyfixest_benchmarkers = []
-    if include_pyfixest:
-        pyfixest_benchmarkers.extend(
-            [
-                PyFeolsBenchmarkerFullApi("pyfixest (within)", "within"),
-                PyFeolsBenchmarkerFullApi("pyfixest (rust-map)", "rust"),
-            ]
+class Backend(NamedTuple):
+    """One measured configuration: a label, a demeaner, and its stopping rule.
+
+    ``tol`` and ``maxiter`` of ``None`` keep the package default.
+    """
+
+    label: str
+    backend: str
+    tol: float | None = None
+    maxiter: int | None = None
+
+
+# What a user gets out of the box. Cross-package tables read these.
+PACKAGE_DEFAULTS = (
+    Backend("pyfixest (within)", "within"),
+    Backend("pyfixest (rust-map)", "rust"),
+)
+
+# The same code path at matched accuracy under one shared iteration budget.
+# The mechanism figures read these. They carry distinct labels so both views
+# can be measured in one pass over the data and separated afterwards: which
+# rows belong in which table is a curation decision, not a reason to run the
+# same designs twice.
+MATCHED_ACCURACY = (
+    Backend(
+        "pyfixest (rust-map, matched)", "rust", MECHANISM_MAP_TOL, MECHANISM_MAXITER
+    ),
+    *(
+        Backend(
+            f"pyfixest (within-{name})",
+            f"within-{name}",
+            MECHANISM_LSMR_TOL,
+            MECHANISM_MAXITER,
+        )
+        for name in WITHIN_PRECONDITIONERS
+    ),
+)
+
+EXTERNAL_FEOLS = (
+    ("fixest-map", FixestFeolsBenchmarker),
+    ("FEM.jl (lsmr)", JuliaFeolsBenchmarker),
+)
+
+
+def require_multiple_absorbed_factors(spec) -> None:
+    """Reject preconditioner comparisons with a single absorbed factor.
+
+    With one factor the Gramian is diagonal and PyFixest falls back to
+    closed-form MAP demeaning, so all three preconditioner settings take the
+    same code path and the comparison measures nothing.
+    """
+    if spec.n_fe < 2:
+        raise ValueError(
+            "The preconditioner comparison needs at least two absorbed factors; "
+            f"got {spec.n_fe}. Single-factor problems fall back to closed-form "
+            "MAP demeaning, so off, diagonal, and additive are identical."
         )
 
-    if include_torch:
-        availability = detect_torch_runtime_availability()
-        if not availability.has_torch:
-            print(
-                "[bench] skipping torch benchmarkers: torch is not installed",
-                flush=True,
+
+def _torch_benchmarkers() -> list:
+    availability = detect_torch_runtime_availability()
+    if not availability.has_torch:
+        print("[bench] skipping Torch backends: Torch is not installed", flush=True)
+        return []
+
+    benchmarkers = [PyFeolsBenchmarkerFullApi("pyfixest (torch-cpu)", "torch_cpu")]
+    for device, available in (
+        ("mps", availability.has_mps),
+        ("cuda", availability.has_cuda),
+    ):
+        if available:
+            benchmarkers.append(
+                PyFeolsBenchmarkerFullApi(
+                    f"pyfixest (torch-{device})", f"torch_{device}"
+                )
             )
         else:
-            pyfixest_benchmarkers.append(
-                PyFeolsBenchmarkerFullApi(
-                    "pyfixest (torch-cpu)",
-                    "torch_cpu",
-                )
-            )
-            if availability.has_mps:
-                pyfixest_benchmarkers.append(
-                    PyFeolsBenchmarkerFullApi(
-                        "pyfixest (torch-mps)",
-                        "torch_mps",
-                    )
-                )
-            else:
-                print(
-                    "[bench] skipping torch-mps benchmarker: MPS unavailable",
-                    flush=True,
-                )
+            print(f"[bench] skipping torch-{device}: unavailable", flush=True)
+    return benchmarkers
 
-            if availability.has_cuda:
-                pyfixest_benchmarkers.append(
-                    PyFeolsBenchmarkerFullApi(
-                        "pyfixest (torch-cuda)",
-                        "torch_cuda",
-                    )
-                )
-            else:
-                print(
-                    "[bench] skipping torch-cuda benchmarker: CUDA unavailable",
-                    flush=True,
-                )
 
-    benchmarkers = list(pyfixest_benchmarkers)
-    if include_fixest:
-        benchmarkers.append(FixestFeolsBenchmarker("fixest-map"))
-    if include_julia:
-        benchmarkers.append(JuliaFeolsBenchmarker("FEM.jl (lsmr)"))
+def _pyfixest_specs(package_defaults: bool, matched_accuracy: bool) -> list[Backend]:
+    specs: list[Backend] = []
+    if package_defaults:
+        specs.extend(PACKAGE_DEFAULTS)
+    if matched_accuracy:
+        specs.extend(MATCHED_ACCURACY)
+    return specs
+
+
+def build_feols_benchmarkers(
+    *,
+    package_defaults: bool = True,
+    matched_accuracy: bool = False,
+    external: bool = True,
+    torch: bool = False,
+) -> BenchmarkerBundle:
+    """Assemble the feols backends for one experiment family.
+
+    Views are selected here rather than split across drivers. A measurement is
+    (design, backend, stopping rule) -> time; running the same designs a second
+    time to fill a second table would only pay the data cost twice.
+    """
+    benchmarkers = [
+        PyFeolsBenchmarkerFullApi(
+            spec.label, spec.backend, tol=spec.tol, maxiter=spec.maxiter
+        )
+        for spec in _pyfixest_specs(package_defaults, matched_accuracy)
+    ]
+    if torch:
+        benchmarkers.extend(_torch_benchmarkers())
+    if external:
+        benchmarkers.extend(cls(label) for label, cls in EXTERNAL_FEOLS)
 
     if not benchmarkers:
-        raise ValueError(
-            "No benchmarkers available after applying include flags and runtime "
-            "availability checks."
-        )
-
+        raise ValueError("No requested benchmark backend is available.")
     return BenchmarkerBundle(benchmarkers=benchmarkers)
 
 
-def build_standard_fepois_benchmarkers(
+def build_fepois_benchmarkers(
     *,
-    include_pyfixest: bool = True,
-    include_fixest: bool = True,
-    include_julia: bool = True,
+    package_defaults: bool = True,
+    matched_accuracy: bool = False,
+    external: bool = True,
+    iwls_maxiter: int = 100,
 ) -> BenchmarkerBundle:
-    """Build the shared fepois benchmark runner set used by modular benchmarks."""
-    benchmarkers = []
-    if include_pyfixest:
-        benchmarkers.extend(
-            [
-                PyFepoisBenchmarkerFullApi(
-                    "pyfixest (within)", "within", iwls_maxiter=100
-                ),
-                PyFepoisBenchmarkerFullApi(
-                    "pyfixest (rust-map)", "rust", iwls_maxiter=100
-                ),
-            ]
+    """The same composition for PPML."""
+    benchmarkers = [
+        PyFepoisBenchmarkerFullApi(
+            spec.label,
+            spec.backend,
+            iwls_maxiter=iwls_maxiter,
+            tol=spec.tol,
+            maxiter=spec.maxiter,
         )
-    if include_fixest:
+        for spec in _pyfixest_specs(package_defaults, matched_accuracy)
+    ]
+    if external:
         benchmarkers.append(FixestFepoisBenchmarker("fixest-fepois"))
-    if include_julia:
         benchmarkers.append(GLFixedEffectModelsBenchmarker("glfixedeffectmodels.jl"))
 
     if not benchmarkers:
-        raise ValueError(
-            "No benchmarkers available after applying include flags."
-        )
-
+        raise ValueError("No requested benchmark backend is available.")
     return BenchmarkerBundle(benchmarkers=benchmarkers)

@@ -4,7 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from benchmarker_sets import build_standard_feols_benchmarkers
+from benchmarker_sets import (
+    build_feols_benchmarkers,
+    require_multiple_absorbed_factors,
+)
 from dgps import get_akm_sweep_scenarios
 from interfaces import FeolsSpec
 from runner import run_benchmarks
@@ -53,8 +56,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    for spec in SPECS:
+        require_multiple_absorbed_factors(spec)
     datasets = generate_akm_datasets()
-    bundle = build_standard_feols_benchmarkers(include_torch=False)
+    # Both views in one pass: package defaults for the cross-package tables and
+    # the matched-accuracy arms for the mechanism figures. The AKM sweep is
+    # where the mechanism experiment lives, so it always measures both.
+    bundle = build_feols_benchmarkers(matched_accuracy=True)
     run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )

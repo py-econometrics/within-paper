@@ -74,9 +74,7 @@ class SampleSpec:
         """Join key that keeps the size.
 
         simple and difficult run at several sizes and are not equally connected
-        at each, so the family name alone is not an identity. The gap-runtime
-        analysis joins hardness to runtime on this, which is why it lives with
-        the spec rather than in the analysis.
+        at each, so the family name alone is not an identity.
         """
         return f"{self.design}@{self.n_obs}"
 
