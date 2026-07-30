@@ -9,6 +9,13 @@
   },
   "claims": [
     {
+      "id": "accuracy-frontier-table",
+      "table": "accuracy_frontier",
+      "sources": [
+        "results/runs/latest/accuracy_frontier.csv"
+      ]
+    },
+    {
       "id": "agreement-table",
       "table": "agreement",
       "sources": [
@@ -47,6 +54,14 @@
         "benchmarks/results/correia-benchmarks.csv",
         "benchmarks/results/correia-benchmarks-raw__*.csv",
         "results/runs/latest/hardness.csv"
+      ]
+    },
+    {
+      "id": "headline-gap-runtime-figure",
+      "table": "__figure_gap_runtime",
+      "sources": [
+        "results/runs/latest/gap_runtime_analysis.json",
+        "figures/results/gap_runtime.svg"
       ]
     },
     {
