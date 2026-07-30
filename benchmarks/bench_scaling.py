@@ -31,6 +31,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.cli import add_runs_arg
 from benchmarks.modular.timing import timed
 from benchmarks.modular.experiment import (
     RunRecord,
@@ -236,7 +237,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--design", default="difficult")
     parser.add_argument("--n-obs", type=int, default=1_000_000)
-    parser.add_argument("--runs", type=int, default=3)
+    add_runs_arg(parser)
     parser.add_argument("--k-values", type=int, nargs="+", default=[1, 2, 5, 10, 25])
     parser.add_argument("--skip-factor-scaling", action="store_true")
     parser.add_argument("--skip-amortization", action="store_true")

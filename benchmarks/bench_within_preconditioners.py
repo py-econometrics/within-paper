@@ -29,6 +29,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.cli import add_runs_arg
 from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     RunRecord,
@@ -271,7 +272,7 @@ def main() -> None:
         default=list(PRECONDITIONERS),
         choices=list(PRECONDITIONERS),
     )
-    parser.add_argument("--runs", type=int, default=3)
+    add_runs_arg(parser)
     parser.add_argument(
         "--with-map",
         action="store_true",

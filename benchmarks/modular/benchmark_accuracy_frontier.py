@@ -27,6 +27,7 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.accuracy import accuracy_record
 from benchmarks.modular.dgp_functions import paper_base_dgp
@@ -286,7 +287,7 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-obs", type=int, default=100_000)
-    parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
+    add_dgps_arg(parser)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument(
         "--include-external",

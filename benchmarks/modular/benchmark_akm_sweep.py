@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from benchmarks.modular.cli import add_output_args
 from benchmarks.modular.benchmarker_sets import (
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
@@ -48,8 +49,7 @@ def generate_akm_datasets():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "benchmarks" / "results")
-    parser.add_argument("--reuse-existing", action="store_true")
+    add_output_args(parser)
     args = parser.parse_args()
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)

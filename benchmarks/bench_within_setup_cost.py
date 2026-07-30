@@ -22,6 +22,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.cli import add_dgps_arg, add_runs_arg
 from benchmarks.modular.timing import timed
 from benchmarks.modular.experiment import (
     SampleSpec,
@@ -131,8 +132,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-obs", type=int, default=10_000_000)
     parser.add_argument("--k", type=int, default=1)
-    parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
-    parser.add_argument("--runs", type=int, default=3)
+    add_dgps_arg(parser)
+    add_runs_arg(parser)
     parser.add_argument(
         "--out",
         type=Path,
