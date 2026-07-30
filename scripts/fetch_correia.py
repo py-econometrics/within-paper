@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CORREIA_DIR = ROOT / "data" / "correia_data"
+CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 
 
 def _sha256(path: Path) -> str:

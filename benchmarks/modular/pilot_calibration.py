@@ -58,7 +58,7 @@ def _preconditioner_configs():
 
 def _load_design(dgp: str, n_obs: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (int categories, uint32 Fortran categories, right-hand sides)."""
-    path = ROOT / "data" / f"{dgp}_{n_obs // 1000}k.parquet"
+    path = ROOT / "benchmarks" / "data" / f"{dgp}_{n_obs // 1000}k.parquet"
     if not path.exists():
         raise FileNotFoundError(
             f"{path} is missing. Run `pixi run bench-generate-data` first."
@@ -202,7 +202,7 @@ def cap_reporting_check(dgp: str, n_obs: int) -> dict:
     )
     capped_map = map_demean_with_sweeps(np.asarray(rhs), codes, tol=1e-10, maxiter=5)
 
-    frame = pd.read_parquet(ROOT / "data" / f"{dgp}_{n_obs // 1000}k.parquet")
+    frame = pd.read_parquet(ROOT / "benchmarks" / "data" / f"{dgp}_{n_obs // 1000}k.parquet")
     formula = f"y ~ x1 | {' + '.join(FE_COLS)}"
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

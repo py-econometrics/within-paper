@@ -45,7 +45,7 @@ TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
-CORREIA_DIR = ROOT / "data" / "correia_data"
+CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 EXPECTED_TRIALS = 3
 # The legacy CUDA timings are quoted only in Appendix C, never in a main
 # runtime table, so they resolve to generated prose values rather than to a

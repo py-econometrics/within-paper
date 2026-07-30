@@ -26,9 +26,9 @@ ROOT = Path(__file__).resolve().parents[2]
 from pyfixest.core.detect_singletons import detect_singletons
 from benchmarks.modular.dgps import get_akm_sweep_scenario_names
 
-CORREIA_DIR = ROOT / "data" / "correia_data"
+CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 DATA_DIR = ROOT / "benchmarks" / "data"
-MEMORY_DATA_DIR = ROOT / "data"
+MEMORY_DATA_DIR = ROOT / "benchmarks" / "data"
 DEFAULT_OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 PROPACK_MAX_MIN_DIM = 20_000
 # Use dense SVD when the normalized block has at most this many entries.

@@ -16,15 +16,14 @@ benchmarks/julia-env/*
 benchmarks/data/*.hash
 
 # Correia HDFE benchmark data is downloaded separately; retain its metadata.
-data/correia_data/*.csv
-data/correia_data/.downloads/
+benchmarks/data/correia_data/*.csv
+benchmarks/data/correia_data/.downloads/
 
 # Generated paper summaries are tracked; raw benchmark results remain local.
 results/runs/
 results/legacy/
 benchmarks/results/
 benchmarks/modular/*.csv
-data/benchmarks/*.csv
 figures/benchmarks/
 
 # local Codex skill marker

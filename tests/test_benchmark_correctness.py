@@ -807,7 +807,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
 
         import pyfixest as pf
 
-        frame = pd.read_parquet(ROOT / "data" / "difficult_100k.parquet")
+        frame = pd.read_parquet(ROOT / "benchmarks" / "data" / "difficult_100k.parquet")
         formula = "y ~ x1 | indiv_id + firm_id + year"
 
         def eta_at(backend: str, tol: float | None) -> float:

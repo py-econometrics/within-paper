@@ -19,7 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DATA_DIR = PROJECT_ROOT / "data" / "correia_data"
+DATA_DIR = PROJECT_ROOT / "benchmarks" / "data" / "correia_data"
 METADATA_DIR = DATA_DIR / "metadata"
 OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
 RAW_OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "correia-benchmarks-raw.csv"
