@@ -14,8 +14,6 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
-from figure_style import METHOD_LEGEND_LABEL, METHOD_LINESTYLE, METHOD_STYLE  # noqa: E402
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
@@ -30,30 +28,12 @@ METHOD_ORDER = (
 )
 
 STYLE = {
-    "lsmr_off": METHOD_STYLE["lsmr_none"],
-    "lsmr_diagonal": METHOD_STYLE["lsmr_diagonal"],
-    "lsmr_additive": METHOD_STYLE["lsmr_factor_pair"],
-    "pyfixest_map": METHOD_STYLE["map"],
-    "r_fixest": METHOD_STYLE["fixest"],
-    "julia_fem": METHOD_STYLE["fem"],
-}
-
-LINESTYLE = {
-    "lsmr_off": METHOD_LINESTYLE["lsmr_none"],
-    "lsmr_diagonal": METHOD_LINESTYLE["lsmr_diagonal"],
-    "lsmr_additive": METHOD_LINESTYLE["lsmr_factor_pair"],
-    "pyfixest_map": METHOD_LINESTYLE["map"],
-    "r_fixest": METHOD_LINESTYLE["fixest"],
-    "julia_fem": METHOD_LINESTYLE["fem"],
-}
-
-METHOD_LABEL_BY_KEY = {
-    "lsmr_off": METHOD_LEGEND_LABEL["within-off"],
-    "lsmr_diagonal": METHOD_LEGEND_LABEL["within-diagonal"],
-    "lsmr_additive": METHOD_LEGEND_LABEL["within-additive"],
-    "pyfixest_map": METHOD_LEGEND_LABEL["rust-map"],
-    "r_fixest": METHOD_LEGEND_LABEL["fixest"],
-    "julia_fem": METHOD_LEGEND_LABEL["FEM.jl"],
+    "lsmr_off": ("#7c3aed", "X"),
+    "lsmr_diagonal": ("#7b8494", "^"),
+    "lsmr_additive": ("#2563eb", "D"),
+    "pyfixest_map": ("#c2410c", "o"),
+    "r_fixest": ("#a16207", "s"),
+    "julia_fem": ("#0f766e", "P"),
 }
 
 METRICS = (
@@ -140,9 +120,7 @@ def _axis_limits(
     if values.size == 0:
         raise ValueError(f"no positive {metric} values to plot")
     floor = max(float(values.min()) / 5, np.finfo(np.float64).eps)
-    # Values below numerical precision are drawn at ``floor``. Leave another
-    # half-decade of room so those markers are not clipped by the right spine.
-    lower = floor / np.sqrt(10)
+    lower = min(floor, float(values.min()) / 2)
     upper = float(values.max()) * 2
     return (lower, upper), floor
 
@@ -166,7 +144,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         subset = failed[failed["method"] == method]
         if subset.empty:
             continue
-        label = METHOD_LABEL_BY_KEY[method].replace("\n", " — ")
+        label = str(subset["label"].iloc[0])
         count = len(subset)
         suffix = "setting" if count == 1 else "settings"
         entries.append(f"{label}: {count} {suffix}")
@@ -186,13 +164,10 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
     fig, axes = plt.subplots(
         2,
         n_columns,
-        # This SVG is placed at nearly full text width on an A4 page. Keep its
-        # intrinsic width close to the printed width so Typst does not shrink
-        # the axis and legend fonts to an unreadable size.
-        figsize=(7.4, 5.4),
+        figsize=(4.0 * n_columns, 7.1),
         sharey=True,
         squeeze=False,
-        gridspec_kw={"hspace": 0.68, "wspace": 0.12},
+        gridspec_kw={"hspace": 0.35, "wspace": 0.12},
     )
     x_limits = {
         metric: _axis_limits(points, metric) for metric, _ in METRICS
@@ -230,19 +205,18 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     method_points["plot_error"],
                     method_points["median_time_s"],
                     color=colour,
-                    linewidth=1.45,
-                    linestyle=LINESTYLE[method],
-                    alpha=0.85,
+                    linewidth=1.2,
+                    alpha=0.75,
                     zorder=2,
                 )
                 ax.scatter(
                     method_points["plot_error"],
                     method_points["median_time_s"],
-                    s=33,
+                    s=35,
                     color=colour,
                     marker=marker,
                     edgecolors="white",
-                    linewidths=0.55,
+                    linewidths=0.5,
                     zorder=3,
                 )
 
@@ -260,14 +234,12 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                         defaults["median_time_s"],
                         s=86,
                         facecolors="none",
-                        edgecolors="#111827",
-                        linewidths=0.9,
+                        edgecolors="#111111",
+                        linewidths=0.85,
                         zorder=4,
                     )
 
-            # Report failures once per design rather than repeating the same
-            # note for both error measures.
-            note = _failure_note(points, design) if row_number == 0 else None
+            note = _failure_note(points, design)
             if note:
                 ax.annotate(
                     note,
@@ -278,32 +250,25 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     fontsize=6.3,
                     color="#555555",
                     linespacing=1.25,
-                    bbox={
-                        "boxstyle": "round,pad=0.25",
-                        "facecolor": "white",
-                        "edgecolor": "#d1d5db",
-                        "linewidth": 0.45,
-                        "alpha": 0.92,
-                    },
                 )
 
             ax.set_xscale("log")
             ax.set_yscale("log")
-            # Precision improves from left to right: large errors are shown on
-            # the left and small errors on the right.
-            ax.set_xlim(limits[1], limits[0])
+            ax.set_xlim(*limits)
             ax.set_ylim(*y_limits)
             ax.set_xlabel(x_label, fontsize=8.4)
             if column_number == 0:
                 ax.set_ylabel("Median runtime (s)", fontsize=8.7)
             ax.tick_params(axis="both", labelsize=7.6)
-            ax.grid(True, which="major", linewidth=0.42, alpha=0.32)
-            ax.grid(True, which="minor", linewidth=0.22, alpha=0.10)
+            ax.grid(True, which="major", linewidth=0.4, alpha=0.35)
+            ax.grid(True, which="minor", linewidth=0.25, alpha=0.16)
             for spine in ("top", "right"):
                 ax.spines[spine].set_visible(False)
 
     labels = {
-        method: METHOD_LABEL_BY_KEY[method]
+        method: str(
+            points.loc[points["method"] == method, "label"].dropna().iloc[0]
+        )
         for method in METHOD_ORDER
         if (points["method"] == method).any()
     }
@@ -313,11 +278,10 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             [0],
             color=STYLE[method][0],
             marker=STYLE[method][1],
-            linewidth=1.45,
-            linestyle=LINESTYLE[method],
+            linewidth=1.2,
             markersize=6,
             markeredgecolor="white",
-            markeredgewidth=0.55,
+            markeredgewidth=0.5,
             label=labels[method],
         )
         for method in METHOD_ORDER
@@ -330,7 +294,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             color="none",
             marker="o",
             markerfacecolor="none",
-            markeredgecolor="#111827",
+            markeredgecolor="#111111",
             markersize=8,
             label="default tolerance",
         )
@@ -350,21 +314,21 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
         caps = pd.to_numeric(raw["maxiter"], errors="coerce").dropna().unique()
         if len(caps) == 1:
             cap_text = f"a common {int(caps[0]):,}-iteration cap"
-    fig.subplots_adjust(left=0.085, right=0.995, top=0.88, bottom=0.15)
+    fig.subplots_adjust(left=0.075, right=0.995, top=0.90, bottom=0.12)
     fig.text(
         0.5,
         0.025,
-        "Error falls from left to right. Points are medians; circles mark "
-        "default tolerances. "
-        f"All methods use {cap_text}.",
+        "Each point is the median of repeated fits on one fixed sample. "
+        f"Lines vary the method's native tolerance; all methods use {cap_text}. "
+        "Smaller errors indicate greater precision.",
         ha="center",
-        fontsize=7,
+        fontsize=7.3,
         color="#444444",
     )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     metadata = {"Date": None} if output.suffix.lower() == ".svg" else None
-    fig.savefig(output, bbox_inches="tight", pad_inches=0.12, metadata=metadata)
+    fig.savefig(output, bbox_inches="tight", metadata=metadata)
     plt.close(fig)
 
 
