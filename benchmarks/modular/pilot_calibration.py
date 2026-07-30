@@ -39,6 +39,7 @@ from benchmarks.modular.accuracy import (
     projection_errors,
 )
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.modular.settings import demeaner_for
 
 RHS_COLS = ["y", "x1"]
 TOLERANCE_GRID = (1e-8, 1e-10, 1e-12, 1e-14)
@@ -211,7 +212,7 @@ def cap_reporting_check(dgp: str, n_obs: int) -> dict:
                 formula,
                 data=frame,
                 vcov="iid",
-                demeaner=pf.MapDemeaner(backend="rust", fixef_tol=1e-10, fixef_maxiter=5),
+                demeaner=demeaner_for("rust", tol=1e-10, maxiter=5),
             )
             feols_signal = "no error raised"
         except Exception as exc:  # noqa: BLE001 - recording the signal is the point

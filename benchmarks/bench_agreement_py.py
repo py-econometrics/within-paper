@@ -146,9 +146,10 @@ for dgp_type in ["simple", "difficult"]:
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        fit_map = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust",
+        fit_map = pf.feols(FML, data=df, vcov="iid", demeaner=demeaner_for("rust"),
                            copy_data=False, store_data=True)
-        fit_cg = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust-cg",
+        fit_cg = pf.feols(FML, data=df, vcov="iid",
+                          demeaner=demeaner_for("rust-cg"),
                           copy_data=False, store_data=True)
     if not fit_map.convergence or not fit_cg.convergence:
         raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
