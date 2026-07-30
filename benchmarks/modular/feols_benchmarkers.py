@@ -316,7 +316,11 @@ def _retained_rows(fit) -> int | None:
 
 def _fit_converged(fit) -> bool:
     """Read the convergence flag exposed by current PyFixest models."""
-    return bool(getattr(fit, "convergence", getattr(fit, "_convergence", True)))
+    for name in ("convergence", "_convergence", "converged"):
+        value = getattr(fit, name, None)
+        if value is not None:
+            return bool(value)
+    return True
 
 
 def _normalize_vcov(vcov: str | dict[str, str]) -> str:

@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parents[2]
 from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
 from benchmarks.modular.experiment import FE_COLS
+from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
@@ -225,14 +226,6 @@ def _drop_recursive_singletons(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
             break
         kept = kept.loc[~singleton, MODEL_COLUMNS].reset_index(drop=True)
     return kept, n_initial - len(kept)
-
-
-def _fit_converged(fit: Any) -> bool:
-    for name in ("convergence", "_convergence", "converged"):
-        value = getattr(fit, name, None)
-        if value is not None:
-            return bool(value)
-    return True
 
 
 def _extract_named_value(values: Any, name: str) -> float:

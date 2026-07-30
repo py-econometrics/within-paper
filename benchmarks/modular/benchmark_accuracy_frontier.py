@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.experiment import FE_COLS
+from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.accuracy import accuracy_record
 from benchmarks.modular.dgp_functions import paper_base_dgp
@@ -187,9 +188,7 @@ def _run_pyfixest_setting(
 ) -> dict:
     try:
         fit, elapsed = _fit_pyfixest(frame, setting)
-        converged = bool(
-            getattr(fit, "convergence", getattr(fit, "_convergence", True))
-        )
+        converged = _fit_converged(fit)
         eta = _external_eta_from_fit(frame, fit) if converged else None
         beta = float(np.asarray(fit.coef())[0]) if converged else None
         row = {
