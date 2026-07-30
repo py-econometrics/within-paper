@@ -208,6 +208,94 @@ def _as_bool(value, *, default: bool) -> bool:
     return bool(value)
 
 
+_WARNED: set[str] = set()
+
+
+def _warn_once(message: str) -> None:
+    """Print a diagnostic the first time it occurs, so a long run stays readable."""
+    if message not in _WARNED:
+        _WARNED.add(message)
+        print(f"[warn] {message}", file=sys.stderr, flush=True)
+
+
+def _external_eta(fit, frame, depvar: str, covariates: list[str]) -> float | None:
+    """Recompute the external normal-equation residual from a fitted model.
+
+    PROTOCOL.md section 5 requires every headline timing to carry an accuracy
+    record on the sample that produced it: a runtime alone cannot answer the
+    "is the speedup a tolerance artifact" objection, because each package stops
+    on its own quantity.
+
+    The demeaned arrays come from the fit; the untransformed ones come from the
+    input frame, restricted to the rows the model kept. `_X_untransformed` is
+    not usable for this - it holds the demeaned covariates, so using it would
+    compare a vector against itself and report a meaningless ratio.
+
+    The alignment is checked rather than assumed: the reconstructed outcome must
+    reproduce `_Y_untransformed` exactly. If it does not, or any piece is
+    missing, this returns None, because an accuracy record that cannot be
+    computed must be recorded as absent rather than as passing.
+
+    A failure is reported once per process. Returning None quietly would let a
+    systematic breakage - a renamed PyFixest attribute, say - read as "this
+    backend does not expose accuracy", which is the same value a genuinely
+    opaque backend records, and the paper leans on the distinction.
+    """
+    try:
+        import numpy as np
+        import pandas as pd
+
+        from accuracy import external_normal_residuals
+
+        fe_frame = getattr(fit, "_fe", None)
+        demeaned_y = getattr(fit, "_Y", None)
+        raw_y_reference = getattr(fit, "_Y_untransformed", None)
+        if fe_frame is None or demeaned_y is None or raw_y_reference is None:
+            return None
+
+        dropped = getattr(fit, "_na_index", None) or frozenset()
+        keep = np.setdiff1d(
+            np.arange(len(frame)), np.fromiter(dropped, dtype=np.int64, count=len(dropped))
+        )
+        if keep.size != len(fe_frame):
+            return None
+        kept = frame.iloc[keep]
+
+        raw_y = kept[depvar].to_numpy(dtype=np.float64)
+        if not np.allclose(
+            raw_y, np.asarray(raw_y_reference, dtype=np.float64).ravel(), rtol=0, atol=0
+        ):
+            return None
+
+        demeaned_x = getattr(fit, "_X", None)
+        raw = np.column_stack(
+            [raw_y, *[kept[name].to_numpy(dtype=np.float64) for name in covariates]]
+        )
+        blocks = [np.asarray(demeaned_y, dtype=np.float64).reshape(keep.size, -1)]
+        if demeaned_x is not None and getattr(demeaned_x, "size", 0):
+            blocks.append(np.asarray(demeaned_x, dtype=np.float64).reshape(keep.size, -1))
+        residual = np.column_stack(blocks)
+        if raw.shape != residual.shape:
+            return None
+
+        weights = getattr(fit, "_weights", None)
+        weights = (
+            np.asarray(weights, dtype=np.float64).reshape(-1)
+            if weights is not None
+            else None
+        )
+        codes = np.column_stack(
+            [
+                pd.factorize(fe_frame.iloc[:, j], sort=True)[0]
+                for j in range(fe_frame.shape[1])
+            ]
+        )
+        return float(np.max(external_normal_residuals(codes, raw, residual, weights=weights)))
+    except Exception as error:  # noqa: BLE001 - reported, then recorded as absent
+        _warn_once(f"external eta unavailable: {type(error).__name__}: {error}")
+        return None
+
+
 def _retained_rows(fit) -> int | None:
     """Rows the backend kept after singleton dropping.
 
@@ -455,6 +543,14 @@ class PyFeolsBenchmarkerFullApi:
                             repetition=repetition,
                             n_planned=planned,
                             n_retained=_retained_rows(fit),
+                            # Computed after the clock stops, so it never enters
+                            # the reported runtime. Deterministic given the fit,
+                            # so only the first repetition pays for it.
+                            max_eta=(
+                                _external_eta(fit, df, spec.depvar, spec.covariates)
+                                if repetition == 0
+                                else None
+                            ),
                         )
                     else:
                         result = _result_from_dataset(
