@@ -177,6 +177,18 @@ class JuliaDriverContractTests(unittest.TestCase):
         self.assertTrue(record["success"], record.get("error"))
         self.assertIsNotNone(record["time"])
 
+    @unittest.skipUnless(HAS_JULIA, "julia not installed")
+    def test_fepois_driver_emits_the_protocol_record(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = _run_driver(
+                "fepois_julia.jl", "negbin_y", Path(tmp), model="fepois"
+            )
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertLessEqual(REQUIRED_FIELDS, set(record))
+        self.assertTrue(record["success"], record.get("error"))
+        self.assertIsNotNone(record["time"])
+
 
 if __name__ == "__main__":
     unittest.main()
