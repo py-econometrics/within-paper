@@ -51,6 +51,7 @@ RAW_GLOBS = (
     # Without these the run that froze Gate A and the diagnostic behind the
     # spectral-gap caveat would carry no provenance.
     "results/runs/latest/*.json",
+    "figures/results/*.svg",
 )
 CODE_GLOBS = (
     "pixi.toml",
@@ -358,6 +359,7 @@ def render(args: argparse.Namespace) -> None:
     }
     ppml_simple = ppml_rows["simple (well-connected)"]
     ppml_difficult = ppml_rows["difficult (near-nested)"]
+    ols_simple = tables["ols"]["rows"][0]
     ols_difficult = tables["ols"]["rows"][1]
     correia_real_rows = {
         _clean_cell(row[0]): row
@@ -405,6 +407,16 @@ def render(args: argparse.Namespace) -> None:
     directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
     prose_values = {
         "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
+        # The limitations section names the regime where the method loses, so
+        # those numbers have to move with the run like every other quoted value.
+        "result_ols_simple_within": ols_simple[5],
+        "result_ols_simple_best_alternative": _format_seconds(
+            min(
+                value
+                for value in (_numeric_cell(ols_simple[i]) for i in (2, 3, 4))
+                if value is not None
+            )
+        ),
         "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
         "result_ols_difficult_rust_map": ols_difficult[2],
         "result_ols_difficult_fixest": ols_difficult[3],
@@ -427,6 +439,14 @@ def render(args: argparse.Namespace) -> None:
         "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
         "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
         "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
+        # The abstract quotes a magnitude, so it has to move with the run
+        # rather than be typed in once and go stale.
+        "result_ols_difficult_within_vs_rust_map": _format_ratio(
+            _numeric_cell(ols_difficult[2]), _numeric_cell(ols_difficult[5])
+        ),
+        "result_ols_difficult_within_vs_fixest": _format_ratio(
+            _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
+        ),
         "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
         "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
@@ -578,20 +598,35 @@ def _row_success(row: dict[str, str]) -> bool:
     return str(row.get("success", "True")).strip().lower() in {"true", "1"}
 
 
-def _expected_trials(candidates: list[dict[str, str]]) -> int | None:
-    """How many trials this cell should contain.
+def _cell_is_complete(candidates: list[dict[str, str]]) -> bool:
+    """Whether a cell holds every trial it was supposed to.
 
-    A cell used to be three trials, full stop. With the R1/R2/R3 repetition
-    rule the count varies by how long the cell takes, so the harness records
-    the number it planned and the renderer checks against that. Rows without
-    the field are pre-rule results and still expect three. A cell whose rows
-    disagree about the plan is incomplete rather than silently pooled.
+    A cell used to be three trials, full stop. With the R1/R2/R3 rule it is one
+    group of repetitions per DGP replicate, and the repetition count is chosen
+    per replicate from its own runtime, so the plan is a property of the
+    replicate rather than of the cell. Checking the recorded plan against the
+    pooled total would call a perfectly good cell incomplete: three replicates
+    of seven repetitions is twenty-one rows against a plan of seven.
+
+    Rows carrying no plan are pre-rule results, where one row per replicate and
+    three replicates is the whole cell.
     """
-    planned = {_integer_field(row, "n_planned") for row in candidates}
-    planned.discard(None)
-    if len(planned) > 1:
-        return None
-    return planned.pop() if planned else EXPECTED_TRIALS
+    by_replicate: dict[int | None, list[dict[str, str]]] = {}
+    for row in candidates:
+        by_replicate.setdefault(_integer_field(row, "iter_num"), []).append(row)
+
+    if not any(_integer_field(row, "n_planned") for row in candidates):
+        return len(candidates) == EXPECTED_TRIALS
+
+    if len(by_replicate) != EXPECTED_TRIALS:
+        return False
+    for rows in by_replicate.values():
+        planned = {_integer_field(row, "n_planned") for row in rows}
+        planned.discard(None)
+        # One replicate runs under one plan, and must deliver exactly it.
+        if len(planned) != 1 or len(rows) != planned.pop():
+            return False
+    return True
 
 
 def _trial_key(row: dict[str, str]) -> tuple[int | None, int]:
@@ -639,10 +674,9 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
             except (KeyError, TypeError, ValueError):
                 return "incomplete"
 
-    expected = _expected_trials(candidates)
-    if expected is None or total != expected or successful is None:
+    if successful is None or not 0 <= successful <= total:
         return "incomplete"
-    if not 0 <= successful <= total:
+    if not summarized and not _cell_is_complete(candidates):
         return "incomplete"
     if successful == 0:
         return f"failed (0/{total})"
@@ -911,6 +945,52 @@ def _synchronize_setup_cost(document: dict) -> int:
     return changed
 
 
+def _synchronize_accuracy_frontier(document: dict) -> int:
+    """Fill the frontier table from the tolerance sweep.
+
+    Each package is swept over its own tolerance settings and the achieved
+    external residual is recorded beside the wall time, so the reader sees the
+    accuracy each runtime bought instead of a single matched point that some
+    packages cannot reach.
+    """
+    path = ROOT / "results" / "runs" / "latest" / "accuracy_frontier.csv"
+    table = document["tables"].get("accuracy_frontier")
+    if table is None or not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = [row for row in csv.DictReader(handle) if _row_success(row)]
+
+    labels = {
+        "pyfixest-rust-map": "`rust-map`",
+        "pyfixest-within-additive": "`within-additive`",
+    }
+    rendered: list[list[str]] = []
+    for design in ("simple", "difficult"):
+        for package, label in labels.items():
+            matching = [
+                row
+                for row in rows
+                if row.get("dgp") == design and row.get("package") == package
+            ]
+            for index, row in enumerate(
+                sorted(matching, key=lambda r: float(r["max_eta"]), reverse=True)
+            ):
+                eta = float(row["max_eta"])
+                rendered.append(
+                    [
+                        f"{design}" if index == 0 and label == list(labels.values())[0] else "",
+                        label if index == 0 else "",
+                        row["setting"].split("=")[-1],
+                        _format_seconds(float(row["time_s"])),
+                        _format_typst_scientific(eta),
+                    ]
+                )
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
 def _synchronize_zigzag(document: dict) -> int:
     """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
 
@@ -1068,8 +1148,6 @@ def _synchronize_canonical_tables(
                         source, dataset, backend, requirements, source_marker
                     )
                 ]
-                if backend == "torch-cuda":
-                    continue
                 _reject_source_collision(name, dataset, backend, candidates)
                 rendered = _render_trial_result(candidates)
                 if row[column] != rendered:
@@ -1114,6 +1192,7 @@ def _synchronize_canonical_tables(
     changed += _synchronize_hardness(document)
     changed += _synchronize_agreement(document)
     changed += _synchronize_setup_cost(document)
+    changed += _synchronize_accuracy_frontier(document)
     changed += _synchronize_zigzag(document)
     changed += _synchronize_external_results(document)
     if write:
