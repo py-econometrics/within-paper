@@ -24,6 +24,7 @@
 }
 
 #let solver-img(name) = "figures/solver/" + name
+#let result-img(name) = "figures/results/" + name
 #let table-rule = rgb("#7b8494")
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
@@ -1248,6 +1249,121 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
     ]
   ]
 ]
+
+#pagebreak()
+
+= Appendix B: Supplementary Benchmark Results
+
+This appendix collects the diagnostics behind the claims in Section 7. Each experiment is
+generated from the recorded benchmark output by `scripts/paper_results.py`; none of the
+numbers here are entered by hand.
+
+== Runtime Against Connectivity
+
+#figure(
+  image(result-img("gap_runtime.svg"), width: 92%),
+  caption: [Runtime against the worker-firm spectral gap, log-log, on common axes. Both
+  panels show the controlled 1M-observation AKM sweep; every marker uses the same stored
+  sample for its scenario. Solid lines are log-log fits to the AKM medians. Panel (a)
+  compares package defaults. Panel (b) reruns the PyFixest configurations on the same
+  samples at matched accuracy under a shared iteration cap. Failed cells are omitted, and
+  hollow markers denote partial convergence.]
+) <fig-gap-runtime>
+
+== Simple and Difficult Designs
+
+#figure(
+  image(result-img("simple_difficult_runtime.svg"), width: 92%),
+  caption: [Median runtime on the simple and difficult `fixest` designs, for OLS at 10M
+  observations and PPML at 1M. Each point is the median of three full regression calls.]
+) <fig-crossover>
+
+== Matched-Accuracy Mechanism
+
+The comparisons in Section 7 change the package as well as the algorithm, so they cannot
+separate the preconditioner from the switch away from MAP. The two tables below run four
+configurations through one PyFixest path on the same samples, so the only thing that
+differs is the preconditioner.
+
+#include "generated/tables/mechanism_mobility.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] All four configurations run through one PyFixest path at
+matched accuracy under a shared 10,000-iteration cap. The matched-accuracy MAP column
+uses the tolerance needed to reach the same accuracy as the LSMR configurations rather
+than its package default. A runtime followed by $(k/3)$ is based on $k$ converged trials;
+`failed` means none converged.]
+
+#v(0.45em)
+
+#include "generated/tables/mechanism_sorting.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Sorting designs, otherwise as in the mobility table.]
+
+#pagebreak()
+
+== Runtime and Achieved Precision
+
+The tolerance experiment uses mobility designs 1, 3, and 5. Within each design, every
+method receives the same pre-pruned one-million-observation sample. We vary each
+package's own tolerance, use a common 10,000-iteration cap, and time three fits at every
+setting. The tight reference uses factor-pair LSMR at tolerance $10^(-14)$.
+
+#figure(
+  image(result-img("tolerance_frontier.svg"), width: 97%),
+  caption: [Runtime against achieved precision on three AKM mobility designs. Each point
+  is the median of three fits on one fixed, identically singleton-pruned sample; lines
+  vary a package's native tolerance. The top row measures coefficient error as
+  $abs(hat(beta)-hat(beta)^star) / "SE"(hat(beta)^star)$. The bottom row measures final
+  residual error as $||r-r^star||_2 / ||r^star||_2$. Both use the tight factor-pair LSMR
+  reference. Error decreases from left to right, so precision improves to the right.
+  Circled points use each package's default tolerance. All runs have a 10,000-iteration
+  cap. The annotation in the final column marks the two PyFixest MAP settings that
+  reached the cap without returning a solution.]
+) <fig-tolerance>
+
+== Time Against Accuracy
+
+#include "generated/tables/accuracy_frontier.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Wall time and achieved external residual $eta$ as each
+package's own tolerance is swept. $eta$ is computed independently of the solvers, so it is
+comparable across configurations.]
+
+== Iteration Counts
+
+#include "generated/tables/iterations.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Counts are in each solver's native unit: MAP is reported
+in sweeps over the factors, the LSMR columns in Krylov iterations. The two are not
+directly comparable, because one sweep touches every factor while one LSMR iteration
+applies the operator once. A count at the cap indicates the solver did not converge.]
+
+#pagebreak()
+
+== Cost Scaling and Amortization
+
+#include "generated/tables/factor_scaling.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Setup and solve time as the number of absorbed factors
+$Q$ grows, on the difficult design at 1M observations. The preconditioner builds one block
+per unordered factor pair, so the pair count grows as $Q(Q-1)/2$.]
+
+#v(0.45em)
+
+#include "generated/tables/amortization.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Total time for $K$ right-hand sides on the difficult
+design at 1M observations. Setup is paid once and reused across right-hand sides, so the
+per-RHS cost of the factor-pair preconditioner falls as $K$ grows.]
+
+== PPML Inner and Outer Convergence
+
+#include "generated/tables/ppml_inner_outer.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Outer IRLS steps and inner LSMR iterations for the PPML
+fits, with and without rebuilding the preconditioner at every outer step. Reuse is
+measured at the inner tolerance stated in the table; it is not a claim about every
+tolerance.]
 
 #pagebreak()
 
