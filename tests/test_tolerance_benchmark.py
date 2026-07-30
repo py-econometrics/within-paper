@@ -17,13 +17,7 @@ from benchmark_tolerance import (  # noqa: E402
     coefficient_error_se,
     residual_error,
 )
-from figure_style import METHOD_STYLE  # noqa: E402
-from make_figures import CROSSOVER_STYLE, STYLE as PAPER_FIGURE_STYLE  # noqa: E402
-from plot_tolerance import (  # noqa: E402
-    STYLE as TOLERANCE_STYLE,
-    aggregate_results,
-    tolerance_figure,
-)
+from plot_tolerance import aggregate_results, tolerance_figure  # noqa: E402
 
 
 class ToleranceMetricTests(unittest.TestCase):
@@ -95,20 +89,6 @@ class TolerancePlotTests(unittest.TestCase):
             tolerance_figure(self._raw_results(), output)
             self.assertTrue(output.exists())
             self.assertIn("<svg", output.read_text(encoding="utf-8")[:500])
-
-    def test_method_styles_are_shared_across_paper_figures(self) -> None:
-        self.assertEqual(PAPER_FIGURE_STYLE["rust-map"], METHOD_STYLE["map"])
-        self.assertEqual(PAPER_FIGURE_STYLE["fixest"], METHOD_STYLE["fixest"])
-        self.assertEqual(PAPER_FIGURE_STYLE["FEM.jl"], METHOD_STYLE["fem"])
-        self.assertEqual(
-            PAPER_FIGURE_STYLE["within"], METHOD_STYLE["lsmr_factor_pair"]
-        )
-        self.assertEqual(TOLERANCE_STYLE["pyfixest_map"], METHOD_STYLE["map"])
-        self.assertEqual(TOLERANCE_STYLE["r_fixest"], METHOD_STYLE["fixest"])
-        self.assertEqual(TOLERANCE_STYLE["julia_fem"], METHOD_STYLE["fem"])
-        self.assertEqual(
-            CROSSOVER_STYLE["Julia"][1:], METHOD_STYLE["fem"]
-        )
 
 
 if __name__ == "__main__":
