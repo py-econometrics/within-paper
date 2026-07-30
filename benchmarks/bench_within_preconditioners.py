@@ -44,7 +44,10 @@ from benchmarks.modular.experiment import (
 
 import within
 from benchmarks.modular.accuracy import accuracy_record, pair_edge_stats
-from benchmarks.modular.feols_benchmarkers import MECHANISM_MAP_TOL, MECHANISM_MAXITER
+from benchmarks.modular.settings import (
+    MECHANISM_MAP_TOL,
+    MECHANISM_MAXITER,
+)
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 

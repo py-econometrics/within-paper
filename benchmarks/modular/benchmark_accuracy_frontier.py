@@ -31,7 +31,7 @@ from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.accuracy import accuracy_record
 from benchmarks.modular.dgp_functions import paper_base_dgp
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.modular.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     LSMR_SETTINGS,
     MAP_SETTINGS,

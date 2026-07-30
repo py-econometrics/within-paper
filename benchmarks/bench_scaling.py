@@ -45,7 +45,10 @@ from benchmarks.modular.experiment import (
 
 import within
 from benchmarks.modular.accuracy import accuracy_record
-from benchmarks.modular.feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER
+from benchmarks.modular.settings import (
+    MECHANISM_LSMR_TOL,
+    MECHANISM_MAXITER,
+)
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
 MAX_FACTORS = 5
