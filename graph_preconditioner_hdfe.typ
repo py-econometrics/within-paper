@@ -797,22 +797,7 @@ Krylov solver should become relatively more competitive in the low-mobility desi
 
 #text(size: 8.9pt)[
 #strong[Mobility benchmark ($n = 1$M).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`akm_mobility_1`], [$1.38 times 10^(-1)$ (1.00)], [0.29s], [0.16s], [0.28s], [0.51s],
-  [`akm_mobility_2`], [$3.41 times 10^(-2)$ (1.00)], [1.10s], [0.36s], [0.58s], [0.38s],
-  [`akm_mobility_3`], [$5.18 times 10^(-3)$ (0.61)], [12.48s], [1.31s], [1.80s], [0.33s],
-  [`akm_mobility_4`], [$3.04 times 10^(-4)$ (0.27)], [51.95s], [3.42s], [2.78s], [0.34s],
-  [`akm_mobility_5`], [$1.65 times 10^(-3)$ (0.53)], [63.23s], [4.17s], [3.34s], [0.35s],
-		  [`akm_mobility_6`], [$7.57 times 10^(-4)$ (0.37)], [#miss], [5.27s], [3.86s], [0.35s],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#include "generated/tables/akm_mobility.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
 		and worker, firm, and year fixed effects. Lower rows reduce worker mobility
@@ -848,21 +833,7 @@ factor-pair solves use the worker-firm graph directly.
 
 #text(size: 8.9pt)[
 #strong[Sorting benchmark ($n = 1$M).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`akm_sorting_1`], [$7.62 times 10^(-3)$ (0.83)], [6.79s], [0.81s], [1.43s], [0.32s],
-  [`akm_sorting_2`], [$2.41 times 10^(-3)$ (0.62)], [9.73s], [1.12s], [1.68s], [0.34s],
-  [`akm_sorting_3`], [$1.50 times 10^(-4)$ (0.59)], [10.31s], [1.24s], [1.67s], [0.33s],
-  [`akm_sorting_4`], [$2.14 times 10^(-5)$ (0.51)], [14.94s], [1.58s], [1.87s], [0.33s],
-		  [`akm_sorting_5`], [$3.97 times 10^(-5)$ (0.53)], [25.77s], [1.80s], [1.94s], [0.34s],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#include "generated/tables/akm_sorting.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
 		and worker, firm, and year fixed effects. Lower rows raise the degree of
@@ -900,18 +871,7 @@ preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
 
 #text(size: 8.8pt)[
 #strong[Simple vs. difficult design (10M observations, 3 FE).]
-#table(
-  columns: (1.25fr, 1.05fr, 0.72fr, 0.72fr, 0.72fr, 0.78fr, 0.86fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`], th[`torch-cuda`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [2.01s], [0.93s], [2.27s], [10.53s], [4.73s],
-  [difficult (sparse graph)], [$1.67 times 10^(-5)$ (1.00)], [382.9s], [32.7s], [28.7s], [3.25s], [8.73s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/ols.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. Both designs
   use 10M observations, one covariate, and three fixed effects. Gap denotes
@@ -965,21 +925,7 @@ reference set for comparing the same software backends outside the AKM generator
 
 #text(size: 8.9pt)[
 #strong[Correia synthetic benchmarks.]
-#table(
-  columns: (1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`synthetic-complete`], [1.000 (1.00)], [0.074s], [0.062s], [0.044s], [0.114s],
-  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.122s], [0.079s], [0.083s], [0.117s],
-  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.367s], [0.251s], [0.353s], [0.957s],
-  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.994s], [0.952s], [0.575s], [0.514s],
-  [`synthetic-assortative`], [0.00133 (0.70)], [26.22s], [3.02s], [2.99s], [1.46s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/correia_synthetic.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
   `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
@@ -1012,24 +958,7 @@ DGPs only approximate.
 
 #text(size: 8.9pt)[
 #strong[Correia real-data benchmarks.]
-#table(
-  columns: (1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [`credit`], [0.402 (1.00)], [0.177s], [0.134s], [0.158s], [0.139s],
-  [`soccer`], [0.889 (1.00)], [0.018s], [0.014s], [0.016s], [0.031s],
-  [`enron`], [0.00704 (0.98)], [4.37s], [0.749s], [0.689s], [0.537s],
-  [`github`], [0.000630 (0.32)], [86.44s], [4.50s], [4.60s], [0.380s],
-  [`patents`], [0.000518 (0.95)], [19.66s], [1.29s], [1.43s], [0.826s],
-  [`workers`], [0.000274 (0.63)], [128.34s], [5.55s], [4.94s], [0.491s],
-  [`schools`], [0.00221 (1.00)], [11.04s], [1.10s], [1.28s], [0.224s],
-  [`directors`], [0.000512 (0.30)], [4.26s], [0.216s], [1.21s], [0.300s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/correia_real.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs on singleton-dropped
   samples, as produced by the PyFixest benchmark suite. The gap is $1-rho$ for the
@@ -1081,20 +1010,7 @@ protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
 
 #text(size: 8.8pt)[
 #strong[Poisson benchmarks (1M observations, k=10 covariates).]
-#table(
-  columns: (1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[FE], th[`fixest`], th[`rust-map`], th[`GLFEM.jl`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  [simple (dense graph)], [2], [1.92s], [3.06s], [8.83s], [6.21s],
-  [difficult (sparse graph)], [2], [1.91s], [3.05s], [7.93s], [6.40s],
-  [simple (dense graph)], [3], [7.80s], [25.29s], [#sym.tilde.op 48s], [13.33s],
-  [difficult (sparse graph)], [3], [309.2s], [failed], [#sym.tilde.op 800s], [8.89s],
-  table.hline(stroke: 0.8pt + table-rule),
-  )
+#include "generated/tables/ppml.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
   $n = 1$M and $k = 10$ covariates. `fixest` is R `fixest::fepois`; `rust-map` and
@@ -1145,23 +1061,7 @@ strategy. Both backends are executed in isolated processes and report peak RSS v
 
 #text(size: 8.9pt)[
 #strong[Memory footprint (3 FE, $k = 10$).]
-#table(
-  columns: (1.25fr, 1.0fr, 0.85fr, 0.85fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`within`]),
-  table.hline(stroke: 0.45pt + table-rule),
-  table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [428 MB], [487 MB],
-  [difficult (sparse graph)], [$1.30 times 10^(-3)$ (1.00)], [432 MB], [479 MB],
-  table.hline(stroke: 0.35pt + table-light-rule),
-  table.cell(colspan: 4, fill: table-head-fill)[#emph[1M observations]],
-  [simple (dense graph)], [$8.57 times 10^(-1)$ (1.00)], [1,188 MB], [1,703 MB],
-		  [difficult (sparse graph)], [$1.67 times 10^(-5)$ (1.00)], [1,263 MB], [1,398 MB],
-		  table.hline(stroke: 0.8pt + table-rule),
-		)
+#include "generated/tables/memory.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
 		isolated Python processes. 10 covariates, three fixed effects. These two DGPs serve as
@@ -1197,27 +1097,7 @@ coefficient for all four backends.
 
 #text(size: 9.2pt)[
 #strong[Coefficient agreement (100K observations, 3 FE, $k = 10$).]
-#table(
-  columns: (0.95fr, 1.0fr, 0.95fr, 0.95fr, 0.95fr),
-  stroke: 0.35pt + table-light-rule,
-  inset: (x: 5pt, y: 3.6pt),
-  align: (left, left, right, right, right),
-  table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Backend], th[$hat(beta)_1$], th[Avg |diff|], th[Max |diff|]),
-  table.hline(stroke: 0.45pt + table-rule),
-  table.cell(rowspan: 4)[simple],
-  [`rust-map`], [0.99914206], [--], [--],
-  [`within`], [0.99914206], [$1.5 times 10^(-14)$], [$3.5 times 10^(-14)$],
-  [`fixest`], [0.99909173], [$2.2 times 10^(-5)$], [$5.0 times 10^(-5)$],
-  [`FEM.jl`], [0.99914206], [$2.1 times 10^(-12)$], [$5.3 times 10^(-12)$],
-  table.hline(stroke: 0.35pt + table-light-rule),
-  table.cell(rowspan: 4)[difficult],
-  [`rust-map`], [1.00086122], [--], [--],
-  [`within`], [1.00086098], [$1.4 times 10^(-7)$], [$3.4 times 10^(-7)$],
-  [`fixest`], [1.00081490], [$2.0 times 10^(-5)$], [$5.0 times 10^(-5)$],
-  [`FEM.jl`], [1.00086098], [$1.4 times 10^(-7)$], [$3.4 times 10^(-7)$],
-  table.hline(stroke: 0.8pt + table-rule),
-)
+#include "generated/tables/agreement.typ"
 #v(0.25em)
 #text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
 Differences are absolute slope-coefficient deviations from `rust-map`, averaged
