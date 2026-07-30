@@ -8,22 +8,26 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "benchmarks" / "data"
+
 FML = "y ~ x1 | indiv_id + firm_id + year"
 
-SCRIPT = """\
+SCRIPT = f"""\
 import resource, sys, time, warnings, gc
-from benchmarks.modular.results import write_rows
+from pathlib import Path
+from benchmarks.modular.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf
 
 size, dgp_type, backend = sys.argv[1], sys.argv[2], sys.argv[3]
-df = pd.read_parquet(f"data/{{dgp_type}}_{{size}}.parquet")
+df = pd.read_parquet(Path("{DATA_DIR}") / f"{{dgp_type}}_{{size}}.parquet")
 gc.collect()
 t0 = time.perf_counter()
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=UserWarning)
-    fit = pf.feols("{fml}", data=df, vcov="iid",
-                   demeaner_backend=backend,
+    fit = pf.feols("{FML}", data=df, vcov="iid",
+                   demeaner=demeaner_for(backend),
                    copy_data=False, store_data=False)
 if not fit.convergence:
     raise RuntimeError("PyFixest model did not converge")
@@ -31,11 +35,11 @@ elapsed = time.perf_counter() - t0
 divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
 rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // divisor
 print(f"{{size:<6}} {{dgp_type:<12}} {{backend:<10}} {{elapsed:>8.2f}}s  {{rss:>6}} MB")
-""".format(fml=FML)
+"""
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--out", type=Path, default=Path("results/runs/latest/memory.csv"),
+    "--out", type=Path, default=ROOT / "results" / "runs" / "latest" / "memory.csv",
     help="Structured result CSV written in addition to the console table.",
 )
 args = parser.parse_args()

@@ -17,6 +17,6 @@ for label, n in SIZES.items():
     for dgp_type in ["simple", "difficult"]:
         print(f"Generating {dgp_type} {label}...")
         df = base_dgp(n=n, type_=dgp_type, k=K, max_k=K, seed=SEED)[KEEP_COLS]
-        path = f"data/{dgp_type}_{label}.parquet"
+        path = ROOT / "benchmarks" / "data" / f"{dgp_type}_{label}.parquet"
         df.to_parquet(path, index=False)
         print(f"  -> {path} ({len(df):,} rows)")

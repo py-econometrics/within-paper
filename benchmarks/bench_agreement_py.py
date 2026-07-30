@@ -29,13 +29,13 @@ import numpy as np
 import pandas as pd
 import pyfixest as pf
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-JULIA_ENV = SCRIPT_DIR / "julia-env"
+ROOT = Path(__file__).resolve().parents[1]
+JULIA_ENV = ROOT / "benchmarks" / "julia-env"
 FML = "y ~ x1 | indiv_id + firm_id + year"
 DEPVAR = "y"
 COVARIATES = ["x1"]
 FE_COLS = ["indiv_id", "firm_id", "year"]
-OUTPUT_PATH = Path(os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.csv"))
+OUTPUT_PATH = ROOT / os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.csv")
 OUTPUT_ROWS: list[dict[str, object]] = []
 
 
@@ -87,9 +87,9 @@ def _external_coefficients(
         "fe_cols": FE_COLS,
     }
     backends = {
-        "fixest": (["Rscript", str(SCRIPT_DIR / "bench_agreement_fixest.R")], "Rscript"),
+        "fixest": (["Rscript", str(ROOT / "benchmarks" / "bench_agreement_fixest.R")], "Rscript"),
         "FixedEffectModels": (
-            ["julia", f"--project={JULIA_ENV}", str(SCRIPT_DIR / "bench_agreement_julia.jl")],
+            ["julia", f"--project={JULIA_ENV}", str(ROOT / "benchmarks" / "bench_agreement_julia.jl")],
             "julia",
         ),
     }
@@ -140,7 +140,7 @@ print(f"{'dgp':<12} {'metric':<28} {'rust vs rust-cg':>16}")
 print("-" * 60)
 
 for dgp_type in ["simple", "difficult"]:
-    data_path = Path(f"data/{dgp_type}_100k.parquet")
+    data_path = ROOT / "benchmarks" / "data" / f"{dgp_type}_100k.parquet"
     df = pd.read_parquet(data_path)
 
     with warnings.catch_warnings():
