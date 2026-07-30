@@ -690,10 +690,13 @@ class SubprocessFeolsBenchmarker:
         name: str,
         command_prefix: Sequence[str],
         script_path: Path,
+        model: str = "feols",
     ):
         self._name = name
         self._command_prefix = tuple(command_prefix)
         self._script_path = script_path.resolve()
+        # Selects the fit family inside a driver that serves more than one.
+        self._model = model
 
     @property
     def name(self) -> str:
@@ -727,6 +730,7 @@ class SubprocessFeolsBenchmarker:
                         "fe_cols": spec.fe_cols,
                         "vcov": spec.vcov,
                         "vcov_type": _normalize_vcov(spec.vcov),
+                        "model": self._model,
                         # Julia PPML can run for several minutes. Write each result
                         # to a file in case the process exits before flushing stdout.
                         "result_log_path": str(result_log_path),
@@ -804,7 +808,8 @@ class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
         super().__init__(
             name=name or "r.fixest",
             command_prefix=["Rscript"],
-            script_path=(script_path or _SCRIPT_DIR / "feols_r.R"),
+            script_path=(script_path or _SCRIPT_DIR / "fixest_bench.R"),
+            model="feols",
         )
 
 
