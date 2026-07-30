@@ -43,6 +43,7 @@ from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
 from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
+from benchmarks.modular.settings import demeaner_for
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
@@ -237,24 +238,6 @@ def _extract_named_value(values: Any, name: str) -> float:
     return float(array[0])
 
 
-def _demeaner(method: MethodSpec, tolerance: float, maxiter: int):
-    import pyfixest as pf
-
-    if method.solver == "MAP":
-        return pf.MapDemeaner(
-            backend="rust",
-            fixef_tol=tolerance,
-            fixef_maxiter=maxiter,
-        )
-    return pf.LsmrDemeaner(
-        backend="within",
-        preconditioner=method.preconditioner,
-        fixef_atol=tolerance,
-        fixef_btol=tolerance,
-        fixef_maxiter=maxiter,
-    )
-
-
 def _fit_pyfixest(
     frame: pd.DataFrame,
     method: MethodSpec,
@@ -263,7 +246,12 @@ def _fit_pyfixest(
 ) -> tuple[Any, float]:
     import pyfixest as pf
 
-    demeaner = _demeaner(method, tolerance, maxiter)
+    backend = (
+        "rust"
+        if method.solver == "MAP"
+        else f"within-{method.preconditioner}"
+    )
+    demeaner = demeaner_for(backend, tol=tolerance, maxiter=maxiter)
     start = time.perf_counter()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)

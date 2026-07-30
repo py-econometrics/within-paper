@@ -37,6 +37,7 @@ from benchmarks.modular.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     LSMR_SETTINGS,
     MAP_SETTINGS,
+    demeaner_for,
 )
 
 FML = "y ~ x1 | indiv_id + firm_id + year"
@@ -120,22 +121,19 @@ def default_settings() -> list[ToleranceSetting]:
 def _fit_pyfixest(frame: pd.DataFrame, setting: ToleranceSetting):
     import pyfixest as pf
 
-    if setting.backend == "rust":
-        demeaner = pf.MapDemeaner(
-            backend="rust",
-            fixef_tol=float(setting.settings["fixef_tol"]),
-            fixef_maxiter=int(setting.settings["fixef_maxiter"]),
-        )
-    elif setting.backend.startswith("within"):
-        demeaner = pf.LsmrDemeaner(
-            backend="within",
-            preconditioner=str(setting.settings["preconditioner"]),
-            fixef_atol=float(setting.settings["fixef_atol"]),
-            fixef_btol=float(setting.settings["fixef_btol"]),
-            fixef_maxiter=int(setting.settings["fixef_maxiter"]),
-        )
+    backend = setting.backend
+    if backend == "rust":
+        tol = float(setting.settings["fixef_tol"])
+    elif backend.startswith("within"):
+        tol = float(setting.settings["fixef_atol"])
     else:
-        raise ValueError(f"unsupported pyfixest backend {setting.backend!r}")
+        raise ValueError(f"unsupported pyfixest backend {backend!r}")
+
+    demeaner = demeaner_for(
+        backend,
+        tol=tol,
+        maxiter=int(setting.settings["fixef_maxiter"]),
+    )
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
