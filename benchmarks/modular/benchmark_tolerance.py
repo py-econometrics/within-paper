@@ -38,12 +38,9 @@ import pandas as pd
 from pyfixest.core.detect_singletons import detect_singletons
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "benchmarks" / "modular"))
 
-from accuracy import external_normal_residuals  # noqa: E402
-from dgps import get_akm_sweep_scenarios  # noqa: E402
+from benchmarks.modular.accuracy import external_normal_residuals
+from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
 FE_COLUMNS = ["indiv_id", "firm_id", "year"]

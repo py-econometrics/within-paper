@@ -16,13 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
-try:
-    from .interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-    from .timing import repetitions_for_runtime
-except ImportError:
-    from interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-    from timing import repetitions_for_runtime
-
+from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.modular.timing import repetitions_for_runtime
 _MIN_DGP_WIDTH = 16
 
 
@@ -245,7 +240,7 @@ def _external_eta(fit, frame, depvar: str, covariates: list[str]) -> float | Non
         import numpy as np
         import pandas as pd
 
-        from accuracy import external_normal_residuals
+        from benchmarks.modular.accuracy import external_normal_residuals
 
         fe_frame = getattr(fit, "_fe", None)
         demeaned_y = getattr(fit, "_Y", None)

@@ -21,16 +21,14 @@ from __future__ import annotations
 
 import argparse
 import gc
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
 
-from experiment import (  # noqa: E402
+from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     SampleSpec,
     add_repo_paths,
@@ -39,10 +37,9 @@ from experiment import (  # noqa: E402
     write_rows,
 )
 
-add_repo_paths()
 
-import within  # noqa: E402
-from within import LsmrOptions, Solver  # noqa: E402
+import within
+from within import LsmrOptions, Solver
 
 
 def _ppml_sample(design: str, n_obs: int):

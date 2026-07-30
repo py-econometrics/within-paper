@@ -6,26 +6,14 @@ from pathlib import Path
 
 import pandas as pd
 
-try:
-    from .interfaces import (
-        BenchmarkDataset,
-        DataGeneratorProtocol,
-        FeolsBenchmarkerProtocol,
-        FeolsResult,
-        FeolsSpec,
-    )
-    from .timing import randomized_order
-except ImportError:
-    from interfaces import (
-        BenchmarkDataset,
-        DataGeneratorProtocol,
-        FeolsBenchmarkerProtocol,
-        FeolsResult,
-        FeolsSpec,
-    )
-    from timing import randomized_order
-
-
+from benchmarks.modular.interfaces import (
+    BenchmarkDataset,
+    DataGeneratorProtocol,
+    FeolsBenchmarkerProtocol,
+    FeolsResult,
+    FeolsSpec,
+)
+from benchmarks.modular.timing import randomized_order
 def _serialize_result(result: FeolsResult) -> dict:
     return asdict(result)
 

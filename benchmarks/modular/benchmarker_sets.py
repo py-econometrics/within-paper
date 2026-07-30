@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from feols_benchmarkers import (
+from benchmarks.modular.feols_benchmarkers import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
@@ -13,7 +13,7 @@ from feols_benchmarkers import (
     PyFeolsBenchmarkerFullApi,
     detect_torch_runtime_availability,
 )
-from fepois_benchmarkers import (
+from benchmarks.modular.fepois_benchmarkers import (
     FixestFepoisBenchmarker,
     GLFixedEffectModelsBenchmarker,
     PyFepoisBenchmarkerFullApi,

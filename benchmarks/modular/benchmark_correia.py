@@ -1,31 +1,18 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-try:
-    from .feols_benchmarkers import (
-        FixestFeolsBenchmarker,
-        JuliaFeolsBenchmarker,
-        PyFeolsBenchmarkerFullApi,
-    )
-    from .interfaces import BenchmarkDataset, FeolsSpec
-    from .runner import run_benchmarks
-except ImportError:
-    from feols_benchmarkers import (
-        FixestFeolsBenchmarker,
-        JuliaFeolsBenchmarker,
-        PyFeolsBenchmarkerFullApi,
-    )
-    from interfaces import BenchmarkDataset, FeolsSpec
-    from runner import run_benchmarks
-
+from benchmarks.modular.feols_benchmarkers import (
+    FixestFeolsBenchmarker,
+    JuliaFeolsBenchmarker,
+    PyFeolsBenchmarkerFullApi,
+)
+from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.modular.runner import run_benchmarks
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 # ---------------------------------------------------------------------------
 # Configuration

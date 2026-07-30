@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,17 +8,15 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
-sys.path.insert(0, str(ROOT / "scripts"))
 
-from benchmark_tolerance import (  # noqa: E402
+from benchmarks.modular.benchmark_tolerance import (
     METHOD_BY_KEY,
     coefficient_error_se,
     residual_error,
 )
-from figure_style import METHOD_STYLE  # noqa: E402
-from make_figures import CROSSOVER_STYLE, STYLE as PAPER_FIGURE_STYLE  # noqa: E402
-from plot_tolerance import (  # noqa: E402
+from scripts.figure_style import METHOD_STYLE
+from scripts.make_figures import CROSSOVER_STYLE, STYLE as PAPER_FIGURE_STYLE
+from scripts.plot_tolerance import (
     STYLE as TOLERANCE_STYLE,
     aggregate_results,
     tolerance_figure,

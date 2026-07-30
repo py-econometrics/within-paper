@@ -22,7 +22,6 @@ import csv
 import gc
 import hashlib
 import os
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
@@ -45,10 +44,7 @@ def add_repo_paths() -> None:
             raise FileNotFoundError(
                 f"WITHIN_REPO has no Python package directory: {source}"
             )
-        sys.path.insert(0, str(source))
     modular = str(ROOT / "benchmarks" / "modular")
-    if modular not in sys.path:
-        sys.path.insert(0, modular)
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +126,7 @@ def _akm_frame(spec: SampleSpec):
     """Read one AKM sweep design from its generated Parquet cache."""
     import pandas as pd
 
-    from dgps import get_akm_sweep_scenarios
+    from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
     data_dir = ROOT / "benchmarks" / "data"
     scenarios = {dgp.dgp_name: dgp for dgp in get_akm_sweep_scenarios(data_dir)}
@@ -156,7 +152,7 @@ def load_sample(
     the AKM mobility and sorting designs the mechanism section is about, not
     only on simple and difficult.
     """
-    from dgp_functions import base_dgp
+    from benchmarks.modular.dgp_functions import base_dgp
 
     columns = tuple(rhs_columns or ("y", *[f"x{i}" for i in range(1, spec.k + 1)]))
     cache_key = (spec.design, spec.n_obs, spec.k, columns)
@@ -240,7 +236,7 @@ def matched_solver_specs() -> tuple[SolverSpec, ...]:
     Imported from the same constants the PyFixest ablation uses, so the
     standalone diagnostics and the end-to-end timings cannot drift apart.
     """
-    from feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER
+    from benchmarks.modular.feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER
 
     return tuple(
         SolverSpec(

@@ -9,7 +9,6 @@ the largest nontrivial MAP contraction factor ``rho = sigma_2(H)^2``.
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -23,11 +22,9 @@ from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import svds
 
 ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
-from pyfixest.core.detect_singletons import detect_singletons  # noqa: E402
-from dgps import get_akm_sweep_scenario_names  # noqa: E402
+from pyfixest.core.detect_singletons import detect_singletons
+from benchmarks.modular.dgps import get_akm_sweep_scenario_names
 
 CORREIA_DIR = ROOT / "data" / "correia_data"
 DATA_DIR = ROOT / "benchmarks" / "data"
