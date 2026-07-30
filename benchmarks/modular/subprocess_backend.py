@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import warnings
 import sys
 import tempfile
 from collections.abc import Sequence
@@ -22,6 +23,7 @@ from pathlib import Path
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 
 from benchmarks.modular.feols_benchmarkers import (
+    _as_bool,
     _normalize_vcov,
     _result_from_dataset,
     _safe_cast,
