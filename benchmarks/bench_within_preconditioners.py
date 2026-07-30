@@ -44,6 +44,7 @@ from benchmarks.modular.experiment import (
 
 import within
 from benchmarks.modular.accuracy import accuracy_record, pair_edge_stats
+from benchmarks.modular.timing import timed
 from benchmarks.modular.settings import (
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
@@ -87,15 +88,14 @@ def _run_map(sample, repetition: int, reference_tol: float) -> RunRecord:
     )
     del del_me
 
-    gc.collect()
-    t0 = time.perf_counter()
-    result = map_demean_with_sweeps(
-        np.asarray(rhs),
-        categories,
-        tol=MECHANISM_MAP_TOL,
-        maxiter=MECHANISM_MAXITER,
-    )
-    solve_wall = time.perf_counter() - t0
+    with timed() as elapsed:
+        result = map_demean_with_sweeps(
+            np.asarray(rhs),
+            categories,
+            tol=MECHANISM_MAP_TOL,
+            maxiter=MECHANISM_MAXITER,
+        )
+    solve_wall = elapsed.seconds
 
     reference = solve_batch(
         categories,
@@ -166,15 +166,13 @@ def _run_once(sample, solver_spec, repetition: int, reference_tol: float) -> Run
     del_me = solve_batch(categories, rhs, config, preconditioner=pc)
     del del_me
 
-    gc.collect()
-    t0 = time.perf_counter()
-    solver = Solver(categories, preconditioner=pc)
-    setup_wall = time.perf_counter() - t0
+    with timed() as setup:
+        solver = Solver(categories, preconditioner=pc)
+    setup_wall = setup.seconds
 
-    gc.collect()
-    t0 = time.perf_counter()
-    result = solver.solve_batch(rhs, config)
-    solve_wall = time.perf_counter() - t0
+    with timed() as solve:
+        result = solver.solve_batch(rhs, config)
+    solve_wall = solve.seconds
 
     iterations = list(result.iterations)
     residuals = list(result.residual)

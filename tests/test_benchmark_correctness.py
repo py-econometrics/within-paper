@@ -5,6 +5,8 @@ import csv
 import hashlib
 import json
 import sys
+import subprocess
+import warnings
 import tempfile
 import time
 import unittest
@@ -60,7 +62,8 @@ from benchmarks.modular.experiment import (
     load_sample,
     matched_solver_specs,
 )
-from benchmarks.modular.interfaces import FeolsSpec
+from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.modular.subprocess_backend import _parse_subprocess_output
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.timing import (
@@ -835,6 +838,50 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             pass
 
         self.assertIsNone(_external_eta(NotAModel(), pd.DataFrame({"y": [1.0]}), "y", []))
+
+
+class SubprocessOutputTests(unittest.TestCase):
+    """Parsing the records a driver emits, including the unhappy paths."""
+
+    @staticmethod
+    def _datasets():
+        return [
+            BenchmarkDataset("d1", Path("/tmp/x.parquet"), "simple", 1, 100, "trial", 1),
+            BenchmarkDataset("d2", Path("/tmp/x.parquet"), "simple", 1, 100, "trial", 2),
+        ]
+
+    def _parse(self, stdout: str, returncode: int = 0):
+        spec = FeolsSpec(depvar="y", covariates=["x1"], fe_cols=["a", "b"], vcov="iid")
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=returncode, stdout=stdout, stderr=""
+        )
+        return _parse_subprocess_output(
+            datasets=self._datasets(), spec=spec, backend="r.fixest",
+            completed_process=completed,
+        )
+
+    def test_a_trial_the_driver_never_reported_is_a_failure(self) -> None:
+        # Not a reused timing from the trial that did run.
+        line = json.dumps(
+            {"dataset_id": "d1", "iter_num": 1, "time": 1.5, "success": "true"}
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            results = self._parse(line + "\n")
+        self.assertTrue(results[0].success)
+        self.assertAlmostEqual(results[0].time, 1.5)
+        self.assertFalse(results[1].success)
+        self.assertIsNone(results[1].time)
+        self.assertTrue(any("1/2" in str(w.message) for w in caught))
+
+    def test_string_success_flags_are_coerced(self) -> None:
+        rows = "\n".join(
+            json.dumps({"dataset_id": d, "iter_num": i, "time": 1.0, "success": flag})
+            for d, i, flag in (("d1", 1, "true"), ("d2", 2, "false"))
+        )
+        results = self._parse(rows + "\n")
+        self.assertTrue(results[0].success)
+        self.assertFalse(results[1].success)
 
 
 class SharedPrimitiveTests(unittest.TestCase):
