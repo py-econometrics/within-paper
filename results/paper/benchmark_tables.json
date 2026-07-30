@@ -7,8 +7,6 @@
     }
   },
   "prose": {
-    "result_cuda_difficult": "8.73s",
-    "result_cuda_simple": "4.73s",
     "setup_difficult_setup_s": 0.8758755000308156,
     "setup_difficult_share": 0.3319326827636981,
     "setup_difficult_solve_s": 1.7628387499134988,

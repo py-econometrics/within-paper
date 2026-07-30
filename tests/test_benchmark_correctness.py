@@ -75,9 +75,7 @@ from scripts.paper_results import (
     _largest_backend_metric,
     _numeric_cell,
     _render_trial_result,
-    _synchronize_external_results,
     _table_fragment,
-    _validate_external_results,
     _validate_ppml_results,
 )
 from benchmarks.modular.analyze_gap_runtime import _sized_key
@@ -312,43 +310,6 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             _iteration_rows(rows),
             [["d", "9500 (capped)", "40", "30", "#miss"]],
         )
-
-    def test_external_cuda_measurements_are_explicit(self) -> None:
-        # The legacy timings resolve to Appendix C prose values, not to a cell
-        # of a runtime table: putting an unreproducible number in a column of
-        # reproducible ones invites the comparison the appendix rules out.
-        document: dict = {"tables": {}, "prose": {"result_cuda_simple": "old"}}
-        changed = _synchronize_external_results(document)
-        self.assertEqual(changed, 2)
-        self.assertEqual(document["prose"]["result_cuda_simple"], "4.73s")
-        self.assertEqual(document["prose"]["result_cuda_difficult"], "8.73s")
-
-    def test_external_cuda_measurements_never_reach_a_runtime_table(self) -> None:
-        document = _read_json(ROOT / "results" / "paper" / "benchmark_tables.json")
-        for name, table in document["tables"].items():
-            headers = [cell.replace("`", "") for cell in table["header"]]
-            self.assertNotIn("torch-cuda", headers, f"{name} exposes a CUDA column")
-
-    def test_external_cuda_policy_disallows_cross_machine_comparisons(self) -> None:
-        external = json.loads(
-            (ROOT / "results" / "external" / "cuda.json").read_text()
-        )
-        measurements = _validate_external_results(external)
-        self.assertEqual(external["source"], "legacy PyFixest benchmark suite")
-        self.assertEqual(external["status"], "indicative_only")
-        self.assertFalse(external["exact_run_provenance_available"])
-        self.assertFalse(external["cross_machine_comparison_allowed"])
-        self.assertEqual([row["time_s"] for row in measurements], [4.73, 8.73])
-
-        invalid = {**external, "cross_machine_comparison_allowed": True}
-        with self.assertRaisesRegex(ValueError, "cross_machine_comparison_allowed"):
-            _validate_external_results(invalid)
-
-    def test_generated_values_contain_no_cuda_cpu_ratio(self) -> None:
-        values = (ROOT / "generated" / "paper_values.typ").read_text()
-        manuscript = (ROOT / "graph_preconditioner_hdfe.typ").read_text()
-        self.assertNotIn("result_ols_gpu_vs_fem", values)
-        self.assertNotIn("result_ols_gpu_vs_fem", manuscript)
 
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
         # A complete bipartite graph has rank one, so its second singular value is

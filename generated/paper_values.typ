@@ -28,5 +28,3 @@
 #let result_directors_component_share = [30%]
 #let result_zigzag_within = [0.011s]
 #let result_zigzag_fem = [0.711s]
-#let result_cuda_difficult = [8.73s]
-#let result_cuda_simple = [4.73s]

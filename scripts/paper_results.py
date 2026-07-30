@@ -45,7 +45,6 @@ TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
-EXTERNAL_RESULTS_PATH = ROOT / "results" / "external" / "cuda.json"
 CORREIA_DIR = ROOT / "data" / "correia_data"
 EXPECTED_TRIALS = 3
 # The legacy CUDA timings are quoted only in Appendix C, never in a main
@@ -1222,79 +1221,6 @@ def _synchronize_zigzag(document: dict) -> int:
     return changed
 
 
-def _validate_external_results(external: dict) -> list[dict]:
-    required_metadata = {
-        "schema_version": 3,
-        "source": "legacy PyFixest benchmark suite",
-        "status": "indicative_only",
-        "exact_run_provenance_available": False,
-        "cross_machine_comparison_allowed": False,
-        "local_reproducible": False,
-    }
-    for field, expected in required_metadata.items():
-        actual = external.get(field)
-        matches = actual is expected if isinstance(expected, bool) else actual == expected
-        if not matches:
-            raise ValueError(
-                f"External CUDA metadata {field!r} must be {expected!r}"
-            )
-    provenance_note = external.get("provenance_note")
-    if not isinstance(provenance_note, str) or not provenance_note.strip():
-        raise ValueError("External CUDA metadata requires a nonempty provenance_note")
-
-    measurements = external.get("measurements")
-    if not isinstance(measurements, list):
-        raise ValueError("External CUDA measurements must be a list")
-
-    targets = []
-    for measurement in measurements:
-        if not isinstance(measurement, dict):
-            raise ValueError("Each external CUDA measurement must be an object")
-        target = tuple(measurement.get(field) for field in ("design", "backend"))
-        if not all(isinstance(value, str) for value in target):
-            raise ValueError("External CUDA targets must use string identifiers")
-        targets.append(target)
-        time_s = measurement.get("time_s")
-        if (
-            isinstance(time_s, bool)
-            or not isinstance(time_s, (int, float))
-            or not math.isfinite(time_s)
-            or time_s <= 0
-        ):
-            raise ValueError(
-                f"External CUDA timing must be finite and positive: {time_s!r}"
-            )
-
-    if len(targets) != len(set(targets)):
-        raise ValueError("External CUDA measurements contain duplicate targets")
-    if set(targets) != EXPECTED_EXTERNAL_CUDA_TARGETS:
-        raise ValueError(
-            "External CUDA measurements must contain exactly the simple and difficult "
-            "torch-cuda designs"
-        )
-    return measurements
-
-
-def _synchronize_external_results(document: dict) -> int:
-    """Publish the legacy CUDA timings as prose values for Appendix C.
-
-    They are deliberately not written into a runtime table. The run recorded
-    neither hardware nor package versions, so placing it in a column next to
-    reproducible timings would invite exactly the comparison the appendix says
-    cannot be made.
-    """
-    measurements = _validate_external_results(_read_json(EXTERNAL_RESULTS_PATH))
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for measurement in measurements:
-        key = f"result_cuda_{measurement['design']}"
-        rendered = _format_seconds(float(measurement["time_s"]))
-        if prose.get(key) != rendered:
-            prose[key] = rendered
-            changed += 1
-    return changed
-
-
 def _reject_source_collision(
     table: str, dataset: str, backend: str, candidates: list[dict[str, str]]
 ) -> None:
@@ -1396,7 +1322,6 @@ def _synchronize_canonical_tables(
     changed += _synchronize_factor_scaling(document)
     changed += _synchronize_amortization(document)
     changed += _synchronize_zigzag(document)
-    changed += _synchronize_external_results(document)
     if write:
         _write_json(TABLES_PATH, document)
     return changed

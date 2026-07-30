@@ -866,9 +866,7 @@ should be easy for MAP because its updates can pass information rapidly through 
 well-connected graph. The
 difficult design should be harder because worker and firm effects are nearly collinear.
 Factor-pair preconditioning should perform well on the difficult design, but may fail to
-amortize its setup cost on the simple design. For this comparison we add a fifth
-backend, `torch-cuda`: the PyFixest GPU backend, which runs the same diagonally
-preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
+amortize its setup cost on the simple design.
 
 #text(size: 8.8pt)[
 #strong[Simple vs. difficult design (10M observations, 3 FE).]
@@ -878,10 +876,7 @@ preconditioned LSMR as `FEM.jl` on an NVIDIA CUDA device.
   use 10M observations, one covariate, and three fixed effects. Gap denotes
   $1-rho_(W F)$ for the worker-firm pair, reported from the generated 1M version of the
   same DGP family; the runtime rows use the identical simple/difficult graph construction
-  at 10M observations. `torch-cuda` denotes the PyFixest GPU LSMR backend with diagonal
-  preconditioning (the same algorithm as
-`FixedEffectModels.jl`), run on an NVIDIA CUDA device; the local benchmark machine does
-not possess a CUDA GPU. The standalone `within` demeaning API decomposes one-shot runtime
+  at 10M observations. The standalone `within` demeaning API decomposes one-shot runtime
 into reusable solver construction and batch solve: simple design 5.76s + 1.51s
 (roughly 80% setup); difficult design 0.40s + 1.00s (roughly 29% setup). PyFixest
 regression overhead is incurred in addition to these figures.]
@@ -901,18 +896,6 @@ directly. A nearly zero diagnostic gap identifies the regime in which MAP requir
 sweeps to disentangle worker and firm effects. The setup share of the standalone
 demeaning time falls to about 29%, indicating that the preconditioner setup is now
 amortized.
-
-On the simple design, `torch-cuda` is not
-competitive with CPU `fixest`, since host-to-device transfer and
-kernel launch overheads outweigh the gain from parallelizing already inexpensive
-iterations. On the difficult design, GPU parallelism reduces runtime to 8.73s (roughly
-three times faster than CPU `FEM.jl`), but the iteration count remains governed by the
-quality of the diagonal preconditioner, which is limited on this graph. `within` at 3.25s
-remains faster on CPU by using a factor-pair preconditioner that captures the
-cross-factor coupling the diagonal cannot. Hardware acceleration and stronger
-preconditioning address different bottlenecks: the GPU speeds up each iteration,
-whereas on poorly conditioned designs the iteration count, which only the
-preconditioner controls, dominates runtime.
 
 #v(0.35em)
 
