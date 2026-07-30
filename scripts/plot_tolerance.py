@@ -60,7 +60,7 @@ METRICS = (
 )
 
 
-def _as_bool(values: pd.Series) -> pd.Series:
+def _coerce_bool_series(values: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(values):
         return values.fillna(False)
     return values.astype(str).str.lower().eq("true")
@@ -84,7 +84,7 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tolerance results are missing columns: {missing}")
 
     data = raw.copy()
-    data["success"] = _as_bool(data["success"])
+    data["success"] = _coerce_bool_series(data["success"])
     numeric = [
         "tolerance",
         "default_tolerance",
