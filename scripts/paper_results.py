@@ -393,7 +393,6 @@ def render(args: argparse.Namespace) -> None:
     }
     ppml_simple = ppml_rows["simple (well-connected)"]
     ppml_difficult = ppml_rows["difficult (near-nested)"]
-    ols_simple = tables["ols"]["rows"][0]
     ols_difficult = tables["ols"]["rows"][1]
     correia_real_rows = {
         _clean_cell(row[0]): row
@@ -440,27 +439,11 @@ def render(args: argparse.Namespace) -> None:
     memory_1m = memory_overheads(memory_rows[4:6])
     directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
     prose_values = {
-        "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
-        # The limitations section names the regime where the method loses, so
-        # those numbers have to move with the run like every other quoted value.
-        **_scaling_prose_values(),
-        **_ppml_reuse_prose_values(),
-        **_gap_prose_values(),
-        "result_ols_simple_within": ols_simple[5],
-        "result_ols_simple_rust_map": ols_simple[2],
-        "result_ols_simple_best_alternative": _format_seconds(
-            min(
-                value
-                for value in (_numeric_cell(ols_simple[i]) for i in (2, 3, 4))
-                if value is not None
-            )
-        ),
         "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
         "result_ols_difficult_rust_map": ols_difficult[2],
         "result_ols_difficult_fixest": ols_difficult[3],
         "result_ols_difficult_fem": ols_difficult[4],
         "result_ols_difficult_within": ols_difficult[5],
-        "result_correia_uniform_harder_gap": tables["correia_synthetic"]["rows"][3][1],
         "result_correia_enron_fem": enron[4],
         "result_correia_enron_within": enron[5],
         "result_ppml_simple_range": seconds_range(ppml_simple, range(2, 6)),
@@ -486,7 +469,6 @@ def render(args: argparse.Namespace) -> None:
             _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
         ),
         "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
-        "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
         "result_directors_component_share": (
@@ -494,9 +476,6 @@ def render(args: argparse.Namespace) -> None:
         ),
         "result_zigzag_within": _format_seconds(float(prose["zigzag_within_s"])),
         "result_zigzag_fem": _format_seconds(float(prose["zigzag_fem_s"])),
-        "result_zigzag_speedup": _format_ratio(
-            float(prose["zigzag_fem_s"]), float(prose["zigzag_within_s"])
-        ),
     }
     # Values synchronized straight into the result file, such as the legacy CUDA
     # timings of Appendix C, are published without further formatting.
@@ -987,125 +966,6 @@ def _synchronize_setup_cost(document: dict) -> int:
                 prose[key] = value
                 changed += 1
     return changed
-
-
-def _scaling_prose_values() -> dict[str, str]:
-    """Quoted numbers from the factor-scaling and amortization sweeps."""
-    values: dict[str, str] = {}
-    runs = ROOT / "results" / "runs" / "latest"
-
-    scaling = runs / "factor_scaling.csv"
-    if scaling.exists():
-        with scaling.open(newline="", encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))
-        by_q: dict[int, list[dict]] = {}
-        for row in rows:
-            by_q.setdefault(int(row["n_factors"]), []).append(row)
-        if 2 in by_q and 5 in by_q:
-            def med(q: int, field: str) -> float:
-                return float(median(float(r[field]) for r in by_q[q]))
-
-            values["result_qscale_setup_ratio"] = _format_ratio(med(5, "setup_s"), med(2, "setup_s"))
-            values["result_qscale_solve_ratio"] = _format_ratio(med(5, "solve_s"), med(2, "solve_s"))
-            values["result_qscale_setup_share_q5"] = f"{med(5, 'setup_share'):.0%}"
-            values["result_qscale_iters_q2"] = f"{med(2, 'iterations_max'):.0f}"
-            values["result_qscale_iters_q5"] = f"{med(5, 'iterations_max'):.0f}"
-
-    amort = runs / "amortization.csv"
-    if amort.exists():
-        with amort.open(newline="", encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))
-        def total(k: int, name: str) -> float | None:
-            picked = [
-                float(r["total_s"])
-                for r in rows
-                if int(r["k_rhs"]) == k and r["preconditioner"] == name
-            ]
-            return float(median(picked)) if picked else None
-
-        for k in (1, 25):
-            diagonal, additive = total(k, "diagonal"), total(k, "additive")
-            if diagonal and additive:
-                values[f"result_amortize_ratio_k{k}"] = _format_ratio(diagonal, additive)
-    return values
-
-
-def _gap_prose_values() -> dict[str, str]:
-    """Publish the worker-firm gap of the difficult design at each measured size.
-
-    Connectivity is size-dependent, so any claim about the difficult design has
-    to name its sample size. Quoting these from one place keeps the sizes in the
-    prose tied to the hardness table.
-    """
-    path = ROOT / "results" / "runs" / "latest" / "hardness.csv"
-    if not path.exists():
-        return {}
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
-    labels = {100_000: "100k", 1_000_000: "1m", 10_000_000: "10m"}
-    values: dict[str, str] = {}
-    for row in rows:
-        if (
-            "difficult" not in row["dataset_id"]
-            or row["fe_a"] != "indiv_id"
-            or row["fe_b"] != "firm_id"
-        ):
-            continue
-        label = labels.get(int(row["n_obs"]))
-        if label is None:
-            continue
-        values[f"result_gap_difficult_{label}"] = _format_typst_scientific(
-            float(row["one_minus_rho"])
-        )
-    return values
-
-
-def _ppml_reuse_prose_values() -> dict[str, str]:
-    """Quoted numbers from the IRLS preconditioner-reuse experiment."""
-    path = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
-    if not path.exists():
-        return {}
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
-
-    values: dict[str, str] = {}
-    for design in ("simple", "difficult"):
-        group = [row for row in rows if row.get("dgp") == design]
-        rebuilt = next(
-            (r for r in group if str(r["rebuild_each_step"]).lower() in {"true", "1"}),
-            None,
-        )
-        reused = next(
-            (
-                r
-                for r in group
-                if r["preconditioner"] == "additive"
-                and str(r["rebuild_each_step"]).lower() not in {"true", "1"}
-            ),
-            None,
-        )
-        if rebuilt is None or reused is None:
-            continue
-        values[f"result_ppml_reuse_speedup_{design}"] = _format_ratio(
-            float(reused["total_s"]), float(rebuilt["total_s"])
-        )
-        values[f"result_ppml_rebuild_outer_{design}"] = str(
-            int(float(rebuilt["outer_iterations"]))
-        )
-        values[f"result_ppml_rebuild_inner_{design}"] = f"{int(float(rebuilt['inner_iterations_sum'])):,}"
-        values[f"result_ppml_rebuild_total_{design}"] = _format_seconds(
-            float(rebuilt["total_s"])
-        )
-        deviations = [
-            abs(float(r["deviance"]) / float(rebuilt["deviance"]) - 1.0)
-            for r in group
-            if r is not rebuilt
-        ]
-        if deviations:
-            values[f"result_ppml_reuse_deviance_gap_{design}"] = (
-                _format_typst_scientific(max(deviations))
-            )
-    return values
 
 
 def _synchronize_accuracy_frontier(document: dict) -> int:
