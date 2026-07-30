@@ -7,6 +7,7 @@ version = "0.1.0"
 
 [tasks]
 compile = "typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
+test = { cmd = "python -m unittest discover -s tests -v", description = "Run benchmark regression tests" }
 within-setup-cost = { cmd = "python benchmarks/bench_within_setup_cost.py", description = "Measure setup and solve time for the standalone within Python API" }
 
 [dependencies]
