@@ -14,7 +14,12 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from scripts.figure_style import METHOD_LEGEND_LABEL, METHOD_LINESTYLE, METHOD_STYLE
+from benchmarks.modular.methods import (
+    METHOD_LINESTYLE,
+    METHOD_STYLE,
+    legend_label,
+    resolve,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
@@ -47,14 +52,7 @@ LINESTYLE = {
     "julia_fem": METHOD_LINESTYLE["fem"],
 }
 
-METHOD_LABEL_BY_KEY = {
-    "lsmr_off": METHOD_LEGEND_LABEL["within-off"],
-    "lsmr_diagonal": METHOD_LEGEND_LABEL["within-diagonal"],
-    "lsmr_additive": METHOD_LEGEND_LABEL["within-additive"],
-    "pyfixest_map": METHOD_LEGEND_LABEL["rust-map"],
-    "r_fixest": METHOD_LEGEND_LABEL["fixest"],
-    "julia_fem": METHOD_LEGEND_LABEL["FEM.jl"],
-}
+METHOD_LABEL_BY_KEY = {key: legend_label(resolve(key)) for key in METHOD_ORDER}
 
 METRICS = (
     ("coefficient_error_se", "Slope error (reference SE)"),

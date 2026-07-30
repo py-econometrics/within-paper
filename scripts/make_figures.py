@@ -16,10 +16,14 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
+# Deterministic SVG: a stable salt fixes the generated clip-path ids and
+# metadata={"Date": None} drops the embedded timestamp. Without both, every
+# regeneration rewrites the whole tracked file.
+matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
 
-from scripts.figure_style import (
+from benchmarks.modular.methods import (
     METHOD_INLINE_LABEL,
     METHOD_LINESTYLE,
     METHOD_STYLE,
@@ -326,7 +330,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
         fontsize=9,
     )
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, format="svg", bbox_inches="tight")
+    fig.savefig(out, format="svg", bbox_inches="tight", metadata={"Date": None})
     plt.close(fig)
 
 
@@ -440,7 +444,7 @@ def crossover_figure(
     )
     fig.subplots_adjust(left=0.09, right=0.99, top=0.76, bottom=0.15)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, format="svg", bbox_inches="tight")
+    fig.savefig(out, format="svg", bbox_inches="tight", metadata={"Date": None})
     plt.close(fig)
 
 
