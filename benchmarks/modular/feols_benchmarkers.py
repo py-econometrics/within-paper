@@ -24,7 +24,7 @@ from benchmarks.modular.settings import (
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
-    _demeaner_from_backend,
+    demeaner_for,
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 from benchmarks.modular.timing import repetitions_for_runtime
@@ -367,7 +367,7 @@ class PyFeolsBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        demeaner = _demeaner_from_backend(
+        demeaner = demeaner_for(
             self._demeaner_backend, tol=self._tol, maxiter=self._maxiter
         )
 

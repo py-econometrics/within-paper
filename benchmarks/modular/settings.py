@@ -56,10 +56,15 @@ MECHANISM_MAP_TOL = 1e-10
 MECHANISM_MAXITER = 10_000
 
 
-def _demeaner_from_backend(
+def demeaner_for(
     backend: str, *, tol: float | None = None, maxiter: int | None = None
 ):
-    """Map a benchmark backend name to a typed demeaner configuration.
+    """Build a typed PyFixest demeaner for one benchmark configuration name.
+
+    The names are labels this project records in its result files, not
+    PyFixest's own strings. PyFixest 0.60 deprecated `demeaner_backend=`,
+    `fixef_tol=` and `fixef_maxiter=` on `feols`, so every caller passes a
+    typed `demeaner=` object and this is the one place that builds one.
 
     Recognised names:
 
@@ -105,10 +110,23 @@ def _demeaner_from_backend(
             settings["fixef_maxiter"] = maxiter
         return pf.LsmrDemeaner(preconditioner=preconditioner, **settings)
 
-    if backend == "torch_cpu":
-        return pf.LsmrDemeaner(backend="torch", device="cpu")
-    if backend == "torch_mps":
-        return pf.LsmrDemeaner(backend="torch", device="mps", precision="float32")
-    if backend == "torch_cuda":
-        return pf.LsmrDemeaner(backend="torch", device="cuda")
+    # Torch device arms. PyFixest's legacy preset table mapped these strings
+    # onto the same three fields, which the typed constructor now takes
+    # directly. mps runs float32 because Metal has no float64.
+    torch_devices = {"torch_cpu": ("cpu", "float64"),
+                     "torch_mps": ("mps", "float32"),
+                     "torch_cuda": ("cuda", "float64")}
+    if backend in torch_devices:
+        device, precision = torch_devices[backend]
+        return pf.LsmrDemeaner(backend="torch", device=device, precision=precision)
+
+    # Pre-0.60 alias. PyFixest resolved "rust-cg" to the within LSMR backend
+    # with preconditioner="auto"; it was never conjugate gradient by 0.60.
+    if backend == "rust-cg":
+        return pf.LsmrDemeaner(backend="within", preconditioner="auto", precision="float64")
+
     raise ValueError(f"Unknown demeaner backend: {backend!r}")
+
+
+# Retained so existing imports keep resolving; prefer `demeaner_for`.
+_demeaner_from_backend = demeaner_for

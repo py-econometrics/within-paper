@@ -2,7 +2,9 @@
 
 The script has two layers:
 
-1. A targeted PyFixest check comparing rust (MAP) and rust-cg (within). Since
+1. A targeted PyFixest check comparing MAP against the within LSMR backend.
+   (Pre-0.60 this backend was spelled "rust-cg"; it has not been conjugate
+   gradient for some time, so the names here say within.) Since
    both use the same Python regression API and Rust data path, this isolates the
    demeaning strategy. It reports coefficient, residual, and firm-effect
    variance differences.
@@ -25,6 +27,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from benchmarks.modular.results import write_rows
+from benchmarks.modular.settings import demeaner_for
 import numpy as np
 import pandas as pd
 import pyfixest as pf
@@ -136,7 +139,7 @@ def _format_diff(value: float | None) -> str:
 
 
 print("PyFixest internal agreement")
-print(f"{'dgp':<12} {'metric':<28} {'rust vs rust-cg':>16}")
+print(f"{'dgp':<12} {'metric':<28} {'MAP vs within':>16}")
 print("-" * 60)
 
 for dgp_type in ["simple", "difficult"]:
@@ -145,23 +148,24 @@ for dgp_type in ["simple", "difficult"]:
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        fit_map = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust",
+        fit_map = pf.feols(FML, data=df, vcov="iid", demeaner=demeaner_for("rust"),
                            copy_data=False, store_data=True)
-        fit_cg = pf.feols(FML, data=df, vcov="iid", demeaner_backend="rust-cg",
-                          copy_data=False, store_data=True)
-    if not fit_map.convergence or not fit_cg.convergence:
+        fit_within = pf.feols(FML, data=df, vcov="iid",
+                              demeaner=demeaner_for("rust-cg"),
+                              copy_data=False, store_data=True)
+    if not fit_map.convergence or not fit_within.convergence:
         raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
 
     # Coefficient differences
     coef_map = np.asarray(fit_map.coef())
-    coef_cg = np.asarray(fit_cg.coef())
+    coef_within = np.asarray(fit_within.coef())
     coef_map_named = _coef_dict(fit_map.coef().index, coef_map)
-    max_coef_diff = np.max(np.abs(coef_map - coef_cg))
+    max_coef_diff = np.max(np.abs(coef_map - coef_within))
     print(f"{dgp_type:<12} {'max |coef diff|':<28} {max_coef_diff:>16.2e}")
 
     # Residual differences
     resid_map = np.asarray(fit_map.resid())
-    resid_cg = np.asarray(fit_cg.resid())
+    resid_cg = np.asarray(fit_within.resid())
     max_resid_diff = np.max(np.abs(resid_map - resid_cg))
     resid_norm_map = np.linalg.norm(resid_map)
     rel_resid_diff = np.linalg.norm(resid_map - resid_cg) / resid_norm_map
@@ -170,7 +174,7 @@ for dgp_type in ["simple", "difficult"]:
 
     # Firm-effect variance component
     fe_map = fit_map.fixef()
-    fe_cg = fit_cg.fixef()
+    fe_cg = fit_within.fixef()
     var_firm_map = np.var(list(fe_map["C(firm_id)"].values()))
     var_firm_cg = np.var(list(fe_cg["C(firm_id)"].values()))
     var_diff = abs(var_firm_map - var_firm_cg)
@@ -182,7 +186,7 @@ for dgp_type in ["simple", "difficult"]:
     external = _external_coefficients(data_path, FML)
     coefficient_sets: dict[str, dict[str, float]] = {
         "rust-map": coef_map_named,
-        "within": _coef_dict(fit_cg.coef().index, coef_cg),
+        "within": _coef_dict(fit_within.coef().index, coef_within),
     }
     skip_messages: dict[str, str] = {}
     for backend, value in external.items():

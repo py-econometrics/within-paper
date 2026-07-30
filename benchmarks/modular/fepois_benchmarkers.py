@@ -8,7 +8,7 @@ import pandas as pd
 from benchmarks.modular.feols_benchmarkers import (
     _TablePrinter,
     _beta_x1,
-    _demeaner_from_backend,
+    demeaner_for,
     _dgp_width,
     _fit_converged,
     _group_key,
@@ -51,7 +51,7 @@ class PyFepoisBenchmarkerFullApi:
     ) -> list[FeolsResult]:
         import pyfixest as pf
 
-        demeaner = _demeaner_from_backend(
+        demeaner = demeaner_for(
             self._demeaner_backend, tol=self._tol, maxiter=self._maxiter
         )
 
