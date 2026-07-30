@@ -39,6 +39,7 @@ from pyfixest.core.detect_singletons import detect_singletons
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
@@ -58,18 +59,21 @@ class MethodSpec:
     """One solver configuration and its tolerance grid."""
 
     key: str
-    label: str
     package: str
     solver: str
     preconditioner: str
     default_tolerance: float
     tolerances: tuple[float, ...]
 
+    @property
+    def label(self) -> str:
+        """Reader-facing name, from the shared method registry."""
+        return inline_label(resolve(self.key))
+
 
 METHODS = (
     MethodSpec(
         key="lsmr_off",
-        label="PyFixest — LSMR — none",
         package="PyFixest",
         solver="LSMR",
         preconditioner="off",
@@ -78,7 +82,6 @@ METHODS = (
     ),
     MethodSpec(
         key="lsmr_diagonal",
-        label="PyFixest — LSMR — diagonal",
         package="PyFixest",
         solver="LSMR",
         preconditioner="diagonal",
@@ -87,7 +90,6 @@ METHODS = (
     ),
     MethodSpec(
         key="lsmr_additive",
-        label="PyFixest — LSMR — factor-pair",
         package="PyFixest",
         solver="LSMR",
         preconditioner="additive",
@@ -96,7 +98,6 @@ METHODS = (
     ),
     MethodSpec(
         key="pyfixest_map",
-        label="PyFixest — MAP — none",
         package="PyFixest",
         solver="MAP",
         preconditioner="none",
@@ -105,7 +106,6 @@ METHODS = (
     ),
     MethodSpec(
         key="r_fixest",
-        label="fixest (R) — MAP — accelerated",
         package="fixest",
         solver="MAP",
         preconditioner="package default",
@@ -114,7 +114,6 @@ METHODS = (
     ),
     MethodSpec(
         key="julia_fem",
-        label="FEM.jl — LSMR — diagonal",
         package="FixedEffectModels.jl",
         solver="LSMR",
         preconditioner="package default",

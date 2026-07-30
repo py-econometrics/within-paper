@@ -14,7 +14,7 @@ from benchmarks.modular.benchmark_tolerance import (
     coefficient_error_se,
     residual_error,
 )
-from scripts.figure_style import METHOD_STYLE
+from benchmarks.modular.methods import METHOD_STYLE
 from scripts.make_figures import CROSSOVER_STYLE, STYLE as PAPER_FIGURE_STYLE
 from scripts.plot_tolerance import (
     STYLE as TOLERANCE_STYLE,
