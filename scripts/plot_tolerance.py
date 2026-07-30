@@ -14,6 +14,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
+from figure_style import METHOD_LEGEND_LABEL, METHOD_LINESTYLE, METHOD_STYLE  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
@@ -28,12 +30,30 @@ METHOD_ORDER = (
 )
 
 STYLE = {
-    "lsmr_off": ("#7c3aed", "X"),
-    "lsmr_diagonal": ("#7b8494", "^"),
-    "lsmr_additive": ("#2563eb", "D"),
-    "pyfixest_map": ("#c2410c", "o"),
-    "r_fixest": ("#a16207", "s"),
-    "julia_fem": ("#0f766e", "P"),
+    "lsmr_off": METHOD_STYLE["lsmr_none"],
+    "lsmr_diagonal": METHOD_STYLE["lsmr_diagonal"],
+    "lsmr_additive": METHOD_STYLE["lsmr_factor_pair"],
+    "pyfixest_map": METHOD_STYLE["map"],
+    "r_fixest": METHOD_STYLE["fixest"],
+    "julia_fem": METHOD_STYLE["fem"],
+}
+
+LINESTYLE = {
+    "lsmr_off": METHOD_LINESTYLE["lsmr_none"],
+    "lsmr_diagonal": METHOD_LINESTYLE["lsmr_diagonal"],
+    "lsmr_additive": METHOD_LINESTYLE["lsmr_factor_pair"],
+    "pyfixest_map": METHOD_LINESTYLE["map"],
+    "r_fixest": METHOD_LINESTYLE["fixest"],
+    "julia_fem": METHOD_LINESTYLE["fem"],
+}
+
+METHOD_LABEL_BY_KEY = {
+    "lsmr_off": METHOD_LEGEND_LABEL["within-off"],
+    "lsmr_diagonal": METHOD_LEGEND_LABEL["within-diagonal"],
+    "lsmr_additive": METHOD_LEGEND_LABEL["within-additive"],
+    "pyfixest_map": METHOD_LEGEND_LABEL["rust-map"],
+    "r_fixest": METHOD_LEGEND_LABEL["fixest"],
+    "julia_fem": METHOD_LEGEND_LABEL["FEM.jl"],
 }
 
 METRICS = (
@@ -144,7 +164,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         subset = failed[failed["method"] == method]
         if subset.empty:
             continue
-        label = str(subset["label"].iloc[0])
+        label = METHOD_LABEL_BY_KEY[method].replace("\n", " — ")
         count = len(subset)
         suffix = "setting" if count == 1 else "settings"
         entries.append(f"{label}: {count} {suffix}")
@@ -206,6 +226,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     method_points["median_time_s"],
                     color=colour,
                     linewidth=1.2,
+                    linestyle=LINESTYLE[method],
                     alpha=0.75,
                     zorder=2,
                 )
@@ -266,9 +287,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                 ax.spines[spine].set_visible(False)
 
     labels = {
-        method: str(
-            points.loc[points["method"] == method, "label"].dropna().iloc[0]
-        )
+        method: METHOD_LABEL_BY_KEY[method]
         for method in METHOD_ORDER
         if (points["method"] == method).any()
     }
@@ -279,6 +298,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             color=STYLE[method][0],
             marker=STYLE[method][1],
             linewidth=1.2,
+            linestyle=LINESTYLE[method],
             markersize=6,
             markeredgecolor="white",
             markeredgewidth=0.5,
