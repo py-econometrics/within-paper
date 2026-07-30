@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from benchmarker_sets import build_standard_fepois_benchmarkers
+from benchmarker_sets import build_fepois_benchmarkers
 from dgps import BaseDGP
 from interfaces import FeolsSpec
 from runner import generate_datasets, run_benchmarks
@@ -31,7 +31,7 @@ SPECS = [
     FeolsSpec(
         depvar="negbin_y",
         covariates=[f"x{i}" for i in range(1, k + 1)],
-        fe_cols=["indiv_id", "year", "firm_id"],
+        fe_cols=["indiv_id", "firm_id", "year"],
         vcov="iid",
     )
     for k in K_VALUES
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     datasets = generate_datasets(DGPS, SIZES, N_ITERS, BURN_IN)
-    bundle = build_standard_fepois_benchmarkers()
+    bundle = build_fepois_benchmarkers()
     run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )

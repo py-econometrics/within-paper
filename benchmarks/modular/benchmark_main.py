@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from benchmarker_sets import build_standard_feols_benchmarkers
+from benchmarker_sets import build_feols_benchmarkers
 from dgps import BaseDGP
 from interfaces import FeolsSpec
 from runner import generate_datasets, run_benchmarks
@@ -37,7 +37,7 @@ SPECS = [
         vcov="iid",
     )
     for k in K_VALUES
-    for fe_cols in (["indiv_id", "year", "firm_id"],)
+    for fe_cols in (["indiv_id", "firm_id", "year"],)
 ]
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,11 @@ if __name__ == "__main__":
     output_csv = args.output_dir / OUTPUT_CSV.name
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     datasets = generate_datasets(DGPS, SIZES, N_ITERS, BURN_IN)
-    bundle = build_standard_feols_benchmarkers(include_torch=False)
+    # Package defaults only. The matched-accuracy arms are available via
+    # matched_accuracy=True, but at 10M the unpreconditioned and MAP arms run
+    # for hours against the cap, so that is an explicit decision rather than a
+    # default.
+    bundle = build_feols_benchmarkers()
     run_benchmarks(
         bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )

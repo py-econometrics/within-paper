@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Reproducible result management for the paper.
+"""Manage reproducible benchmark results for the paper.
 
-This module deliberately uses only the Python standard library so it can be run
-both inside the Pixi environment and as a preflight helper before a full run.
-Canonical table values live in ``results/paper/benchmark_tables.json``; render
-turns them into the Typst fragments included by the manuscript. ``collect``
-records the raw output files and execution environment for a benchmark run.
+This script uses only the Python standard library, so runtime checks can run before the
+Pixi environment is available. Paper table data is stored in
+``results/paper/benchmark_tables.json``; ``render`` writes the Typst includes, and
+``collect`` records raw outputs and runtime information.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import math
 import os
 import platform
 import re
@@ -40,9 +40,17 @@ RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXTERNAL_RESULTS_PATH = ROOT / "results" / "external" / "cuda.json"
 CORREIA_DIR = ROOT / "data" / "correia_data"
 EXPECTED_TRIALS = 3
+EXPECTED_EXTERNAL_CUDA_TARGETS = {
+    ("ols", "simple", "torch-cuda"),
+    ("ols", "difficult", "torch-cuda"),
+}
 RAW_GLOBS = (
     "benchmarks/results/*.csv",
     "results/runs/latest/*.csv",
+    # The calibration pilot and the pooled gap analysis write JSON, not CSV.
+    # Without these the run that froze Gate A and the diagnostic behind the
+    # spectral-gap caveat would carry no provenance.
+    "results/runs/latest/*.json",
 )
 CODE_GLOBS = (
     "pixi.toml",
@@ -122,6 +130,7 @@ def _runtime_provenance() -> dict:
         "processor": platform.processor(),
         "bench_threads": os.environ.get("BENCH_THREADS"),
         "julia_num_threads": os.environ.get("JULIA_NUM_THREADS"),
+        "within_repo": os.environ.get("WITHIN_REPO"),
         "git_commit": _git_commit(),
         "git_dirty": _git_dirty(),
         "code_sha256": _code_fingerprint(),
@@ -232,8 +241,8 @@ def check_external_runtimes(_: argparse.Namespace) -> None:
                     configured_threads = _run(["julia", "-e", "print(Threads.nthreads())"])
                     if configured_threads.strip() != str(julia_threads):
                         failures.append(
-                            f"Julia thread check: JULIA_NUM_THREADS={julia_threads}, "
-                            f"but Julia started with {configured_threads.strip()} thread(s)"
+                            f"Julia is using {configured_threads.strip()} thread(s), "
+                            f"but JULIA_NUM_THREADS={julia_threads}"
                         )
                     else:
                         print(f"Julia threads: {configured_threads.strip()}")
@@ -252,7 +261,7 @@ def setup_julia_env(_: argparse.Namespace) -> None:
 
 
 def fetch_correia(args: argparse.Namespace) -> None:
-    """Fetch each metadata-described zip and verify its source checksum."""
+    """Download each archive listed in the metadata and verify its checksum."""
     metadata_dir = CORREIA_DIR / "metadata"
     if not metadata_dir.exists():
         raise SystemExit(f"Metadata directory not found: {metadata_dir}")
@@ -320,8 +329,16 @@ def _table_fragment(name: str, table: dict) -> str:
         elif marker == "#agreement-difficult":
             lines.append("  table.hline(stroke: 0.35pt + table-light-rule),")
             row = ["table.cell(rowspan: 4)[difficult]", *row[1:]]
+        elif name == "agreement":
+            # The first grid slot is already occupied by the row-spanning
+            # design cell, so omit the empty marker from subsequent rows.
+            row = row[1:]
         cells = [cell if cell else "" for cell in row]
-        lines.append("  " + ", ".join(f"[{cell}]" for cell in cells) + ",")
+        rendered_cells = [
+            cell if index == 0 and cell.startswith("table.cell(") else f"[{cell}]"
+            for index, cell in enumerate(cells)
+        ]
+        lines.append("  " + ", ".join(rendered_cells) + ",")
     lines.extend(["  table.hline(stroke: 0.8pt + table-rule),", ")", ""])
     return "\n".join(lines)
 
@@ -335,10 +352,19 @@ def render(args: argparse.Namespace) -> None:
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
-    for name in tables:
-        values.append(f'#let paper_{name}_source = "results/paper/benchmark_tables.json"')
+    ppml_rows = {
+        _clean_cell(row[0]): row
+        for row in tables["ppml"]["rows"]
+    }
+    ppml_simple = ppml_rows["simple (well-connected)"]
+    ppml_difficult = ppml_rows["difficult (near-nested)"]
     ols_difficult = tables["ols"]["rows"][1]
-    ppml_difficult = tables["ppml"]["rows"][3]
+    correia_real_rows = {
+        _clean_cell(row[0]): row
+        for row in tables["correia_real"]["rows"]
+    }
+    enron = correia_real_rows["enron"]
+    agreement_rows = tables["agreement"]["rows"]
     memory_rows = tables["memory"]["rows"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
@@ -349,34 +375,70 @@ def render(args: argparse.Namespace) -> None:
                 values.append(within_memory - map_memory)
         return values
 
+    def gap_without_share(value: str) -> str:
+        return re.sub(r"\s+\([^)]*\)\s*$", "", value)
+
+    def largest_metric(rows: list[list[str]], column: int) -> str:
+        candidates = [
+            row[column]
+            for row in rows
+            if _numeric_cell(row[column]) is not None
+        ]
+        if not candidates:
+            return "--"
+        return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
+
+    def seconds_range(row: list[str], columns: range) -> str:
+        candidates = [
+            value
+            for column in columns
+            if (value := _numeric_cell(row[column])) is not None
+        ]
+        if not candidates:
+            return "--"
+        lower = _format_seconds(min(candidates)).removesuffix("s")
+        upper = _format_seconds(max(candidates))
+        return f"{lower}--{upper}"
+
     memory_100k = memory_overheads(memory_rows[1:3])
     memory_1m = memory_overheads(memory_rows[4:6])
-    directors_share = re.search(r"\(([^)]+)\)", tables["correia_real"]["rows"][-1][1])
+    directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
     prose_values = {
         "result_akm_mobility_first_gap": tables["akm_mobility"]["rows"][0][1],
-        "result_ols_difficult_within": tables["ols"]["rows"][1][5],
-        "result_ols_difficult_gpu": tables["ols"]["rows"][1][6],
-        "result_ols_difficult_rust_map": tables["ols"]["rows"][1][3],
+        "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
+        "result_ols_difficult_rust_map": ols_difficult[2],
+        "result_ols_difficult_fixest": ols_difficult[3],
+        "result_ols_difficult_fem": ols_difficult[4],
+        "result_ols_difficult_within": ols_difficult[5],
         "result_correia_uniform_harder_gap": tables["correia_synthetic"]["rows"][3][1],
-        "result_ppml_simple_three_map": tables["ppml"]["rows"][2][3],
-        "result_ppml_simple_three_glfem": tables["ppml"]["rows"][2][4],
-        "result_ppml_simple_three_within": tables["ppml"]["rows"][2][5],
-        "result_ppml_difficult_three_fixest": tables["ppml"]["rows"][3][2],
-        "result_ppml_difficult_three_glfem": tables["ppml"]["rows"][3][4],
-        "result_ppml_difficult_three_within": tables["ppml"]["rows"][3][5],
-        "result_agreement_fixest_max": tables["agreement"]["rows"][2][4],
+        "result_correia_enron_fem": enron[4],
+        "result_correia_enron_within": enron[5],
+        "result_ppml_simple_range": seconds_range(ppml_simple, range(2, 6)),
+        "result_ppml_difficult_three_fixest": ppml_difficult[3],
+        "result_ppml_difficult_three_glfem": ppml_difficult[4],
+        "result_ppml_difficult_three_within": ppml_difficult[5],
+        "result_agreement_simple_gap": gap_without_share(memory_rows[1][1]),
+        "result_agreement_difficult_gap": gap_without_share(memory_rows[2][1]),
+        "result_agreement_simple_max": largest_metric(agreement_rows[:4], 3),
+        "result_agreement_difficult_max": largest_metric(agreement_rows[4:], 3),
         "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
         "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
         "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
         "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
         "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
         "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
-        "result_ols_gpu_vs_fem": _format_ratio(_numeric_cell(ols_difficult[4]), _numeric_cell(ols_difficult[6])),
-        "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[2]), _numeric_cell(ppml_difficult[5])),
+        "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
         "result_ppml_within_vs_glfem": _format_ratio(_numeric_cell(ppml_difficult[4]), _numeric_cell(ppml_difficult[5])),
-        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MB" if memory_100k else "--",
-        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MB" if memory_1m else "--",
-        "result_directors_component_share": f"{float(directors_share.group(1)):.0%}" if directors_share else "--",
+        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
+        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
+        "result_directors_component_share": (
+            f"{directors_share:.0%}" if directors_share is not None else "--"
+        ),
+        "result_zigzag_within": _format_seconds(float(prose["zigzag_within_s"])),
+        "result_zigzag_fem": _format_seconds(float(prose["zigzag_fem_s"])),
+        "result_zigzag_speedup": _format_ratio(
+            float(prose["zigzag_fem_s"]), float(prose["zigzag_within_s"])
+        ),
     }
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
@@ -387,6 +449,11 @@ def collect(args: argparse.Namespace) -> None:
     run_dir = ROOT / "results" / "runs" / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     runtime = _runtime_provenance()
+    if runtime["within_repo"]:
+        raise SystemExit(
+            "Refusing to collect paper results with WITHIN_REPO set; "
+            "the paper run must use the locked within-py package"
+        )
     if runtime["git_dirty"]:
         raise SystemExit(
             "Refusing to collect paper results from a dirty tracked worktree; "
@@ -400,8 +467,8 @@ def collect(args: argparse.Namespace) -> None:
                 artifacts.append({"path": str(path.relative_to(ROOT)), "bytes": path.stat().st_size, "sha256": _sha256(path)})
     _write_json(run_dir / "provenance.json", {"runtime": runtime, "artifacts": artifacts})
     print(
-        f"[collect] recorded {len(artifacts)} raw result artifacts in {run_dir}; "
-        f"updated {updated} canonical timing cells"
+        f"[collect] recorded {len(artifacts)} raw result files in {run_dir}; "
+        f"updated {updated} paper table cells"
     )
 
 
@@ -420,7 +487,7 @@ def _is_git_tracked(path: Path) -> bool:
 
 
 def archive_legacy_results(_: argparse.Namespace) -> None:
-    """Archive untracked generated artifacts without touching input caches."""
+    """Archive untracked generated files without touching input caches."""
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     archive_root = ROOT / "results" / "legacy" / stamp
     sources = (
@@ -444,9 +511,9 @@ def archive_legacy_results(_: argparse.Namespace) -> None:
             shutil.move(str(path), str(destination))
             moved += 1
     if moved:
-        print(f"[archive] moved {moved} generated artifacts to {archive_root}")
+        print(f"[archive] moved {moved} generated files to {archive_root}")
     else:
-        print("[archive] no untracked generated artifacts found")
+        print("[archive] no untracked generated files found")
     if skipped:
         print("[archive] left tracked files in place:")
         for path in skipped:
@@ -473,9 +540,20 @@ def _rows_from_csvs() -> list[dict[str, str]]:
 
 def _backend_name(value: str) -> str | None:
     text = value.lower()
-    if "within" in text or "rust-cg" in text:
+    # Matched-accuracy arms are their own series and must never be folded into
+    # the package-default cell they share a solver with. Both views are
+    # measured in one sweep (PROTOCOL.md section 6), so without this the four
+    # within variants would collapse onto "within", the two MAP variants onto
+    # "rust-map", and every affected cell would render as "incomplete" from
+    # duplicate trial ids.
+    for preconditioner in ("off", "diagonal", "additive"):
+        if f"within-{preconditioner}" in text:
+            return f"within-{preconditioner}"
+    if "matched" in text:
+        return "rust-map-matched"
+    if "within" in text or "rust-cg" in text or "rust_cg" in text:
         return "within"
-    if "rust-map" in text or text in {"rust", "pyfixest-map"}:
+    if "rust-map" in text or "rust_map" in text or text in {"rust", "pyfixest-map", "pyfixest_map"}:
         return "rust-map"
     if "torch-cuda" in text:
         return "torch-cuda"
@@ -500,8 +578,35 @@ def _row_success(row: dict[str, str]) -> bool:
     return str(row.get("success", "True")).strip().lower() in {"true", "1"}
 
 
+def _expected_trials(candidates: list[dict[str, str]]) -> int | None:
+    """How many trials this cell should contain.
+
+    A cell used to be three trials, full stop. With the R1/R2/R3 repetition
+    rule the count varies by how long the cell takes, so the harness records
+    the number it planned and the renderer checks against that. Rows without
+    the field are pre-rule results and still expect three. A cell whose rows
+    disagree about the plan is incomplete rather than silently pooled.
+    """
+    planned = {_integer_field(row, "n_planned") for row in candidates}
+    planned.discard(None)
+    if len(planned) > 1:
+        return None
+    return planned.pop() if planned else EXPECTED_TRIALS
+
+
+def _trial_key(row: dict[str, str]) -> tuple[int | None, int]:
+    """Identify a trial by DGP replicate and timing repetition.
+
+    Repetitions on one fixed sample and replicates of the DGP are different
+    things (PROTOCOL.md section 2), so they are separate coordinates. Rows
+    without a repetition are pre-rule results and count as repetition zero.
+    """
+    repetition = _integer_field(row, "repetition")
+    return (_integer_field(row, "iter_num"), 0 if repetition is None else repetition)
+
+
 def _render_trial_result(candidates: list[dict[str, str]]) -> str:
-    """Render a complete three-trial result, including measured non-convergence."""
+    """Format the benchmark trials for one cell, including failed trials."""
     if not candidates:
         return "#miss"
 
@@ -519,8 +624,10 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
         except (TypeError, ValueError):
             return "incomplete"
     else:
-        trial_ids = [_integer_field(row, "iter_num") for row in candidates]
-        if any(trial_id is None for trial_id in trial_ids) or len(set(trial_ids)) != len(trial_ids):
+        trial_ids = [_trial_key(row) for row in candidates]
+        if any(replicate is None for replicate, _ in trial_ids):
+            return "incomplete"
+        if len(set(trial_ids)) != len(trial_ids):
             return "incomplete"
         total = len(candidates)
         successful_rows = [row for row in candidates if _row_success(row)]
@@ -532,7 +639,10 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
             except (KeyError, TypeError, ValueError):
                 return "incomplete"
 
-    if total != EXPECTED_TRIALS or successful is None or not 0 <= successful <= total:
+    expected = _expected_trials(candidates)
+    if expected is None or total != expected or successful is None:
+        return "incomplete"
+    if not 0 <= successful <= total:
         return "incomplete"
     if successful == 0:
         return f"failed (0/{total})"
@@ -555,6 +665,23 @@ def _integer_field(row: dict[str, str], name: str) -> int | None:
         return None
 
 
+def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
+    unexpected = sorted(
+        {
+            str(row.get("n_fe") or "missing")
+            for row in rows
+            if "fepois_bench__" in row.get("_source_file", "")
+            and _integer_field(row, "n_fe") != 3
+        }
+    )
+    if unexpected:
+        raise ValueError(
+            "PPML result files must contain only n_fe=3 rows; found "
+            f"{', '.join(unexpected)}. Archive old results and rerun without "
+            "--reuse-existing."
+        )
+
+
 def _paper_runtime_target(
     table_name: str, row: list[str]
 ) -> tuple[str, dict[str, int], str]:
@@ -562,7 +689,12 @@ def _paper_runtime_target(
     dataset = _clean_cell(row[0]).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
-    if table_name in {"akm_mobility", "akm_sorting"}:
+    if table_name in {
+        "akm_mobility",
+        "akm_sorting",
+        "mechanism_mobility",
+        "mechanism_sorting",
+    }:
         return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": 3}, "feols_akm_sweep__"
     if table_name == "ols":
         return dataset, {"n_obs": 10_000_000, "model_k": 1, "n_fe": 3}, "feols_bench__"
@@ -588,10 +720,38 @@ def _matches_runtime_target(
 
 
 def _numeric_cell(value: str) -> float | None:
+    if "failed" in value.lower():
+        # A failed cell such as "failed (0/3)" carries no runtime; do not let the
+        # "0" in the trial count read back as a 0.0-second measurement.
+        return None
+    scientific = re.search(
+        r"(-?\d[\d,]*\.?\d*)\s+times\s+10\^\((-?\d+)\)", value
+    )
+    if scientific is not None:
+        mantissa = float(scientific.group(1).replace(",", ""))
+        return mantissa * 10 ** int(scientific.group(2))
     match = re.search(r"(?:\d[\d,]*\.?\d*|\.\d+)", value)
     if match is None:
         return None
     return float(match.group().replace(",", ""))
+
+
+def _largest_backend_metric(
+    rows: list[list[str]], backend: str, column: int
+) -> str:
+    candidates = [
+        row[column]
+        for row in rows
+        if _clean_cell(row[1]) == backend and _numeric_cell(row[column]) is not None
+    ]
+    if not candidates:
+        return "--"
+    return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
+
+
+def _component_share(value: str) -> float | None:
+    match = re.search(r"\((0(?:\.\d+)?|1(?:\.0+)?)\)\s*$", value)
+    return float(match.group(1)) if match else None
 
 
 def _format_ratio(numerator: float | None, denominator: float | None) -> str:
@@ -614,16 +774,18 @@ def _clean_cell(value: str) -> str:
 
 
 def _prose_cell(value: str) -> str:
-    """Prevent failed table-cell markers from becoming invalid Typst prose."""
+    """Replace failure markers before inserting a value into Typst text."""
     return "--" if value in {"#miss", "failed", "--"} else value
 
 
 def _format_hardness(gap: float, share: float) -> str:
-    """Use compact Typst-compatible formatting for a gap and component share."""
+    """Format a gap and component share for Typst."""
     if gap and abs(gap) < 1e-2:
         exponent = int(f"{gap:.0e}".split("e")[1])
         mantissa = gap / (10**exponent)
         gap_text = f"${mantissa:.2f} times 10^({exponent})$"
+    elif gap >= 1.0:
+        gap_text = f"{gap:.2f}"
     else:
         gap_text = f"{gap:.3g}"
     return f"{gap_text} ({share:.2f})"
@@ -659,13 +821,18 @@ def _synchronize_hardness(document: dict) -> int:
         return 1
 
     changed = 0
-    for table_name in ("akm_mobility", "akm_sorting"):
+    for table_name in (
+        "akm_mobility",
+        "akm_sorting",
+        "mechanism_mobility",
+        "mechanism_sorting",
+    ):
         for row in document["tables"][table_name]["rows"]:
             scenario = _clean_cell(row[0])
             changed += update(table_name, f"{scenario}_1000000_k1_iter_1", row)
     for row in document["tables"]["ols"]["rows"]:
         family = row[0].split()[0]
-        changed += update("ols", f"{family}_1000000_k1_iter_1", row)
+        changed += update("ols", f"{family}_10000000_k1_iter_1", row)
     for table_name in ("correia_synthetic", "correia_real"):
         for row in document["tables"][table_name]["rows"]:
             changed += update(table_name, _clean_cell(row[0]), row)
@@ -699,13 +866,12 @@ def _synchronize_agreement(document: dict) -> int:
         backend = _clean_cell(row[1])
         source = by_key.get((dgp, backend))
         if source is None:
-            replacement = ["#miss", "#miss", "#miss"]
+            replacement = ["#miss", "#miss"]
         elif source.get("success", "").lower() != "true":
-            replacement = ["failed", "failed", "failed"]
+            replacement = ["failed", "failed"]
         else:
             replacement = [
                 f"{float(source['x1']):.8f}",
-                "--" if backend == "rust-map" else _format_typst_scientific(float(source["avg_abs_diff"])),
                 "--" if backend == "rust-map" else _format_typst_scientific(float(source["max_abs_diff"])),
             ]
         for index, value in enumerate(replacement, start=2):
@@ -745,10 +911,95 @@ def _synchronize_setup_cost(document: dict) -> int:
     return changed
 
 
-def _synchronize_external_results(document: dict) -> int:
-    external = _read_json(EXTERNAL_RESULTS_PATH)
+def _synchronize_zigzag(document: dict) -> int:
+    """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
+
+    Read both times directly from the raw benchmark output.
+    """
+    path = ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
+    if not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = [
+            row
+            for row in csv.DictReader(handle)
+            if row.get("dataset") == "synthetic-zigzag"
+        ]
+    times: dict[str, float] = {}
+    for row in rows:
+        backend = _backend_name(row.get("algo") or "")
+        if backend in {"within", "FEM.jl"} and str(row.get("success", "")).lower() == "true":
+            try:
+                times[backend] = float(row["time"])
+            except (KeyError, TypeError, ValueError):
+                continue
+    prose = document.setdefault("prose", {})
     changed = 0
-    for measurement in external.get("measurements", []):
+    for backend, key in (("within", "zigzag_within_s"), ("FEM.jl", "zigzag_fem_s")):
+        value = times.get(backend)
+        if value is not None and prose.get(key) != value:
+            prose[key] = value
+            changed += 1
+    return changed
+
+
+def _validate_external_results(external: dict) -> list[dict]:
+    required_metadata = {
+        "schema_version": 2,
+        "source": "legacy PyFixest benchmark suite",
+        "status": "indicative_only",
+        "exact_run_provenance_available": False,
+        "cross_machine_comparison_allowed": False,
+        "local_reproducible": False,
+    }
+    for field, expected in required_metadata.items():
+        actual = external.get(field)
+        matches = actual is expected if isinstance(expected, bool) else actual == expected
+        if not matches:
+            raise ValueError(
+                f"External CUDA metadata {field!r} must be {expected!r}"
+            )
+    provenance_note = external.get("provenance_note")
+    if not isinstance(provenance_note, str) or not provenance_note.strip():
+        raise ValueError("External CUDA metadata requires a nonempty provenance_note")
+
+    measurements = external.get("measurements")
+    if not isinstance(measurements, list):
+        raise ValueError("External CUDA measurements must be a list")
+
+    targets = []
+    for measurement in measurements:
+        if not isinstance(measurement, dict):
+            raise ValueError("Each external CUDA measurement must be an object")
+        target = tuple(measurement.get(field) for field in ("table", "row", "backend"))
+        if not all(isinstance(value, str) for value in target):
+            raise ValueError("External CUDA targets must use string identifiers")
+        targets.append(target)
+        time_s = measurement.get("time_s")
+        if (
+            isinstance(time_s, bool)
+            or not isinstance(time_s, (int, float))
+            or not math.isfinite(time_s)
+            or time_s <= 0
+        ):
+            raise ValueError(
+                f"External CUDA timing must be finite and positive: {time_s!r}"
+            )
+
+    if len(targets) != len(set(targets)):
+        raise ValueError("External CUDA measurements contain duplicate targets")
+    if set(targets) != EXPECTED_EXTERNAL_CUDA_TARGETS:
+        raise ValueError(
+            "External CUDA measurements must contain exactly the simple and difficult "
+            "OLS torch-cuda targets"
+        )
+    return measurements
+
+
+def _synchronize_external_results(document: dict) -> int:
+    measurements = _validate_external_results(_read_json(EXTERNAL_RESULTS_PATH))
+    changed = 0
+    for measurement in measurements:
         table_name = measurement["table"]
         row_name = measurement["row"]
         backend = measurement["backend"]
@@ -766,16 +1017,40 @@ def _synchronize_external_results(document: dict) -> int:
     return changed
 
 
+def _reject_source_collision(
+    table: str, dataset: str, backend: str, candidates: list[dict[str, str]]
+) -> None:
+    """Fail loudly when two result files claim the same cell.
+
+    The harness writes one file per backend label, so this can only happen if a
+    file was renamed without relabelling the `backend` column inside it. The
+    renderer would otherwise report the cell as "incomplete" from duplicate
+    trial ids, which does not say why.
+    """
+    per_backend_sources = {
+        row.get("_source_file", "")
+        for row in candidates
+        if "__" in row.get("_source_file", "")
+    }
+    if len(per_backend_sources) > 1:
+        listed = ", ".join(sorted(per_backend_sources))
+        raise ValueError(
+            f"{table}/{dataset}/{backend} draws on more than one per-backend "
+            f"result file: {listed}. Two files carry the same `backend` label; "
+            "relabel or remove one."
+        )
+
+
 def _synchronize_canonical_tables(
     document: dict | None = None, *, write: bool = True
 ) -> int:
-    """Update timing cells from current raw result CSVs, preserving diagnostics.
+    """Update runtime cells from current raw CSV files.
 
-    Gap/component diagnostics are calculated in their dedicated diagnostic pipeline
-    and intentionally live in the canonical table store. Runtime columns are
-    replaced whenever a complete median is present in a new benchmark output.
+    Keep the separately computed gap and component-share values. Replace a runtime only
+    when the new output records all expected trials.
     """
     raw = _rows_from_csvs()
+    _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
     changed = 0
@@ -795,6 +1070,7 @@ def _synchronize_canonical_tables(
                 ]
                 if backend == "torch-cuda":
                     continue
+                _reject_source_collision(name, dataset, backend, candidates)
                 rendered = _render_trial_result(candidates)
                 if row[column] != rendered:
                     row[column] = rendered
@@ -804,11 +1080,11 @@ def _synchronize_canonical_tables(
         with memory_path.open(newline="", encoding="utf-8") as handle:
             measurements = list(csv.DictReader(handle))
         table = document["tables"]["memory"]
-        for row in table["rows"]:
+        for index, row in enumerate(table["rows"]):
             if row[0].startswith("#"):
                 continue
             dgp = row[0].split()[0]
-            size = "100k" if table["rows"].index(row) < 4 else "1m"
+            size = "100k" if index < 4 else "1m"
             for column, backend in ((2, "rust"), (3, "rust-cg")):
                 candidates = [
                     item
@@ -827,7 +1103,7 @@ def _synchronize_canonical_tables(
                     None,
                 )
                 if match and match["rss_mb"]:
-                    rendered = f"{int(float(match['rss_mb'])):,} MB"
+                    rendered = f"{int(float(match['rss_mb'])):,} MiB"
                 elif candidates:
                     rendered = "failed"
                 else:
@@ -838,6 +1114,7 @@ def _synchronize_canonical_tables(
     changed += _synchronize_hardness(document)
     changed += _synchronize_agreement(document)
     changed += _synchronize_setup_cost(document)
+    changed += _synchronize_zigzag(document)
     changed += _synchronize_external_results(document)
     if write:
         _write_json(TABLES_PATH, document)
@@ -855,26 +1132,8 @@ def verify(_: argparse.Namespace) -> None:
         raise SystemExit(f"Missing claim registry entries: {', '.join(missing)}")
 
     provenance_path = ROOT / "results" / "runs" / "latest" / "provenance.json"
-    if not getattr(_, "strict", False):
-        with tempfile.TemporaryDirectory() as temp:
-            temp_root = Path(temp)
-            render(argparse.Namespace(output_dir=temp_root / "tables"))
-            for name in tables:
-                expected = (temp_root / "tables" / f"{name}.typ").read_text(encoding="utf-8")
-                actual_path = GENERATED_DIR / f"{name}.typ"
-                if not actual_path.exists() or actual_path.read_text(encoding="utf-8") != expected:
-                    raise SystemExit(f"Stale generated fragment: {actual_path}")
-            expected_values = (temp_root / "paper_values.typ").read_text(encoding="utf-8")
-            actual_values = GENERATED_DIR.parent / "paper_values.typ"
-            if not actual_values.exists() or actual_values.read_text(encoding="utf-8") != expected_values:
-                raise SystemExit(f"Stale generated values: {actual_values}")
-        manuscript = (ROOT / "graph_preconditioner_hdfe.typ").read_text(encoding="utf-8")
-        required_includes = [f'generated/tables/{name}.typ' for name in tables]
-        absent = [item for item in required_includes if item not in manuscript]
-        if absent:
-            raise SystemExit("Manuscript is not wired to generated tables: " + ", ".join(absent))
-        print("[verify] generated fragments and manuscript wiring are current; raw-result verification requires provenance")
-        return
+    if not provenance_path.exists():
+        raise SystemExit(f"Missing benchmark provenance: {provenance_path}")
     provenance = _read_json(provenance_path)
     runtime = provenance.get("runtime", {})
     required_runtime = (
@@ -935,8 +1194,8 @@ def verify(_: argparse.Namespace) -> None:
         raise SystemExit(f"Cannot reconstruct paper tables from raw results: {exc}") from exc
     if expected_document != document:
         raise SystemExit(
-            "Canonical paper tables do not match the current raw results; "
-            "run pixi run render-paper-results after collecting a clean run"
+            "Paper table values do not match the raw results. Run "
+            "`pixi run render-paper-results` after collecting the benchmark results."
         )
 
     with tempfile.TemporaryDirectory() as temp:
@@ -946,16 +1205,16 @@ def verify(_: argparse.Namespace) -> None:
             expected = (temp_root / "tables" / f"{name}.typ").read_text(encoding="utf-8")
             actual_path = GENERATED_DIR / f"{name}.typ"
             if not actual_path.exists() or actual_path.read_text(encoding="utf-8") != expected:
-                raise SystemExit(f"Stale generated fragment: {actual_path}")
+                raise SystemExit(f"Generated table is stale: {actual_path}")
         expected_values = (temp_root / "paper_values.typ").read_text(encoding="utf-8")
         actual_values = GENERATED_DIR.parent / "paper_values.typ"
         if not actual_values.exists() or actual_values.read_text(encoding="utf-8") != expected_values:
-            raise SystemExit(f"Stale generated prose values: {actual_values}")
+            raise SystemExit(f"Generated paper values are stale: {actual_values}")
     manuscript = (ROOT / "graph_preconditioner_hdfe.typ").read_text(encoding="utf-8")
     required_includes = [f'generated/tables/{name}.typ' for name in tables]
     absent = [item for item in required_includes if item not in manuscript]
     if absent:
-        raise SystemExit("Manuscript is not wired to generated tables: " + ", ".join(absent))
+        raise SystemExit("Manuscript is missing generated table includes: " + ", ".join(absent))
     incomplete = []
     for table_name, table in tables.items():
         for row_number, row in enumerate(table["rows"], start=1):
@@ -963,8 +1222,8 @@ def verify(_: argparse.Namespace) -> None:
                 if cell in {"#miss", "incomplete"}:
                     incomplete.append(f"{table_name}[{row_number},{column}]={cell}")
     if incomplete:
-        raise SystemExit("Incomplete locally reproducible paper results: " + ", ".join(incomplete))
-    print("[verify] raw results, hashes, code, generated fragments, and manuscript wiring are current")
+        raise SystemExit("Required paper table cells are missing or incomplete: " + ", ".join(incomplete))
+    print("[verify] raw results, hashes, code, generated tables, and manuscript includes are current")
 
 
 def main() -> None:
@@ -973,7 +1232,7 @@ def main() -> None:
     sub.add_parser("check-external-runtimes").set_defaults(func=check_external_runtimes)
     sub.add_parser("setup-julia-env").set_defaults(func=setup_julia_env)
     fetch = sub.add_parser("fetch-correia")
-    fetch.add_argument("--datasets", nargs="*", help="Optional metadata slugs to fetch")
+    fetch.add_argument("--datasets", nargs="*", help="Dataset metadata IDs to fetch (default: all)")
     fetch.add_argument("--offline", action="store_true", help="Validate local CSVs without network access")
     fetch.set_defaults(func=fetch_correia)
     collect_parser = sub.add_parser("collect")
@@ -983,9 +1242,7 @@ def main() -> None:
     render_parser = sub.add_parser("render")
     render_parser.add_argument("--output-dir", type=Path)
     render_parser.set_defaults(func=render)
-    verify_parser = sub.add_parser("verify")
-    verify_parser.add_argument("--strict", action="store_true")
-    verify_parser.set_defaults(func=verify)
+    sub.add_parser("verify").set_defaults(func=verify)
     args = parser.parse_args()
     args.func(args)
 
