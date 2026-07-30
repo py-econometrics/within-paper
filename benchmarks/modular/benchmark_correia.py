@@ -7,6 +7,7 @@ import pandas as pd
 
 from benchmarks.modular.feols_benchmarkers import (
     PyFeolsBenchmarkerFullApi,
+    _fmt_time,
 )
 from benchmarks.modular.subprocess_backend import (
     FixestFeolsBenchmarker,
@@ -55,12 +56,6 @@ LANGUAGE = {
     "fixest": "R",
     "FixedEffectModels": "Julia",
 }
-
-
-def fmt_time(value: float) -> str:
-    if value < 1:
-        return f"{value * 1000:.1f}ms"
-    return f"{value:.3f}s"
 
 
 def _n_obs_from_metadata(dataset: str) -> int:
@@ -181,7 +176,7 @@ def print_runtime_summary(results_df: pd.DataFrame) -> None:
     for _, row in summary_df.iterrows():
         ok = bool(row["success"])
         elapsed = row["time"]
-        time_text = fmt_time(elapsed) if ok and pd.notna(elapsed) else "—"
+        time_text = _fmt_time(elapsed) if ok and pd.notna(elapsed) else "—"
         status = "ok" if ok else str(row["error"])[:40]
         print(
             "  "

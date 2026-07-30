@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import ctypes
 import gc
-import json
 import statistics
-import subprocess
 import sys
-import tempfile
 import time
 import warnings
-from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
