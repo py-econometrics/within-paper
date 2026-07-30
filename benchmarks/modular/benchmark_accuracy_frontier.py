@@ -21,6 +21,7 @@ import time
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -118,7 +119,7 @@ def default_settings() -> list[ToleranceSetting]:
     return settings
 
 
-def _fit_pyfixest(frame: pd.DataFrame, setting: ToleranceSetting):
+def _fit_pyfixest(frame: pd.DataFrame, setting: ToleranceSetting) -> tuple[Any, float]:
     import pyfixest as pf
 
     backend = setting.backend
@@ -150,7 +151,7 @@ def _fit_pyfixest(frame: pd.DataFrame, setting: ToleranceSetting):
     return fit, elapsed
 
 
-def _external_eta_from_fit(frame: pd.DataFrame, fit) -> float:
+def _external_eta_from_fit(frame: pd.DataFrame, fit: Any) -> float:
     """Recompute η from the fit's own demeaned columns when available."""
     categories, rhs = _categories_and_rhs(frame)
 

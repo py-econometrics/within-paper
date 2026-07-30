@@ -9,6 +9,7 @@ import warnings
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable, TypeVar
 
 import pandas as pd
 
@@ -156,7 +157,7 @@ def _result_from_dataset(
     )
 
 
-def _preconditioner_build_s(fit) -> float | None:
+def _preconditioner_build_s(fit: Any) -> float | None:
     """Read preconditioner setup time when PyFixest exposes it."""
     pc = getattr(fit, "preconditioner", None)
     if pc is None:
@@ -170,7 +171,7 @@ def _preconditioner_build_s(fit) -> float | None:
         return None
 
 
-def _beta_x1(fit) -> float | None:
+def _beta_x1(fit: Any) -> float | None:
     try:
         coef = fit.coef()
         names = [str(name) for name in list(getattr(fit, "_coefnames", []) or [])]
@@ -188,7 +189,10 @@ def _beta_x1(fit) -> float | None:
     return None
 
 
-def _safe_cast(val, type_fn):
+_T = TypeVar("_T")
+
+
+def _safe_cast(val: Any, type_fn: Callable[[Any], _T]) -> _T | None:
     if val is None:
         return None
     try:
@@ -197,7 +201,7 @@ def _safe_cast(val, type_fn):
         return None
 
 
-def _as_bool(value, *, default: bool) -> bool:
+def _as_bool(value: Any, *, default: bool) -> bool:
     if value is None:
         return default
     if isinstance(value, str):
@@ -219,7 +223,7 @@ def _warn_once(message: str) -> None:
         print(f"[warn] {message}", file=sys.stderr, flush=True)
 
 
-def _external_eta(fit, frame, depvar: str, covariates: list[str]) -> float | None:
+def _external_eta(fit: Any, frame: "pd.DataFrame", depvar: str, covariates: list[str]) -> float | None:
     """Recompute the external normal-equation residual from a fitted model.
 
     PROTOCOL.md section 5 requires every headline timing to carry an accuracy
@@ -297,7 +301,7 @@ def _external_eta(fit, frame, depvar: str, covariates: list[str]) -> float | Non
         return None
 
 
-def _retained_rows(fit) -> int | None:
+def _retained_rows(fit: Any) -> int | None:
     """Rows the backend kept after singleton dropping.
 
     Recorded per trial because a comparison across backends is only a
@@ -310,7 +314,7 @@ def _retained_rows(fit) -> int | None:
         return None
 
 
-def _fit_converged(fit) -> bool:
+def _fit_converged(fit: Any) -> bool:
     """Read the convergence flag exposed by current PyFixest models."""
     for name in ("convergence", "_convergence", "converged"):
         value = getattr(fit, name, None)

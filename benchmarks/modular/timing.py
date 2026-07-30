@@ -16,10 +16,10 @@ from __future__ import annotations
 import gc
 import random
 import time
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from statistics import median
-from typing import Sequence
 
 # (upper runtime bound in seconds, timed repetitions). PROTOCOL.md rules
 # R1/R2/R3. The lower end of each published band is used: the bands are
@@ -107,7 +107,7 @@ class Elapsed:
 
 
 @contextmanager
-def timed(*, collect: bool = True):
+def timed(*, collect: bool = True) -> Generator[Elapsed, None, None]:
     """Time a block on the perf counter, after collecting garbage.
 
     The collection matters more than it looks. Without it a fit inherits

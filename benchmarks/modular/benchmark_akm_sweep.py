@@ -9,7 +9,7 @@ from benchmarks.modular.benchmarker_sets import (
     require_multiple_absorbed_factors,
 )
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
-from benchmarks.modular.interfaces import FeolsSpec
+from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ SPECS = [
 ]
 
 
-def generate_akm_datasets():
+def generate_akm_datasets() -> list[BenchmarkDataset]:
     datasets = []
     for dgp in DGPS:
         print(f"[data] generating {dgp.dgp_name} n={DEFAULT_N_OBS:,}")

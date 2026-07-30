@@ -47,7 +47,7 @@ REFERENCE_TOL = 1e-14
 REFERENCE_MAXITER = 20_000
 
 
-def _preconditioner_configs():
+def _preconditioner_configs() -> dict[str, "PreconditionerConfig"]:
     from within import PreconditionerConfig
 
     return {

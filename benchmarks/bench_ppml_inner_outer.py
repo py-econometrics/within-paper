@@ -42,7 +42,7 @@ import within
 from within import LsmrOptions, Solver
 
 
-def _ppml_sample(design: str, n_obs: int):
+def _ppml_sample(design: str, n_obs: int) -> tuple["Sample", "np.ndarray", "np.ndarray"]:
     """One fixed PPML sample: negative-binomial outcome and one covariate."""
     sample = load_sample(
         SampleSpec(design=design, n_obs=n_obs), rhs_columns=("negbin_y", "x1")

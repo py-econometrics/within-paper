@@ -110,7 +110,7 @@ def _factor_codes(frame, columns: Iterable[str]) -> np.ndarray:
     return np.asfortranarray(np.column_stack(codes).astype(np.uint32))
 
 
-def _akm_frame(spec: SampleSpec):
+def _akm_frame(spec: SampleSpec) -> "pd.DataFrame":
     """Read one AKM sweep design from its generated Parquet cache."""
     import pandas as pd
 
@@ -182,7 +182,7 @@ def clear_sample_cache() -> None:
 PRECONDITIONERS = ("off", "diagonal", "additive")
 
 
-def preconditioner_config(name: str):
+def preconditioner_config(name: str) -> "PreconditionerConfig":
     """Map a preconditioner name to the `within` enum member."""
     from within import PreconditionerConfig
 
