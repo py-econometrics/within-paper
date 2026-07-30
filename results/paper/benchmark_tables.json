@@ -9,12 +9,12 @@
   "prose": {
     "result_cuda_difficult": "8.73s",
     "result_cuda_simple": "4.73s",
-    "setup_difficult_setup_s": 0.712432875065133,
-    "setup_difficult_share": 0.3316846471525506,
-    "setup_difficult_solve_s": 1.4354894999414682,
-    "setup_simple_setup_s": 7.314824625034817,
-    "setup_simple_share": 0.7934695552650243,
-    "setup_simple_solve_s": 1.9374000419629738,
+    "setup_difficult_setup_s": 0.8758755000308156,
+    "setup_difficult_share": 0.3319326827636981,
+    "setup_difficult_solve_s": 1.7628387499134988,
+    "setup_simple_setup_s": 8.068801125045866,
+    "setup_simple_share": 0.7947389125940293,
+    "setup_simple_solve_s": 2.1195310830371454,
     "zigzag_fem_s": 0.7110340595245361,
     "zigzag_within_s": 0.01118156296433881
   },
@@ -165,19 +165,19 @@
           "",
           "`within`",
           "0.99871660",
-          "$4.4 times 10^(-16)$"
+          "$1.1 times 10^(-15)$"
         ],
         [
           "",
           "`fixest`",
           "0.99871660",
-          "$1.2 times 10^(-14)$"
+          "$1.1 times 10^(-14)$"
         ],
         [
           "",
           "`FEM.jl`",
           "0.99871660",
-          "$9.2 times 10^(-14)$"
+          "$9.3 times 10^(-14)$"
         ],
         [
           "#agreement-difficult",
@@ -709,14 +709,14 @@
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "308 MiB",
-          "354 MiB"
+          "306 MiB",
+          "359 MiB"
         ],
         [
           "difficult (near-nested)",
           "$1.30 times 10^(-3)$ (1.00)",
-          "302 MiB",
-          "352 MiB"
+          "318 MiB",
+          "354 MiB"
         ],
         [
           "#memory-1m",
@@ -727,14 +727,14 @@
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "690 MiB",
-          "1,004 MiB"
+          "679 MiB",
+          "1,000 MiB"
         ],
         [
           "difficult (near-nested)",
           "$1.67 times 10^(-5)$ (1.00)",
-          "678 MiB",
-          "823 MiB"
+          "702 MiB",
+          "884 MiB"
         ]
       ]
     },
@@ -753,17 +753,17 @@
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "2.29s",
-          "2.48s",
-          "2.10s",
+          "2.98s",
+          "2.82s",
+          "2.53s",
           "12.0s"
         ],
         [
           "difficult (near-nested)",
           "$1.67 times 10^(-7)$ (1.00)",
-          "347.9s",
-          "70.6s",
-          "26.6s",
+          "416.2s",
+          "73.0s",
+          "31.7s",
           "4.37s"
         ]
       ]
