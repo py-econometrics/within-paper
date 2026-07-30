@@ -85,18 +85,11 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(_render_trial_result(partial[:2]), "incomplete")
 
     def test_external_cuda_measurements_are_explicit(self) -> None:
-        document = {
-            "tables": {
-                "ols": {
-                    "header": ["Design", "Gap", "`torch-cuda`"],
-                    "rows": [["simple (dense graph)", "", "old"], ["difficult (sparse graph)", "", "old"]],
-                }
-            }
-        }
+        document = {"tables": {}, "prose": {"result_cuda_simple": "old"}}
         changed = _synchronize_external_results(document)
         self.assertEqual(changed, 2)
-        self.assertEqual(document["tables"]["ols"]["rows"][0][2], "4.73s")
-        self.assertEqual(document["tables"]["ols"]["rows"][1][2], "8.73s")
+        self.assertEqual(document["prose"]["result_cuda_simple"], "4.73s")
+        self.assertEqual(document["prose"]["result_cuda_difficult"], "8.73s")
 
 
 if __name__ == "__main__":
