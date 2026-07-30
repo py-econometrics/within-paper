@@ -30,6 +30,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 
+from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.accuracy import (
     GATE_A_DELTA,
     GATE_A_ETA,
@@ -229,7 +230,7 @@ def cap_reporting_check(dgp: str, n_obs: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-obs", type=int, default=100_000)
-    parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
+    add_dgps_arg(parser)
     parser.add_argument(
         "--out",
         type=Path,

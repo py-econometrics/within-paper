@@ -28,6 +28,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     SampleSpec,
@@ -213,7 +214,7 @@ def _parse_regime(text: str) -> tuple[float, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-obs", type=int, default=100_000)
-    parser.add_argument("--dgps", nargs="+", default=["simple", "difficult"])
+    add_dgps_arg(parser)
     parser.add_argument(
         "--preconditioners",
         nargs="+",
