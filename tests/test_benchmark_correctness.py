@@ -6,6 +6,7 @@ import hashlib
 import json
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -59,10 +60,12 @@ from benchmarks.modular.experiment import (
 )
 from benchmarks.modular.interfaces import FeolsSpec
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.modular.results import write_rows
 from benchmarks.modular.timing import (
     randomized_order,
     repetitions_for_runtime,
     summarize_times,
+    timed,
 )
 from scripts.paper_results import (
     _backend_name,
@@ -869,6 +872,51 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             pass
 
         self.assertIsNone(_external_eta(NotAModel(), pd.DataFrame({"y": [1.0]}), "y", []))
+
+
+class SharedPrimitiveTests(unittest.TestCase):
+    """The timing and result-IO primitives every driver now goes through."""
+
+    def test_timed_block_reports_its_own_duration(self) -> None:
+        with timed(collect=False) as elapsed:
+            self.assertIsNone(elapsed.seconds)
+            time.sleep(0.01)
+        self.assertIsNotNone(elapsed.seconds)
+        self.assertGreaterEqual(elapsed.seconds, 0.01)
+
+    def test_timed_block_records_time_even_when_the_fit_raises(self) -> None:
+        # A backend that throws still consumed wall time, and a driver that
+        # wants to record the failure needs the duration rather than nothing.
+        with self.assertRaises(RuntimeError):
+            with timed(collect=False) as elapsed:
+                time.sleep(0.01)
+                raise RuntimeError("backend failed")
+        self.assertIsNotNone(elapsed.seconds)
+        self.assertGreaterEqual(elapsed.seconds, 0.01)
+
+    def test_writer_unions_keys_so_optional_fields_stay_aligned(self) -> None:
+        # An optional diagnostic recorded for only some rows must widen the
+        # table, not truncate it to the first row's columns.
+        rows = [{"a": 1}, {"a": 2, "b": 3}]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "nested" / "rows.csv"
+            write_rows(out, rows)
+            written = list(csv.DictReader(out.open()))
+        self.assertEqual([row["a"] for row in written], ["1", "2"])
+        self.assertEqual([row["b"] for row in written], ["", "3"])
+
+    def test_writer_honours_a_pinned_column_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "rows.csv"
+            write_rows(out, [{"b": 1, "a": 2}], fieldnames=["a", "b"])
+            self.assertEqual(out.read_text().splitlines()[0], "a,b")
+
+    def test_writer_refuses_an_empty_result_set(self) -> None:
+        # A header-only file reads downstream as a completed run that measured
+        # nothing, which is exactly the failure it should surface instead.
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                write_rows(Path(tmp) / "rows.csv", [])
 
 
 if __name__ == "__main__":

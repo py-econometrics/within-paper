@@ -15,7 +15,6 @@ Run with:
 from __future__ import annotations
 
 import argparse
-import csv
 import gc
 import hashlib
 import time
@@ -28,6 +27,7 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+from benchmarks.modular.results import write_rows
 from benchmarks.modular.accuracy import accuracy_record
 from benchmarks.modular.dgp_functions import paper_base_dgp
 from benchmarks.modular.feols_benchmarkers import (
@@ -279,18 +279,8 @@ def _run_design(
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    # Union of keys; external skip rows may omit some opt_* fields.
-    fieldnames: list[str] = []
-    seen: set[str] = set()
-    for row in rows:
-        for key in row:
-            if key not in seen:
-                seen.add(key)
-                fieldnames.append(key)
-    with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
+    # External skip rows omit some opt_* fields; the shared writer unions keys.
+    write_rows(path, rows)
 
 
 def main() -> None:

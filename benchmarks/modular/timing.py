@@ -13,7 +13,10 @@ iter_num values; see the open items in PROTOCOL.md.
 
 from __future__ import annotations
 
+import gc
 import random
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from statistics import median
 from typing import Sequence
@@ -94,6 +97,33 @@ def summarize_times(
         n_attempted=attempted,
         n_converged=len(converged),
     )
+
+
+@dataclass
+class Elapsed:
+    """Wall time of a timed block, filled in when the block exits."""
+
+    seconds: float | None = None
+
+
+@contextmanager
+def timed(*, collect: bool = True):
+    """Time a block on the perf counter, after collecting garbage.
+
+    The collection matters more than it looks. Without it a fit inherits
+    whatever the previous fit left for the collector to free, so the first
+    backend in a sweep is charged for the last one's garbage. Every driver
+    that got this right did it by hand; the ones that forgot produced timings
+    that moved when the backend order changed.
+    """
+    if collect:
+        gc.collect()
+    result = Elapsed()
+    start = time.perf_counter()
+    try:
+        yield result
+    finally:
+        result.seconds = time.perf_counter() - start
 
 
 def randomized_order(items: Sequence, seed: int) -> list:

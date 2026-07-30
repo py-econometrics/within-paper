@@ -18,13 +18,13 @@ schema the drivers write through rather than restated in prose beside them.
 
 from __future__ import annotations
 
-import csv
 import gc
 import hashlib
-import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+from benchmarks.modular.results import write_rows
 
 import numpy as np
 
@@ -33,18 +33,6 @@ ROOT = Path(__file__).resolve().parents[2]
 # Absorbed in this order everywhere. MAP cycles through the factors as given,
 # so a driver that varies the order is not measuring the same specification.
 FE_COLS = ("indiv_id", "firm_id", "year")
-
-
-def add_repo_paths() -> None:
-    """Make `within` and the modular benchmark package importable."""
-    within_repo = os.environ.get("WITHIN_REPO")
-    if within_repo:
-        source = Path(within_repo).expanduser().resolve() / "python"
-        if not source.exists():
-            raise FileNotFoundError(
-                f"WITHIN_REPO has no Python package directory: {source}"
-            )
-    modular = str(ROOT / "benchmarks" / "modular")
 
 
 # ---------------------------------------------------------------------------
@@ -340,20 +328,3 @@ def write_records(path: Path, records: list[RunRecord]) -> None:
         detail = "\n".join(f"  {key}: {'; '.join(v)}" for key, v in problems.items())
         raise ValueError(f"records violate PROTOCOL.md:\n{detail}")
     write_rows(path, [record.to_row() for record in records])
-
-
-def write_rows(path: Path, rows: list[dict]) -> None:
-    """Write dict rows to CSV, unioning keys so optional fields stay aligned."""
-    if not rows:
-        raise ValueError("no rows to write")
-    fieldnames: list[str] = []
-    for row in rows:
-        for key in row:
-            if key not in fieldnames:
-                fieldnames.append(key)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({key: row.get(key) for key in fieldnames})

@@ -15,7 +15,6 @@ The script has two layers:
 Runs on 100k simple and difficult DGPs.
 """
 
-import csv
 import json
 import os
 import shutil
@@ -25,6 +24,7 @@ import warnings
 from collections.abc import Iterable
 from pathlib import Path
 
+from benchmarks.modular.results import write_rows
 import numpy as np
 import pandas as pd
 import pyfixest as pf
@@ -240,22 +240,19 @@ for dgp_type in ["simple", "difficult"]:
         )
     print()
 
-OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-with OUTPUT_PATH.open("w", newline="") as handle:
-    writer = csv.DictWriter(
-        handle,
-        fieldnames=[
-            "dgp",
-            "model_k",
-            "backend",
-            "x1",
-            "avg_abs_diff",
-            "max_abs_diff",
-            "success",
-            "error",
-        ],
-        lineterminator="\n",
-    )
-    writer.writeheader()
-    writer.writerows(OUTPUT_ROWS)
+# Column order is pinned: this file is read positionally by the agreement table.
+write_rows(
+    OUTPUT_PATH,
+    OUTPUT_ROWS,
+    fieldnames=[
+        "dgp",
+        "model_k",
+        "backend",
+        "x1",
+        "avg_abs_diff",
+        "max_abs_diff",
+        "success",
+        "error",
+    ],
+)
 print(f"Wrote {OUTPUT_PATH}")

@@ -33,7 +33,6 @@ from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     RunRecord,
     SampleSpec,
-    add_repo_paths,
     clear_sample_cache,
     load_sample,
     matched_solver_specs,

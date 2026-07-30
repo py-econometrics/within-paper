@@ -31,7 +31,6 @@ ROOT = Path(__file__).resolve().parents[1]
 from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     SampleSpec,
-    add_repo_paths,
     load_sample,
     preconditioner_config,
     write_rows,
