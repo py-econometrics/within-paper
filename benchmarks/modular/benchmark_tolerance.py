@@ -41,11 +41,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
+from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
-FE_COLUMNS = ["indiv_id", "firm_id", "year"]
-MODEL_COLUMNS = [*FE_COLUMNS, "x1", "y"]
+MODEL_COLUMNS = [*FE_COLS, "x1", "y"]
 DEFAULT_DESIGNS = (1, 3, 5)
 DEFAULT_N_OBS = 1_000_000
 DEFAULT_REPETITIONS = 3
@@ -218,7 +218,7 @@ def _drop_recursive_singletons(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     n_initial = len(kept)
     while True:
         ids = np.asfortranarray(
-            kept.loc[:, FE_COLUMNS].to_numpy(dtype=np.uint32, copy=True)
+            kept.loc[:, FE_COLS].to_numpy(dtype=np.uint32, copy=True)
         )
         singleton = detect_singletons(ids)
         if not singleton.any():
@@ -304,7 +304,7 @@ def _reference_solution(frame: pd.DataFrame) -> ReferenceSolution:
         raise RuntimeError("reference fit did not retain the pre-pruned sample")
 
     categories = np.asfortranarray(
-        frame.loc[:, FE_COLUMNS].to_numpy(dtype=np.uint32, copy=True)
+        frame.loc[:, FE_COLS].to_numpy(dtype=np.uint32, copy=True)
     )
     y = frame["y"].to_numpy(dtype=np.float64, copy=False)
     x = frame["x1"].to_numpy(dtype=np.float64, copy=False)

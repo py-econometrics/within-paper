@@ -28,6 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.cli import add_dgps_arg
+from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.accuracy import accuracy_record
 from benchmarks.modular.dgp_functions import paper_base_dgp
@@ -37,7 +38,6 @@ from benchmarks.modular.settings import (
     MAP_SETTINGS,
 )
 
-FE_COLS = ["indiv_id", "firm_id", "year"]
 FML = "y ~ x1 | indiv_id + firm_id + year"
 
 

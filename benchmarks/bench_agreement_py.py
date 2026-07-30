@@ -25,6 +25,8 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from benchmarks.modular.results import write_rows
+from benchmarks.modular.experiment import FE_COLS
+from benchmarks.modular.settings import demeaner_for
 import numpy as np
 import pandas as pd
 import pyfixest as pf
@@ -34,7 +36,6 @@ JULIA_ENV = ROOT / "benchmarks" / "julia-env"
 FML = "y ~ x1 | indiv_id + firm_id + year"
 DEPVAR = "y"
 COVARIATES = ["x1"]
-FE_COLS = ["indiv_id", "firm_id", "year"]
 OUTPUT_PATH = ROOT / os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.csv")
 OUTPUT_ROWS: list[dict[str, object]] = []
 

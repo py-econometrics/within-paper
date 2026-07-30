@@ -31,6 +31,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.cli import add_dgps_arg
+from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.accuracy import (
     GATE_A_DELTA,
     GATE_A_ETA,
@@ -39,7 +40,6 @@ from benchmarks.modular.accuracy import (
 )
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 
-FE_COLS = ["indiv_id", "firm_id", "year"]
 RHS_COLS = ["y", "x1"]
 TOLERANCE_GRID = (1e-8, 1e-10, 1e-12, 1e-14)
 REFERENCE_TOL = 1e-14
