@@ -39,10 +39,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # one per consumer. The module is standard-library only, which is what lets
 # this script keep running before the Pixi environment exists; a test pins
 # that property.
-sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
-sys.path.insert(0, str(ROOT / "scripts"))
-from timing import summarize_times  # noqa: E402
-from figure_style import METHOD_TABLE_HEADER  # noqa: E402
+from benchmarks.modular.timing import summarize_times
+from scripts.figure_style import METHOD_TABLE_HEADER
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"

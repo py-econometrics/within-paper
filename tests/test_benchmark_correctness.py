@@ -16,36 +16,31 @@ import scipy.sparse as sp
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULAR = ROOT / "benchmarks" / "modular"
-BENCHMARKS = ROOT / "benchmarks"
-SCRIPTS = ROOT / "scripts"
-for path in (MODULAR, BENCHMARKS, SCRIPTS):
-    sys.path.insert(0, str(path))
 
-from bench_within_setup_cost import _setup_share  # noqa: E402
-from benchmark_correia import summarize_results  # noqa: E402
-from benchmark_fepois import (  # noqa: E402
+from benchmarks.bench_within_setup_cost import _setup_share
+from benchmarks.modular.benchmark_correia import summarize_results
+from benchmarks.modular.benchmark_fepois import (
     SIZES as FEPOIS_SIZES,
     SPECS as FEPOIS_SPECS,
 )
-from benchmark_main import SIZES as OLS_SIZES  # noqa: E402
-from akm_dgp import AKMConfig, simulate_akm_panel  # noqa: E402
-from dgp_functions import paper_base_dgp  # noqa: E402
-from dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names  # noqa: E402
-from accuracy import (  # noqa: E402
+from benchmarks.modular.benchmark_main import SIZES as OLS_SIZES
+from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
+from benchmarks.modular.dgp_functions import paper_base_dgp
+from benchmarks.modular.dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names
+from benchmarks.modular.accuracy import (
     GATE_A_ETA,
     accuracy_record,
     external_normal_residuals,
     pair_edge_stats,
     projection_errors,
 )
-from benchmarker_sets import (  # noqa: E402
+from benchmarks.modular.benchmarker_sets import (
     MATCHED_ACCURACY,
     PACKAGE_DEFAULTS,
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
 )
-from feols_benchmarkers import (  # noqa: E402
+from benchmarks.modular.feols_benchmarkers import (
     DEFAULT_WITHIN_PRECONDITIONER,
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
@@ -54,7 +49,7 @@ from feols_benchmarkers import (  # noqa: E402
     _demeaner_from_backend,
     _external_eta,
 )
-from experiment import (  # noqa: E402
+from benchmarks.modular.experiment import (
     FE_COLS,
     RunRecord,
     SampleSpec,
@@ -62,14 +57,14 @@ from experiment import (  # noqa: E402
     load_sample,
     matched_solver_specs,
 )
-from interfaces import FeolsSpec  # noqa: E402
-from map_diagnostics import map_demean_with_sweeps  # noqa: E402
-from timing import (  # noqa: E402
+from benchmarks.modular.interfaces import FeolsSpec
+from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.modular.timing import (
     randomized_order,
     repetitions_for_runtime,
     summarize_times,
 )
-from paper_results import (  # noqa: E402
+from scripts.paper_results import (
     _backend_name,
     _iteration_rows,
     _read_json,
@@ -82,8 +77,8 @@ from paper_results import (  # noqa: E402
     _validate_external_results,
     _validate_ppml_results,
 )
-from analyze_gap_runtime import _sized_key  # noqa: E402
-from benchmarks.modular.compute_hardness import _component_rho  # noqa: E402
+from benchmarks.modular.analyze_gap_runtime import _sized_key
+from benchmarks.modular.compute_hardness import _component_rho
 
 
 def _frame_hash(frame: pd.DataFrame) -> str:
@@ -135,14 +130,14 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                 dataset = dgp.generate(n=2_300, n_iters=1, burn_in=0)[0]
 
                 with patch(
-                    "dgps.paper_base_dgp", side_effect=AssertionError("cache miss")
+                    "benchmarks.modular.dgps.paper_base_dgp", side_effect=AssertionError("cache miss")
                 ):
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
 
                 frame = pd.read_parquet(dataset.data_path)
                 frame["unused"] = 0
                 frame.to_parquet(dataset.data_path, index=False)
-                with patch("dgps.paper_base_dgp", wraps=paper_base_dgp) as generator:
+                with patch("benchmarks.modular.dgps.paper_base_dgp", wraps=paper_base_dgp) as generator:
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
             generator.assert_called_once()
 
@@ -639,9 +634,9 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
     def test_absorbed_factor_order_is_the_same_everywhere(self) -> None:
         # MAP cycles through factors in the given order, so a table that
         # absorbs in a different order is not comparing the same specification.
-        from benchmark_akm_sweep import SPECS as AKM_SPECS
-        from benchmark_fepois import SPECS as PPML_SPECS
-        from benchmark_main import SPECS as MAIN_SPECS
+        from benchmarks.modular.benchmark_akm_sweep import SPECS as AKM_SPECS
+        from benchmarks.modular.benchmark_fepois import SPECS as PPML_SPECS
+        from benchmarks.modular.benchmark_main import SPECS as MAIN_SPECS
 
         expected = ["indiv_id", "firm_id", "year"]
         for label, specs in (
@@ -706,7 +701,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         1.7e-7 at 10M, so a join on the family name alone pairs a 1M runtime
         with a 10M gap.
         """
-        from analyze_gap_runtime import _design_key_from_hardness, _sized_key
+        from benchmarks.modular.analyze_gap_runtime import _design_key_from_hardness, _sized_key
 
         self.assertEqual(_design_key_from_hardness("difficult_10000000_k1_iter_1"), "difficult")
         self.assertNotEqual(
@@ -724,7 +719,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         """
         import pandas as pd
 
-        from analyze_gap_runtime import _counter_examples
+        from benchmarks.modular.analyze_gap_runtime import _counter_examples
 
         def frame(times):
             return pd.DataFrame(

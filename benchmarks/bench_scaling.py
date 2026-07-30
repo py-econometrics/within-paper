@@ -25,16 +25,14 @@ from __future__ import annotations
 
 import argparse
 import gc
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
 
-from experiment import (  # noqa: E402
+from benchmarks.modular.experiment import (
     RunRecord,
     SampleSpec,
     add_repo_paths,
@@ -44,12 +42,11 @@ from experiment import (  # noqa: E402
     write_records,
 )
 
-add_repo_paths()
 
-import within  # noqa: E402
-from accuracy import accuracy_record  # noqa: E402
-from feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER  # noqa: E402
-from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch  # noqa: E402
+import within
+from benchmarks.modular.accuracy import accuracy_record
+from benchmarks.modular.feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER
+from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
 MAX_FACTORS = 5
 

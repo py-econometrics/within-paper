@@ -9,12 +9,12 @@ import matplotlib
 
 matplotlib.use("Agg")
 matplotlib.rcParams["svg.hashsalt"] = "within-paper-tolerance"
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from matplotlib.lines import Line2D  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.lines import Line2D
 
-from figure_style import METHOD_LEGEND_LABEL, METHOD_LINESTYLE, METHOD_STYLE  # noqa: E402
+from scripts.figure_style import METHOD_LEGEND_LABEL, METHOD_LINESTYLE, METHOD_STYLE
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"

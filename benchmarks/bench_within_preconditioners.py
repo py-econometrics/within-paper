@@ -22,16 +22,14 @@ from __future__ import annotations
 
 import argparse
 import gc
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "benchmarks" / "modular"))
 
-from experiment import (  # noqa: E402
+from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     RunRecord,
     SampleSpec,
@@ -43,13 +41,12 @@ from experiment import (  # noqa: E402
     write_records,
 )
 
-add_repo_paths()
 
-import within  # noqa: E402
-from accuracy import accuracy_record, pair_edge_stats  # noqa: E402
-from feols_benchmarkers import MECHANISM_MAP_TOL, MECHANISM_MAXITER  # noqa: E402
-from map_diagnostics import map_demean_with_sweeps  # noqa: E402
-from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch  # noqa: E402
+import within
+from benchmarks.modular.accuracy import accuracy_record, pair_edge_stats
+from benchmarks.modular.feols_benchmarkers import MECHANISM_MAP_TOL, MECHANISM_MAXITER
+from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
 
 def _edge_summary(categories: np.ndarray) -> dict[str, float | int]:

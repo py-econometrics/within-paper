@@ -18,7 +18,6 @@ import argparse
 import csv
 import gc
 import hashlib
-import sys
 import time
 import warnings
 from dataclasses import dataclass
@@ -28,13 +27,10 @@ import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "benchmarks" / "modular"))
 
-from accuracy import accuracy_record  # noqa: E402
-from dgp_functions import paper_base_dgp  # noqa: E402
-from feols_benchmarkers import (  # noqa: E402
+from benchmarks.modular.accuracy import accuracy_record
+from benchmarks.modular.dgp_functions import paper_base_dgp
+from benchmarks.modular.feols_benchmarkers import (
     DEFAULT_WITHIN_PRECONDITIONER,
     LSMR_SETTINGS,
     MAP_SETTINGS,

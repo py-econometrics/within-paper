@@ -16,10 +16,10 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
 
-from figure_style import (  # noqa: E402
+from scripts.figure_style import (
     METHOD_INLINE_LABEL,
     METHOD_LINESTYLE,
     METHOD_STYLE,

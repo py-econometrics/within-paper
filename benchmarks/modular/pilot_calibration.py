@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -30,16 +29,14 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-if str(Path(__file__).parent) not in sys.path:
-    sys.path.insert(0, str(Path(__file__).parent))
 
-from accuracy import (  # noqa: E402
+from benchmarks.modular.accuracy import (
     GATE_A_DELTA,
     GATE_A_ETA,
     external_normal_residuals,
     projection_errors,
 )
-from map_diagnostics import map_demean_with_sweeps  # noqa: E402
+from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 
 FE_COLS = ["indiv_id", "firm_id", "year"]
 RHS_COLS = ["y", "x1"]

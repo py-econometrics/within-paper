@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-from benchmarker_sets import build_feols_benchmarkers
-from dgps import BaseDGP
-from interfaces import FeolsSpec
-from runner import generate_datasets, run_benchmarks
+from benchmarks.modular.benchmarker_sets import build_feols_benchmarkers
+from benchmarks.modular.dgps import BaseDGP
+from benchmarks.modular.interfaces import FeolsSpec
+from benchmarks.modular.runner import generate_datasets, run_benchmarks
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------

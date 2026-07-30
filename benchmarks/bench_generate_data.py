@@ -1,14 +1,11 @@
 """Generate simple and difficult DGP datasets (k=1, 3 FE) as parquet."""
 
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULAR_DIR = ROOT / "benchmarks" / "modular"
-if str(MODULAR_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULAR_DIR))
 
-from dgp_functions import base_dgp  # noqa: E402
+from benchmarks.modular.dgp_functions import base_dgp
 
 SIZES = {"100k": 100_000, "1m": 1_000_000}
 K = 1

@@ -5,44 +5,23 @@ import warnings
 
 import pandas as pd
 
-try:
-    from .feols_benchmarkers import (
-        JuliaFeolsBenchmarker,
-        SubprocessFeolsBenchmarker,
-        _beta_x1,
-        _demeaner_from_backend,
-        _dgp_width,
-        _fit_converged,
-        _group_key,
-        _preconditioner_build_s,
-        _read_data_columns,
-        _retained_rows,
-        _result_from_dataset,
-        _SCRIPT_DIR,
-        _TablePrinter,
-        _trim_process_memory,
-    )
-    from .interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-except ImportError:
-    from feols_benchmarkers import (
-        JuliaFeolsBenchmarker,
-        SubprocessFeolsBenchmarker,
-        _beta_x1,
-        _demeaner_from_backend,
-        _dgp_width,
-        _fit_converged,
-        _group_key,
-        _preconditioner_build_s,
-        _read_data_columns,
-        _retained_rows,
-        _result_from_dataset,
-        _SCRIPT_DIR,
-        _TablePrinter,
-        _trim_process_memory,
-    )
-    from interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-
-
+from benchmarks.modular.feols_benchmarkers import (
+    JuliaFeolsBenchmarker,
+    SubprocessFeolsBenchmarker,
+    _beta_x1,
+    _demeaner_from_backend,
+    _dgp_width,
+    _fit_converged,
+    _group_key,
+    _preconditioner_build_s,
+    _read_data_columns,
+    _retained_rows,
+    _result_from_dataset,
+    _SCRIPT_DIR,
+    _TablePrinter,
+    _trim_process_memory,
+)
+from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 class PyFepoisBenchmarkerFullApi:
     """Benchmark one pf.fepois() call with the selected demeaning backend."""
 
