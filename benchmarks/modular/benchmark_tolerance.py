@@ -72,7 +72,7 @@ class MethodSpec:
 METHODS = (
     MethodSpec(
         key="lsmr_off",
-        label="LSMR, none",
+        label="PyFixest — LSMR — none",
         package="PyFixest",
         solver="LSMR",
         preconditioner="off",
@@ -81,7 +81,7 @@ METHODS = (
     ),
     MethodSpec(
         key="lsmr_diagonal",
-        label="LSMR, diagonal",
+        label="PyFixest — LSMR — diagonal",
         package="PyFixest",
         solver="LSMR",
         preconditioner="diagonal",
@@ -90,7 +90,7 @@ METHODS = (
     ),
     MethodSpec(
         key="lsmr_additive",
-        label="LSMR, factor-pair",
+        label="PyFixest — LSMR — factor-pair",
         package="PyFixest",
         solver="LSMR",
         preconditioner="additive",
@@ -99,7 +99,7 @@ METHODS = (
     ),
     MethodSpec(
         key="pyfixest_map",
-        label="PyFixest MAP",
+        label="PyFixest — MAP — none",
         package="PyFixest",
         solver="MAP",
         preconditioner="none",
@@ -108,7 +108,7 @@ METHODS = (
     ),
     MethodSpec(
         key="r_fixest",
-        label="R fixest",
+        label="fixest (R) — MAP — accelerated",
         package="fixest",
         solver="MAP",
         preconditioner="package default",
@@ -117,7 +117,7 @@ METHODS = (
     ),
     MethodSpec(
         key="julia_fem",
-        label="FEM.jl",
+        label="FEM.jl — LSMR — diagonal",
         package="FixedEffectModels.jl",
         solver="LSMR",
         preconditioner="package default",
