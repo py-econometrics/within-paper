@@ -37,7 +37,7 @@ import numpy as np
 import pandas as pd
 from pyfixest.core.detect_singletons import detect_singletons
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
@@ -129,11 +129,11 @@ PYTHON_METHODS = frozenset(
 EXTERNAL_METHODS = {
     "r_fixest": (
         ["Rscript"],
-        PROJECT_ROOT / "benchmarks" / "modular" / "tolerance_fixest.R",
+        ROOT / "benchmarks" / "modular" / "tolerance_fixest.R",
     ),
     "julia_fem": (
         ["julia"],
-        PROJECT_ROOT / "benchmarks" / "modular" / "tolerance_julia.jl",
+        ROOT / "benchmarks" / "modular" / "tolerance_julia.jl",
     ),
 }
 
@@ -554,13 +554,13 @@ def _run_external_method(
     command = [*command_prefix, str(script), str(config_path)]
     env = os.environ.copy()
     if method.key == "julia_fem":
-        env["JULIA_PROJECT"] = str(PROJECT_ROOT / "benchmarks" / "julia-env")
+        env["JULIA_PROJECT"] = str(ROOT / "benchmarks" / "julia-env")
         env["JULIA_NUM_THREADS"] = str(config["thread_count"])
 
     print(f"[external] {config['design']} {method.label}", flush=True)
     completed = subprocess.run(
         command,
-        cwd=PROJECT_ROOT,
+        cwd=ROOT,
         env=env,
         check=False,
         capture_output=True,
@@ -658,13 +658,13 @@ def _validate_threads() -> int:
 def _run_plot(input_path: Path, output_path: Path) -> None:
     command = [
         sys.executable,
-        str(PROJECT_ROOT / "scripts" / "plot_tolerance.py"),
+        str(ROOT / "scripts" / "plot_tolerance.py"),
         "--input",
         str(input_path),
         "--output",
         str(output_path),
     ]
-    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    subprocess.run(command, cwd=ROOT, check=True)
 
 
 def main() -> None:
@@ -696,12 +696,12 @@ def main() -> None:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=PROJECT_ROOT / "benchmarks" / "data",
+        default=ROOT / "benchmarks" / "data",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=PROJECT_ROOT
+        default=ROOT
         / "results"
         / "runs"
         / "latest"
@@ -710,7 +710,7 @@ def main() -> None:
     parser.add_argument(
         "--figure",
         type=Path,
-        default=PROJECT_ROOT / "figures" / "results" / "tolerance_frontier.svg",
+        default=ROOT / "figures" / "results" / "tolerance_frontier.svg",
     )
     parser.add_argument(
         "--no-plot",

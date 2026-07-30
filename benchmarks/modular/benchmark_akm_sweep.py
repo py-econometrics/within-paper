@@ -12,7 +12,7 @@ from benchmarks.modular.dgps import get_akm_sweep_scenarios
 from benchmarks.modular.interfaces import FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -20,8 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 N_ITERS = 3
 BURN_IN = 1
 DEFAULT_N_OBS = 1_000_000
-DATA_DIR = PROJECT_ROOT / "benchmarks" / "data"
-OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "feols_akm_sweep.csv"
+DATA_DIR = ROOT / "benchmarks" / "data"
+OUTPUT_CSV = ROOT / "benchmarks" / "results" / "feols_akm_sweep.csv"
 
 DGPS = get_akm_sweep_scenarios(DATA_DIR)
 

@@ -9,7 +9,7 @@ from benchmarks.modular.dgps import BaseDGP
 from benchmarks.modular.interfaces import FeolsSpec
 from benchmarks.modular.runner import generate_datasets, run_benchmarks
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -19,8 +19,8 @@ SIZES = [10_000_000]
 K_VALUES = [1]
 N_ITERS = 3
 BURN_IN = 1
-DATA_DIR = PROJECT_ROOT / "benchmarks" / "data"
-OUTPUT_CSV = PROJECT_ROOT / "benchmarks" / "results" / "feols_bench.csv"
+DATA_DIR = ROOT / "benchmarks" / "data"
+OUTPUT_CSV = ROOT / "benchmarks" / "results" / "feols_bench.csv"
 
 DGPS = [
     BaseDGP(DATA_DIR, "simple"),
