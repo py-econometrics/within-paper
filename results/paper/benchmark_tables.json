@@ -1,0 +1,457 @@
+{
+  "prose": {
+    "setup_difficult_setup_s": 0.896835417021066,
+    "setup_difficult_share": 0.3751180999715018,
+    "setup_difficult_solve_s": 1.4939727500313893,
+    "setup_simple_setup_s": 7.460069249966182,
+    "setup_simple_share": 0.7853968652602301,
+    "setup_simple_solve_s": 2.0384016250027344
+  },
+  "schema_version": 1,
+  "tables": {
+    "agreement": {
+      "align": "(left, left, right, right, right)",
+      "columns": "(0.95fr, 1.0fr, 0.95fr, 0.95fr, 0.95fr)",
+      "header": [
+        "Design",
+        "Backend",
+        "$hat(beta)_1$",
+        "Avg |diff|",
+        "Max |diff|"
+      ],
+      "rows": [
+        [
+          "#agreement-simple",
+          "`rust-map`",
+          "0.99871660",
+          "--",
+          "--"
+        ],
+        [
+          "",
+          "`within`",
+          "0.99871660",
+          "$8.9 times 10^(-16)$",
+          "$8.9 times 10^(-16)$"
+        ],
+        [
+          "",
+          "`fixest`",
+          "0.99871660",
+          "$1.1 times 10^(-14)$",
+          "$1.1 times 10^(-14)$"
+        ],
+        [
+          "",
+          "`FEM.jl`",
+          "0.99871660",
+          "$9.2 times 10^(-14)$",
+          "$9.2 times 10^(-14)$"
+        ],
+        [
+          "#agreement-difficult",
+          "`rust-map`",
+          "1.00321065",
+          "--",
+          "--"
+        ],
+        [
+          "",
+          "`within`",
+          "1.00321085",
+          "$1.9 times 10^(-7)$",
+          "$1.9 times 10^(-7)$"
+        ],
+        [
+          "",
+          "`fixest`",
+          "1.00321085",
+          "$1.9 times 10^(-7)$",
+          "$1.9 times 10^(-7)$"
+        ],
+        [
+          "",
+          "`FEM.jl`",
+          "1.00321069",
+          "$3.9 times 10^(-8)$",
+          "$3.9 times 10^(-8)$"
+        ]
+      ]
+    },
+    "akm_mobility": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "header": [
+        "Scenario",
+        "Gap (share)",
+        "`rust-map`",
+        "`fixest`",
+        "`FEM.jl`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "`akm_mobility_1`",
+          "0.373 (1.00)",
+          "0.295s",
+          "0.453s",
+          "0.332s",
+          "0.602s"
+        ],
+        [
+          "`akm_mobility_2`",
+          "0.0709 (1.00)",
+          "1.15s",
+          "0.909s",
+          "0.591s",
+          "0.432s"
+        ],
+        [
+          "`akm_mobility_3`",
+          "$5.02 times 10^(-3)$ (0.88)",
+          "12.0s",
+          "1.88s",
+          "1.77s",
+          "0.349s"
+        ],
+        [
+          "`akm_mobility_4`",
+          "$1.18 times 10^(-3)$ (0.63)",
+          "45.4s",
+          "5.82s",
+          "2.68s",
+          "0.333s"
+        ],
+        [
+          "`akm_mobility_5`",
+          "$1.02 times 10^(-3)$ (0.66)",
+          "62.6s (2/3)",
+          "5.84s",
+          "2.98s",
+          "0.337s"
+        ],
+        [
+          "`akm_mobility_6`",
+          "$4.63 times 10^(-4)$ (0.64)",
+          "failed (0/3)",
+          "7.21s",
+          "3.93s",
+          "0.324s"
+        ]
+      ]
+    },
+    "akm_sorting": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "header": [
+        "Scenario",
+        "Gap (share)",
+        "`rust-map`",
+        "`fixest`",
+        "`FEM.jl`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "`akm_sorting_1`",
+          "$8.94 times 10^(-3)$ (0.96)",
+          "7.34s",
+          "1.32s",
+          "1.38s",
+          "0.346s"
+        ],
+        [
+          "`akm_sorting_2`",
+          "$3.58 times 10^(-3)$ (0.96)",
+          "12.9s",
+          "2.17s",
+          "1.70s",
+          "0.389s"
+        ],
+        [
+          "`akm_sorting_3`",
+          "$6.80 times 10^(-3)$ (0.96)",
+          "10.1s",
+          "2.03s",
+          "1.53s",
+          "0.372s"
+        ],
+        [
+          "`akm_sorting_4`",
+          "$4.38 times 10^(-3)$ (0.96)",
+          "14.7s",
+          "2.18s",
+          "1.61s",
+          "0.388s"
+        ],
+        [
+          "`akm_sorting_5`",
+          "$2.17 times 10^(-3)$ (0.96)",
+          "27.4s",
+          "3.01s",
+          "1.94s",
+          "0.381s"
+        ]
+      ]
+    },
+    "correia_real": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "header": [
+        "Dataset",
+        "Gap (share)",
+        "`rust-map`",
+        "`fixest`",
+        "`FEM.jl`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "`credit`",
+          "0.402 (1.00)",
+          "0.166s",
+          "0.133s",
+          "0.120s",
+          "0.136s"
+        ],
+        [
+          "`soccer`",
+          "0.889 (1.00)",
+          "0.017s",
+          "0.014s",
+          "0.012s",
+          "0.030s"
+        ],
+        [
+          "`enron`",
+          "$7.04 times 10^(-3)$ (0.99)",
+          "3.95s",
+          "0.546s",
+          "0.459s",
+          "0.317s"
+        ],
+        [
+          "`github`",
+          "$6.30 times 10^(-4)$ (0.32)",
+          "78.8s",
+          "1.86s",
+          "3.02s",
+          "0.209s"
+        ],
+        [
+          "`patents`",
+          "$5.18 times 10^(-4)$ (0.95)",
+          "21.1s",
+          "1.49s",
+          "0.962s",
+          "0.283s"
+        ],
+        [
+          "`workers`",
+          "$2.74 times 10^(-4)$ (0.63)",
+          "117.4s",
+          "3.68s",
+          "3.30s",
+          "0.167s"
+        ],
+        [
+          "`schools`",
+          "$2.21 times 10^(-3)$ (1.00)",
+          "8.58s",
+          "1.14s",
+          "0.856s",
+          "0.142s"
+        ],
+        [
+          "`directors`",
+          "$5.12 times 10^(-4)$ (0.30)",
+          "10.9s",
+          "0.333s",
+          "0.809s",
+          "0.200s"
+        ]
+      ]
+    },
+    "correia_synthetic": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "header": [
+        "Dataset",
+        "Gap (share)",
+        "`rust-map`",
+        "`fixest`",
+        "`FEM.jl`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "`synthetic-complete`",
+          "0.76 (1.00)",
+          "0.070s",
+          "0.059s",
+          "0.034s",
+          "0.119s"
+        ],
+        [
+          "`synthetic-uniform-easy`",
+          "0.651 (1.00)",
+          "0.112s",
+          "0.138s",
+          "0.063s",
+          "0.108s"
+        ],
+        [
+          "`synthetic-uniform-hard`",
+          "0.184 (1.00)",
+          "0.293s",
+          "0.349s",
+          "0.243s",
+          "0.861s"
+        ],
+        [
+          "`synthetic-uniform-harder`",
+          "0.0249 (1.00)",
+          "0.880s",
+          "1.23s",
+          "0.395s",
+          "0.462s"
+        ],
+        [
+          "`synthetic-assortative`",
+          "$1.33 times 10^(-3)$ (0.70)",
+          "20.1s",
+          "1.73s",
+          "2.02s",
+          "0.280s"
+        ]
+      ]
+    },
+    "memory": {
+      "align": "(left, right, right, right)",
+      "columns": "(1.25fr, 1.0fr, 0.85fr, 0.85fr)",
+      "header": [
+        "Design",
+        "Gap (share)",
+        "`rust-map`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "#memory-100k",
+          "",
+          "",
+          ""
+        ],
+        [
+          "simple (dense graph)",
+          "0.857 (1.00)",
+          "315 MB",
+          "357 MB"
+        ],
+        [
+          "difficult (sparse graph)",
+          "$1.30 times 10^(-3)$ (1.00)",
+          "304 MB",
+          "352 MB"
+        ],
+        [
+          "#memory-1m",
+          "",
+          "",
+          ""
+        ],
+        [
+          "simple (dense graph)",
+          "0.857 (1.00)",
+          "734 MB",
+          "1,047 MB"
+        ],
+        [
+          "difficult (sparse graph)",
+          "$1.67 times 10^(-5)$ (1.00)",
+          "693 MB",
+          "872 MB"
+        ]
+      ]
+    },
+    "ols": {
+      "align": "(left, right, right, right, right, right, right)",
+      "columns": "(1.25fr, 1.05fr, 0.72fr, 0.72fr, 0.72fr, 0.78fr, 0.86fr)",
+      "header": [
+        "Design",
+        "Gap (share)",
+        "`rust-map`",
+        "`fixest`",
+        "`FEM.jl`",
+        "`within`",
+        "`torch-cuda`"
+      ],
+      "rows": [
+        [
+          "simple (dense graph)",
+          "0.857 (1.00)",
+          "2.50s",
+          "2.71s",
+          "2.15s",
+          "13.0s",
+          "4.73s"
+        ],
+        [
+          "difficult (sparse graph)",
+          "$1.67 times 10^(-5)$ (1.00)",
+          "331.7s",
+          "71.6s",
+          "26.9s",
+          "4.73s",
+          "8.73s"
+        ]
+      ]
+    },
+    "ppml": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr)",
+      "header": [
+        "Design",
+        "FE",
+        "`fixest`",
+        "`rust-map`",
+        "`GLFEM.jl`",
+        "`within`"
+      ],
+      "rows": [
+        [
+          "simple (dense graph)",
+          "2",
+          "1.25s",
+          "1.67s",
+          "2.19s",
+          "3.21s"
+        ],
+        [
+          "difficult (sparse graph)",
+          "2",
+          "1.22s",
+          "1.64s",
+          "2.23s",
+          "3.21s"
+        ],
+        [
+          "simple (dense graph)",
+          "3",
+          "5.69s",
+          "10.0s",
+          "8.65s",
+          "8.67s"
+        ],
+        [
+          "difficult (sparse graph)",
+          "3",
+          "324.3s",
+          "failed (0/3)",
+          "165.7s",
+          "5.27s"
+        ]
+      ]
+    }
+  }
+}
