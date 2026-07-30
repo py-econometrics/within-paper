@@ -39,7 +39,10 @@ verify-paper-results = { cmd = "python -m scripts.paper_results verify", descrip
 
 [dependencies]
 # Figures are generated from recorded results, never drawn by hand.
-matplotlib-base = ">=3.9"
+# Pinned exactly: the tracked SVGs are byte-compared, and matplotlib
+# changes tight-bbox geometry between minor versions, so a float here
+# silently rewrites every figure.
+matplotlib-base = "==3.11.1"
 typst = ">=0.14.2,<0.15"
 python = ">=3.14.4,<3.15"
 scipy = ">=1.11"
@@ -47,4 +50,8 @@ scipy = ">=1.11"
 [pypi-dependencies]
 pyfixest = ">=0.60.0"
 pyarrow = ">=19.0.0"
+# Pinned to the version that produced the tracked SVGs. A PyPI matplotlib
+# arrives transitively via seaborn and shadows the conda matplotlib-base, so
+# the pin has to be here or the two disagree.
+matplotlib = "==3.11.1"
 within-py = ">=0.2.0"
