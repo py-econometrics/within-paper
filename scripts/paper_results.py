@@ -87,6 +87,30 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+LATEST_RUN = ROOT / "results" / "runs" / "latest"
+
+
+def _latest(filename: str) -> Path:
+    """One result file from the current run directory."""
+    return LATEST_RUN / filename
+
+
+def _latest_rows(filename: str) -> list[dict[str, str]] | None:
+    """Rows of one result CSV, or None when the file is not there.
+
+    Absent and empty are different and the synchronizers rely on the
+    difference: a table whose benchmark has not been run is left as it stands,
+    while a table whose benchmark ran and produced no usable row has its cells
+    marked missing. Returning None for the first case keeps that distinction at
+    the call site instead of making every caller re-test the path.
+    """
+    path = _latest(filename)
+    if not path.exists():
+        return None
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -848,12 +872,7 @@ def _format_hardness(gap: float, share: float) -> str:
 
 
 def _synchronize_hardness(document: dict) -> int:
-    path = ROOT / "results" / "runs" / "latest" / "hardness.csv"
-    if path.exists():
-        with path.open(newline="", encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))
-    else:
-        rows = []
+    rows = _latest_rows("hardness.csv") or []
     diagnostics = {
         row["dataset_id"]: row
         for row in rows
@@ -902,11 +921,9 @@ def _synchronize_hardness(document: dict) -> int:
 
 
 def _synchronize_agreement(document: dict) -> int:
-    path = ROOT / "results" / "runs" / "latest" / "agreement.csv"
-    if not path.exists():
+    observations = _latest_rows("agreement.csv")
+    if observations is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        observations = list(csv.DictReader(handle))
     by_key = {
         (row["dgp"], _backend_name(row["backend"])): row
         for row in observations
@@ -938,11 +955,10 @@ def _synchronize_agreement(document: dict) -> int:
 
 
 def _synchronize_setup_cost(document: dict) -> int:
-    path = ROOT / "results" / "runs" / "latest" / "within_setup_cost_summary.csv"
-    if not path.exists():
+    rows = _latest_rows("within_setup_cost_summary.csv")
+    if rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        summary = {row["dgp"]: row for row in csv.DictReader(handle)}
+    summary = {row["dgp"]: row for row in rows}
     prose = document.setdefault("prose", {})
     changed = 0
     for dgp in ("simple", "difficult"):
@@ -975,12 +991,11 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
     accuracy each runtime bought instead of a single matched point that some
     packages cannot reach.
     """
-    path = ROOT / "results" / "runs" / "latest" / "accuracy_frontier.csv"
+    measured = _latest_rows("accuracy_frontier.csv")
     table = document["tables"].get("accuracy_frontier")
-    if table is None or not path.exists():
+    if table is None or measured is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = [row for row in csv.DictReader(handle) if _row_success(row)]
+    rows = [row for row in measured if _row_success(row)]
 
     labels = {
         "pyfixest-rust-map": "`rust-map`",
@@ -1020,12 +1035,10 @@ def _synchronize_ppml_inner_outer(document: dict) -> int:
     table reports whether the outer loop converged rather than only how many
     steps it took.
     """
-    path = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
+    rows = _latest_rows("ppml_inner_outer.csv")
     table = document["tables"].get("ppml_inner_outer")
-    if table is None or not path.exists():
+    if table is None or rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
 
     rendered: list[list[str]] = []
     for design in ("simple", "difficult"):
@@ -1057,12 +1070,10 @@ def _synchronize_factor_scaling(document: dict) -> int:
     the axis on which the Schwarz preconditioner is most exposed, and every
     other experiment in the paper holds it at three.
     """
-    path = ROOT / "results" / "runs" / "latest" / "factor_scaling.csv"
+    rows = _latest_rows("factor_scaling.csv")
     table = document["tables"].get("factor_scaling")
-    if table is None or not path.exists():
+    if table is None or rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
 
     by_q: dict[int, list[dict]] = {}
     for row in rows:
@@ -1097,12 +1108,10 @@ def _synchronize_amortization(document: dict) -> int:
     The break-even is read off the measurements rather than from a closed form,
     because marginal solve cost is not exactly linear in K.
     """
-    path = ROOT / "results" / "runs" / "latest" / "amortization.csv"
+    rows = _latest_rows("amortization.csv")
     table = document["tables"].get("amortization")
-    if table is None or not path.exists():
+    if table is None or rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
 
     def med(k: int, name: str, field: str) -> float | None:
         picked = [
@@ -1148,12 +1157,11 @@ def _synchronize_iterations(document: dict) -> int:
     or plotted on one axis, so the table records which unit each column is in
     and the median is taken within a column only.
     """
-    path = ROOT / "results" / "runs" / "latest" / "within_preconditioners.csv"
+    rows = _latest_rows("within_preconditioners.csv")
     table = document["tables"].get("iterations")
-    if table is None or not path.exists():
+    if table is None or rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rendered = _iteration_rows(list(csv.DictReader(handle)))
+    rendered = _iteration_rows(rows)
     if rendered == table["rows"]:
         return 0
     table["rows"] = rendered
@@ -1277,10 +1285,8 @@ def _synchronize_canonical_tables(
                 if row[column] != rendered:
                     row[column] = rendered
                     changed += 1
-    memory_path = ROOT / "results" / "runs" / "latest" / "memory.csv"
-    if memory_path.exists():
-        with memory_path.open(newline="", encoding="utf-8") as handle:
-            measurements = list(csv.DictReader(handle))
+    measurements = _latest_rows("memory.csv")
+    if measurements is not None:
         table = document["tables"]["memory"]
         for index, row in enumerate(table["rows"]):
             if row[0].startswith("#"):
@@ -1337,7 +1343,7 @@ def verify(_: argparse.Namespace) -> None:
     if missing:
         raise SystemExit(f"Missing claim registry entries: {', '.join(missing)}")
 
-    provenance_path = ROOT / "results" / "runs" / "latest" / "provenance.json"
+    provenance_path = _latest("provenance.json")
     if not provenance_path.exists():
         raise SystemExit(f"Missing benchmark provenance: {provenance_path}")
     provenance = _read_json(provenance_path)
