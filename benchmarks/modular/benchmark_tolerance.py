@@ -314,7 +314,7 @@ def _reference_solution(frame: pd.DataFrame) -> ReferenceSolution:
     )
 
 
-def _base_row(
+def _shared_fields(
     *,
     design: str,
     source_n_obs: int,
@@ -323,12 +323,19 @@ def _base_row(
     sample_hash: str,
     source_path: Path,
     method: MethodSpec,
-    tolerance: float,
     maxiter: int,
-    repetition: int,
     reference: ReferenceSolution,
     thread_count: int,
 ) -> dict[str, Any]:
+    """What identifies a measurement, whichever arm produced it.
+
+    The Python arm writes rows directly and the external arm sends a config to
+    an R or Julia driver that writes rows back, but both end up in one
+    tolerance_frontier.csv. These fields have to match across the two or the
+    file has two schemas and the aggregation silently drops whichever columns
+    the plotting code does not find. Defining them once is what keeps that
+    from happening by accident.
+    """
     return {
         "design": design,
         "n_obs_source": source_n_obs,
@@ -341,11 +348,8 @@ def _base_row(
         "package": method.package,
         "solver": method.solver,
         "preconditioner": method.preconditioner,
-        "tolerance": tolerance,
         "default_tolerance": method.default_tolerance,
-        "is_default_tolerance": tolerance == method.default_tolerance,
         "maxiter": maxiter,
-        "repetition": repetition,
         "reference_beta_x1": reference.beta_x1,
         "reference_se_x1": reference.se_x1,
         "reference_residual_norm": reference.residual_norm,
@@ -354,6 +358,22 @@ def _base_row(
         "reference_tolerance": REFERENCE_TOLERANCE,
         "reference_maxiter": REFERENCE_MAXITER,
         "thread_count": thread_count,
+    }
+
+
+def _base_row(
+    *,
+    method: MethodSpec,
+    tolerance: float,
+    repetition: int,
+    **shared: Any,
+) -> dict[str, Any]:
+    """One measured row from the in-process PyFixest arm."""
+    return {
+        **_shared_fields(method=method, **shared),
+        "tolerance": tolerance,
+        "is_default_tolerance": tolerance == method.default_tolerance,
+        "repetition": repetition,
     }
 
 
@@ -481,47 +501,25 @@ def _run_python_methods(
 
 def _external_config(
     *,
-    design: str,
-    source_n_obs: int,
-    frame: pd.DataFrame,
-    n_singletons_dropped: int,
-    sample_hash: str,
-    source_path: Path,
-    prepared_path: Path,
     method: MethodSpec,
+    prepared_path: Path,
     repetitions: int,
     tolerance_override: tuple[float, ...] | None,
-    maxiter: int,
     seed: int,
-    reference: ReferenceSolution,
-    thread_count: int,
+    **shared: Any,
 ) -> dict[str, Any]:
+    """The job handed to an R or Julia driver, which sweeps the grid itself.
+
+    The external arm receives the whole tolerance grid and its own repetition
+    count, because one subprocess covers every setting for a method rather
+    than one setting per call.
+    """
     return {
-        "design": design,
-        "n_obs_source": source_n_obs,
-        "n_obs": len(frame),
-        "n_singletons_dropped": n_singletons_dropped,
-        "sample_hash": sample_hash,
-        "source_path": str(source_path),
+        **_shared_fields(method=method, **shared),
         "data_path": str(prepared_path),
-        "method": method.key,
-        "label": method.label,
-        "package": method.package,
-        "solver": method.solver,
-        "preconditioner": method.preconditioner,
         "tolerances": list(tolerance_override or method.tolerances),
-        "default_tolerance": method.default_tolerance,
-        "maxiter": maxiter,
         "repetitions": repetitions,
         "seed": seed,
-        "reference_beta_x1": reference.beta_x1,
-        "reference_se_x1": reference.se_x1,
-        "reference_residual_norm": reference.residual_norm,
-        "reference_fe_eta": reference.fe_eta,
-        "reference_x_score": reference.x_score,
-        "reference_tolerance": REFERENCE_TOLERANCE,
-        "reference_maxiter": REFERENCE_MAXITER,
-        "thread_count": thread_count,
     }
 
 
