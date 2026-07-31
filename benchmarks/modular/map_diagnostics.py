@@ -171,8 +171,3 @@ def map_demean_with_sweeps(
         maxiter=maxiter,
         tol=tol,
     )
-
-
-def map_result_as_dict(result: MapSweepResult) -> dict:
-    """Serialize the scalar summary; omit the demeaned matrix."""
-    return result.summary_row()
