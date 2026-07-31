@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from benchmarks.modular.results import write_rows
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "benchmarks" / "data"
 

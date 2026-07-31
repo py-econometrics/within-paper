@@ -52,7 +52,7 @@ from benchmarks.modular.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
-    _demeaner_from_backend,
+    demeaner_for,
 )
 from benchmarks.modular.experiment import (
     FE_COLS,
@@ -405,23 +405,23 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         )
 
     def test_demeaner_backend_labels_map_to_preconditioners(self) -> None:
-        rust = _demeaner_from_backend("rust")
+        rust = demeaner_for("rust")
         self.assertEqual(rust.kind, "map")
         self.assertEqual(rust.backend, "rust")
 
-        alias = _demeaner_from_backend("within")
+        alias = demeaner_for("within")
         self.assertEqual(alias.kind, "lsmr")
         self.assertEqual(alias.preconditioner, DEFAULT_WITHIN_PRECONDITIONER)
         self.assertEqual(alias.fixef_atol, alias.fixef_btol)
 
         for name in WITHIN_PRECONDITIONERS:
-            demeaner = _demeaner_from_backend(f"within-{name}")
+            demeaner = demeaner_for(f"within-{name}")
             self.assertEqual(demeaner.preconditioner, name)
             self.assertEqual(demeaner.fixef_atol, 1e-8)
             self.assertEqual(demeaner.fixef_btol, 1e-8)
 
         with self.assertRaisesRegex(ValueError, "Unknown within preconditioner"):
-            _demeaner_from_backend("within-bogus")
+            demeaner_for("within-bogus")
 
     def test_both_views_are_measured_in_one_pass(self) -> None:
         """One sweep produces the cross-package rows and the mechanism rows.
@@ -470,7 +470,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             package_defaults=False, matched_accuracy=True, external=False
         )
         for benchmarker in matched.benchmarkers:
-            demeaner = _demeaner_from_backend(
+            demeaner = demeaner_for(
                 benchmarker._demeaner_backend,
                 tol=benchmarker._tol,
                 maxiter=benchmarker._maxiter,
@@ -479,7 +479,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(budgets, {MECHANISM_MAXITER})
 
         # The cross-package view keeps each package's documented default.
-        default_lsmr = _demeaner_from_backend("within")
+        default_lsmr = demeaner_for("within")
         self.assertEqual(default_lsmr.fixef_maxiter, 1_000)
 
     def test_external_residual_is_small_for_exact_demeaning(self) -> None:
@@ -817,7 +817,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                     formula,
                     data=frame,
                     vcov="iid",
-                    demeaner=_demeaner_from_backend(backend, tol=tol),
+                    demeaner=demeaner_for(backend, tol=tol),
                 )
             value = _external_eta(fit, frame, "y", ["x1"])
             self.assertIsNotNone(value)
@@ -838,6 +838,41 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             pass
 
         self.assertIsNone(_external_eta(NotAModel(), pd.DataFrame({"y": [1.0]}), "y", []))
+
+
+class TypedDemeanerTests(unittest.TestCase):
+    """Every fit goes through a typed demeaner, not the deprecated strings."""
+
+    def test_no_source_file_passes_the_deprecated_arguments(self) -> None:
+        # PyFixest 0.60 deprecated demeaner_backend/fixef_tol/fixef_maxiter on
+        # feols and fepois. They remain valid as typed-constructor keywords, so
+        # only the call-site form is banned.
+        offenders = []
+        for path in sorted((ROOT / "benchmarks").rglob("*.py")):
+            for number, line in enumerate(path.read_text().splitlines(), start=1):
+                # Prose that names the deprecated argument is fine; a call
+                # that passes it is not.
+                if "`demeaner_backend=`" in line or line.lstrip().startswith("#"):
+                    continue
+                if "demeaner_backend=" in line:
+                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(offenders, [], "pass a typed demeaner= instead")
+
+    def test_rust_cg_resolves_to_the_within_lsmr_backend(self) -> None:
+        # Pre-0.60 alias. It was not conjugate gradient by then: PyFixest
+        # mapped it onto the within backend with preconditioner "auto", and the
+        # agreement check depends on that being what it compares against.
+        demeaner = demeaner_for("rust-cg")
+        self.assertEqual(demeaner.backend, "within")
+        self.assertEqual(demeaner.preconditioner, "auto")
+        self.assertEqual(demeaner.precision, "float64")
+
+    def test_named_configurations_build_the_expected_demeaner(self) -> None:
+        self.assertEqual(demeaner_for("rust").backend, "rust")
+        self.assertEqual(demeaner_for("within").preconditioner, "additive")
+        for name in ("off", "diagonal", "additive"):
+            self.assertEqual(demeaner_for(f"within-{name}").preconditioner, name)
+        self.assertEqual(demeaner_for("torch_mps").precision, "float32")
 
 
 class SubprocessOutputTests(unittest.TestCase):
