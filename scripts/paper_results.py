@@ -436,16 +436,6 @@ def render(args: argparse.Namespace) -> None:
     def gap_without_share(value: str) -> str:
         return re.sub(r"\s+\([^)]*\)\s*$", "", value)
 
-    def largest_metric(rows: list[list[str]], column: int) -> str:
-        candidates = [
-            row[column]
-            for row in rows
-            if _numeric_cell(row[column]) is not None
-        ]
-        if not candidates:
-            return "--"
-        return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
-
     def seconds_range(row: list[str], columns: range) -> str:
         candidates = [
             value
@@ -475,8 +465,8 @@ def render(args: argparse.Namespace) -> None:
         "result_ppml_difficult_three_within": ppml_difficult[5],
         "result_agreement_simple_gap": gap_without_share(memory_rows[1][1]),
         "result_agreement_difficult_gap": gap_without_share(memory_rows[2][1]),
-        "result_agreement_simple_max": largest_metric(agreement_rows[:4], 3),
-        "result_agreement_difficult_max": largest_metric(agreement_rows[4:], 3),
+        "result_agreement_simple_max": _largest_metric(agreement_rows[:4], 3),
+        "result_agreement_difficult_max": _largest_metric(agreement_rows[4:], 3),
         "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
         "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
         "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
@@ -816,13 +806,20 @@ def _numeric_cell(value: str) -> float | None:
     return float(match.group().replace(",", ""))
 
 
-def _largest_backend_metric(
-    rows: list[list[str]], backend: str, column: int
+def _largest_metric(
+    rows: list[list[str]], column: int, *, backend: str | None = None
 ) -> str:
+    """The largest numeric cell in one column, optionally within one backend.
+
+    Cells that do not parse as a number are skipped rather than read as zero,
+    so a "--" or a "#miss" marker cannot win the comparison and be reported as
+    a measured worst case.
+    """
     candidates = [
         row[column]
         for row in rows
-        if _clean_cell(row[1]) == backend and _numeric_cell(row[column]) is not None
+        if (backend is None or _clean_cell(row[1]) == backend)
+        and _numeric_cell(row[column]) is not None
     ]
     if not candidates:
         return "--"

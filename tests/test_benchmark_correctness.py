@@ -77,7 +77,7 @@ from scripts.paper_results import (
     _iteration_rows,
     _read_json,
     _component_share,
-    _largest_backend_metric,
+    _largest_metric,
     _numeric_cell,
     _render_trial_result,
     _table_fragment,
@@ -371,7 +371,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         ]
         self.assertEqual(_numeric_cell(rows[0][3]), 1.1e-14)
         self.assertEqual(
-            _largest_backend_metric(rows, "fixest", 3), "$1.9 times 10^(-7)$"
+            _largest_metric(rows, 3, backend="fixest"), "$1.9 times 10^(-7)$"
         )
 
     def test_component_share_ignores_scientific_exponent(self) -> None:
