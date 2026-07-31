@@ -223,19 +223,30 @@ class SubprocessFeolsBenchmarker:
 _SCRIPT_DIR = Path(__file__).parent
 
 
+def _name_and_script(
+    name: str | Path | None, script_path: Path | None, owner: str
+) -> tuple[str | None, Path | None]:
+    """Sort a first positional argument that may be either name or script.
+
+    The presets are built both ways: benchmark_correia passes a name and a
+    keyword script, while other callers pass the script alone as the first
+    argument. Accepting both here keeps each preset to the two lines that
+    actually differ between them.
+    """
+    if not isinstance(name, Path):
+        return name, script_path
+    if script_path is not None:
+        raise TypeError(f"script_path must not be provided twice for {owner}.")
+    return None, name
+
+
 class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
     def __init__(
         self,
         name: str | Path | None = None,
         script_path: Path | None = None,
     ):
-        if isinstance(name, Path):
-            if script_path is not None:
-                raise TypeError(
-                    "script_path must not be provided twice for FixestFeolsBenchmarker."
-                )
-            script_path = name
-            name = None
+        name, script_path = _name_and_script(name, script_path, type(self).__name__)
         super().__init__(
             name=name or "r.fixest",
             command_prefix=["Rscript"],
@@ -250,13 +261,7 @@ class JuliaFeolsBenchmarker(SubprocessFeolsBenchmarker):
         name: str | Path | None = None,
         script_path: Path | None = None,
     ):
-        if isinstance(name, Path):
-            if script_path is not None:
-                raise TypeError(
-                    "script_path must not be provided twice for JuliaFeolsBenchmarker."
-                )
-            script_path = name
-            name = None
+        name, script_path = _name_and_script(name, script_path, type(self).__name__)
         super().__init__(
             name=name or "julia.FixedEffectModels",
             command_prefix=["julia"],

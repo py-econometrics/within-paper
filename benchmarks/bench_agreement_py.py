@@ -111,19 +111,20 @@ def _external_coefficients(
     return results
 
 
-def _max_named_coef_diff(reference: dict[str, float], candidate: dict[str, float]) -> float:
-    missing = sorted(set(reference) ^ set(candidate))
-    if missing:
-        raise ValueError(f"coefficient names differ: {missing}")
-    return max(abs(reference[name] - candidate[name]) for name in reference)
+def _named_coef_diffs(
+    reference: dict[str, float], candidate: dict[str, float]
+) -> list[float]:
+    """Absolute differences, matched by coefficient name.
 
-
-def _avg_named_coef_diff(reference: dict[str, float], candidate: dict[str, float]) -> float:
-    missing = sorted(set(reference) ^ set(candidate))
-    if missing:
-        raise ValueError(f"coefficient names differ: {missing}")
-    diffs = [abs(reference[name] - candidate[name]) for name in reference]
-    return sum(diffs) / len(diffs)
+    Comparing by name rather than by position is what makes this a
+    cross-package check: two packages may order the coefficient table
+    differently, and a positional comparison would silently difference
+    unrelated terms instead of failing.
+    """
+    mismatched = sorted(set(reference) ^ set(candidate))
+    if mismatched:
+        raise ValueError(f"coefficient names differ: {mismatched}")
+    return [abs(reference[name] - candidate[name]) for name in reference]
 
 
 def _format_float(value: float | None) -> str:
@@ -202,8 +203,9 @@ for dgp_type in ["simple", "difficult"]:
     print(f"{'':<12} {'backend':<20} {'x1':>14} {'avg |diff|':>14} {'max |diff|':>14}")
     for backend, coefficients in coefficient_sets.items():
         try:
-            avg_diff = _avg_named_coef_diff(reference, coefficients)
-            max_diff = _max_named_coef_diff(reference, coefficients)
+            diffs = _named_coef_diffs(reference, coefficients)
+            avg_diff = sum(diffs) / len(diffs)
+            max_diff = max(diffs)
         except ValueError as exc:
             print(f"{'':<12} {backend:<20} {coefficients.get('x1', np.nan):>14.8f} {f'SKIP ({exc})':>28}")
             continue
