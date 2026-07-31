@@ -25,6 +25,11 @@ from pathlib import Path
 from typing import Iterable
 
 from benchmarks.modular.results import write_rows
+from benchmarks.modular.settings import (
+    MECHANISM_LSMR_TOL,
+    MECHANISM_MAXITER,
+    WITHIN_PRECONDITIONERS,
+)
 
 import numpy as np
 
@@ -179,7 +184,10 @@ def clear_sample_cache() -> None:
 # ---------------------------------------------------------------------------
 # Solver configurations
 # ---------------------------------------------------------------------------
-PRECONDITIONERS = ("off", "diagonal", "additive")
+# Re-exported under the name the standalone drivers already import. The list
+# itself lives with the pinned solver settings, so the ablation arms and the
+# demeaner factory cannot come to disagree about which preconditioners exist.
+PRECONDITIONERS = WITHIN_PRECONDITIONERS
 
 
 def preconditioner_config(name: str) -> "PreconditionerConfig":
@@ -221,11 +229,9 @@ class SolverSpec:
 def matched_solver_specs() -> tuple[SolverSpec, ...]:
     """The three preconditioners at the frozen matched settings.
 
-    Imported from the same constants the PyFixest ablation uses, so the
+    Built from the same constants the PyFixest ablation uses, so the
     standalone diagnostics and the end-to-end timings cannot drift apart.
     """
-    from benchmarks.modular.feols_benchmarkers import MECHANISM_LSMR_TOL, MECHANISM_MAXITER
-
     return tuple(
         SolverSpec(
             label=f"within-{name}",
