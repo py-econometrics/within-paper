@@ -1,22 +1,14 @@
 #!/usr/bin/env julia
 
+# The Correia collection ships as CSV, not Parquet, so this driver reads its
+# own data and cannot use run_manifest. It shares the thread check, which is
+# the part that must agree across every driver: a sweep whose drivers disagree
+# about thread count is not a like-for-like comparison.
 using CSV
-using DataFrames
 using FixedEffectModels
-using JSON3
 using StatsModels
 
-function benchmark_threads()
-    requested = tryparse(Int, get(ENV, "JULIA_NUM_THREADS", ""))
-    if requested === nothing || requested < 1
-        error("JULIA_NUM_THREADS must be set to a positive integer before running benchmarks")
-    end
-    actual = Threads.nthreads()
-    if actual != requested
-        error("Julia started with $actual thread(s), but JULIA_NUM_THREADS=$requested; set it before Julia starts")
-    end
-    return actual
-end
+include(joinpath(@__DIR__, "bench_common.jl"))
 
 function main()
     if length(ARGS) != 1
