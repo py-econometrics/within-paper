@@ -11,7 +11,7 @@ The download metadata and expected checksums are stored in `metadata/`. To verif
 existing local copy without downloading anything:
 
 ```bash
-pixi run python scripts/paper_results.py fetch-correia --offline
+pixi run check-correia-data
 ```
 
 The collection is described on [Sergio Correia's HDFE data page](https://scorreia.com/data/hdfe/index.html).
