@@ -126,7 +126,3 @@ def demeaner_for(
         return pf.LsmrDemeaner(backend="within", preconditioner="auto", precision="float64")
 
     raise ValueError(f"Unknown demeaner backend: {backend!r}")
-
-
-# Retained so existing imports keep resolving; prefer `demeaner_for`.
-_demeaner_from_backend = demeaner_for

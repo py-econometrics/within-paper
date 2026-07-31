@@ -3,8 +3,6 @@ from __future__ import annotations
 import time
 import warnings
 
-import pandas as pd
-
 from benchmarks.modular.feols_benchmarkers import (
     _TablePrinter,
     _beta_x1,
