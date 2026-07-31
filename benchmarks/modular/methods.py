@@ -37,32 +37,55 @@ METHODS = {
     "GLFEM.jl": Method("GLFEM.jl", "LSMR", "diagonal", "#ca8a04", "P"),
 }
 
-# Solver-shaped aliases, for figures that key on algorithm rather than package.
-METHOD_STYLE = {
-    "map": (METHODS["rust-map"].colour, METHODS["rust-map"].marker),
-    "lsmr_none": (METHODS["within-off"].colour, METHODS["within-off"].marker),
-    "lsmr_diagonal": (
-        METHODS["within-diagonal"].colour,
-        METHODS["within-diagonal"].marker,
-    ),
-    "lsmr_factor_pair": (METHODS["within"].colour, METHODS["within"].marker),
-    "fixest": (METHODS["fixest"].colour, METHODS["fixest"].marker),
-    "fem": (METHODS["FEM.jl"].colour, METHODS["FEM.jl"].marker),
+# The tolerance benchmark, the sweep result files, and the figures each name
+# these configurations differently. One table maps every spelling onto the
+# canonical key, so a caller never has to hold a second mapping of its own.
+ALIASES = {
+    # Tolerance benchmark arm names.
+    "lsmr_off": "within-off",
+    "lsmr_diagonal": "within-diagonal",
+    "lsmr_additive": "within-additive",
+    "pyfixest_map": "rust-map",
+    "r_fixest": "fixest",
+    "julia_fem": "FEM.jl",
+    # Backend names as the sweep drivers record them in the result files.
+    "pyfixest (rust-map)": "rust-map",
+    "pyfixest (rust-map, matched)": "rust-map-matched",
+    "pyfixest (within)": "within",
+    "pyfixest (within-off)": "within-off",
+    "pyfixest (within-diagonal)": "within-diagonal",
+    "pyfixest (within-additive)": "within-additive",
+    "fixest-map": "fixest",
+    "FEM.jl (lsmr)": "FEM.jl",
+    # The crossover figure draws one series for both Julia packages, which
+    # share a style. Its own label is set at the call site.
+    "Julia": "FEM.jl",
 }
 
-METHOD_LINESTYLE = {
-    "map": METHODS["rust-map"].linestyle,
-    "lsmr_none": METHODS["within-off"].linestyle,
-    "lsmr_diagonal": METHODS["within-diagonal"].linestyle,
-    "lsmr_factor_pair": METHODS["within"].linestyle,
-    "fixest": METHODS["fixest"].linestyle,
-    "fem": METHODS["FEM.jl"].linestyle,
-}
+
+def resolve(key: str) -> str:
+    """Map any known alias onto its canonical result-file key."""
+    return ALIASES.get(key, key)
+
+
+def method(key: str) -> Method:
+    """The record for a canonical key or any of its aliases."""
+    return METHODS[resolve(key)]
+
+
+def style(key: str) -> tuple[str, str]:
+    """Colour and marker, as matplotlib takes them."""
+    record = method(key)
+    return record.colour, record.marker
+
+
+def linestyle(key: str) -> str:
+    return method(key).linestyle
 
 
 def _fields(key: str) -> tuple[str, str, str]:
-    method = METHODS[key]
-    return method.package, method.algorithm, method.preconditioner
+    record = method(key)
+    return record.package, record.algorithm, record.preconditioner
 
 
 def legend_label(key: str) -> str:
@@ -81,24 +104,7 @@ def table_header(key: str) -> str:
     return legend_label(key).replace("\n", " #linebreak() ")
 
 
-METHOD_LEGEND_LABEL = {key: legend_label(key) for key in METHODS}
-METHOD_INLINE_LABEL = {key: inline_label(key) for key in METHODS}
+# Keyed by canonical name only. paper_results looks table cells up here with
+# `.get(cell, cell)`, so adding aliases would let an ordinary cell that happens
+# to read "Julia" be rewritten as a method label.
 METHOD_TABLE_HEADER = {key: table_header(key) for key in METHODS}
-
-
-# The tolerance benchmark names its arms after solver and preconditioner rather
-# than after the result-file backend. One alias table here keeps that experiment
-# from restating the labels.
-ALIASES = {
-    "lsmr_off": "within-off",
-    "lsmr_diagonal": "within-diagonal",
-    "lsmr_additive": "within-additive",
-    "pyfixest_map": "rust-map",
-    "r_fixest": "fixest",
-    "julia_fem": "FEM.jl",
-}
-
-
-def resolve(key: str) -> str:
-    """Map any known alias onto its canonical result-file key."""
-    return ALIASES.get(key, key)
