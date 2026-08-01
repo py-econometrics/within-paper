@@ -51,10 +51,10 @@ SPEC = FeolsSpec(
     vcov="iid",
 )
 LANGUAGE = {
-    "pyfixest-map": "Python",
-    "pyfixest-within": "Python",
+    "rust-map": "Python",
+    "within": "Python",
     "fixest": "R",
-    "FixedEffectModels": "Julia",
+    "FEM.jl": "Julia",
 }
 
 
@@ -92,14 +92,14 @@ def load_datasets() -> list[BenchmarkDataset]:
 
 def build_benchmarkers() -> list:
     return [
-        PyFeolsBenchmarkerFullApi("pyfixest-map", "rust"),
-        PyFeolsBenchmarkerFullApi("pyfixest-within", "within"),
+        PyFeolsBenchmarkerFullApi("rust-map", "rust"),
+        PyFeolsBenchmarkerFullApi("within", "within"),
         FixestFeolsBenchmarker(
             "fixest",
             script_path=EXTERNAL_DIR / "correia_r.R",
         ),
         JuliaFeolsBenchmarker(
-            "FixedEffectModels",
+            "FEM.jl",
             script_path=EXTERNAL_DIR / "correia_julia.jl",
         ),
     ]

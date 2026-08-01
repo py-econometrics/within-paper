@@ -37,36 +37,40 @@ METHODS = {
     "GLFEM.jl": Method("GLFEM.jl", "LSMR", "diagonal", "#ca8a04", "P"),
 }
 
-# The tolerance benchmark, the sweep result files, and the figures each name
-# these configurations differently. One table maps every spelling onto the
-# canonical key, so a caller never has to hold a second mapping of its own.
-ALIASES = {
-    # Tolerance benchmark arm names.
-    "lsmr_off": "within-off",
-    "lsmr_diagonal": "within-diagonal",
-    "lsmr_additive": "within-additive",
-    "pyfixest_map": "rust-map",
-    "r_fixest": "fixest",
-    "julia_fem": "FEM.jl",
-    # Backend names as the sweep drivers record them in the result files.
+# Spellings recorded by runs made before the names were unified on 2026-08-01.
+#
+# Nothing in the codebase produces any of these any more: every driver records
+# the canonical key above, and a test enforces it. They stay only so the
+# existing result CSVs, which are untracked and cannot be regenerated cheaply,
+# still render. Delete this table after the next full sweep.
+#
+# Note how many of them named the same thing. "rust-map" alone was spelled
+# five ways, one per driver that happened to write it.
+LEGACY_SPELLINGS = {
     "pyfixest (rust-map)": "rust-map",
+    "pyfixest-map": "rust-map",
+    "pyfixest_map": "rust-map",
+    "rust": "rust-map",
     "pyfixest (rust-map, matched)": "rust-map-matched",
     "pyfixest (within)": "within",
+    "pyfixest-within": "within",
     "pyfixest (within-off)": "within-off",
+    "lsmr_off": "within-off",
     "pyfixest (within-diagonal)": "within-diagonal",
+    "lsmr_diagonal": "within-diagonal",
     "pyfixest (within-additive)": "within-additive",
+    "lsmr_additive": "within-additive",
     "fixest-map": "fixest",
     "fixest-fepois": "fixest",
+    "r_fixest": "fixest",
     "FEM.jl (lsmr)": "FEM.jl",
     "FixedEffectModels": "FEM.jl",
-    "glfixedeffectmodels.jl": "GLFEM.jl",
-    "pyfixest-map": "rust-map",
-    "pyfixest-within": "within",
-    "rust": "rust-map",
-    # The crossover figure draws one series for both Julia packages, which
-    # share a style. Its own label is set at the call site.
+    "julia_fem": "FEM.jl",
     "Julia": "FEM.jl",
+    "glfixedeffectmodels.jl": "GLFEM.jl",
 }
+
+ALIASES = LEGACY_SPELLINGS
 
 
 def canonical(key: str) -> str | None:

@@ -446,10 +446,10 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(
             [spec.label for spec in MATCHED_ACCURACY],
             [
-                "pyfixest (rust-map, matched)",
-                "pyfixest (within-off)",
-                "pyfixest (within-diagonal)",
-                "pyfixest (within-additive)",
+                "rust-map-matched",
+                "within-off",
+                "within-diagonal",
+                "within-additive",
             ],
         )
         default_labels = {spec.label for spec in PACKAGE_DEFAULTS}
@@ -1056,6 +1056,32 @@ class BackendRegistryTests(unittest.TestCase):
                     canonical(spec.label),
                     f"{spec.label!r} runs but core.methods cannot name it",
                 )
+
+    def test_no_driver_invents_a_spelling(self) -> None:
+        """Every name a driver records must already be canonical.
+
+        The alias table exists only to read result files written before the
+        names were unified. If a new arm needs an alias to be understood, the
+        arm is spelled wrong, not the table incomplete: that is how "rust-map"
+        came to have five spellings, one per driver that wrote it.
+        """
+        from benchmarks.core.methods import METHODS
+        from benchmarks.drivers.tolerance import METHOD_BY_KEY
+        from benchmarks.solvers.registry import (
+            EXTERNAL_FEOLS,
+            MATCHED_ACCURACY,
+            PACKAGE_DEFAULTS,
+        )
+
+        recorded = (
+            [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)]
+            + [label for label, _ in EXTERNAL_FEOLS]
+            + list(METHOD_BY_KEY)
+        )
+        aliased = sorted(name for name in recorded if name not in METHODS)
+        self.assertEqual(
+            aliased, [], f"these are recorded but are not canonical keys: {aliased}"
+        )
 
     def test_every_recorded_backend_is_registered(self) -> None:
         """Whatever the drivers actually wrote must still resolve.

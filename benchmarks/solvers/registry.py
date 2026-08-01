@@ -42,9 +42,14 @@ class Backend(NamedTuple):
 
 
 # What a user gets out of the box. Cross-package tables read these.
+#
+# The label is the name recorded in the result file, and it is always the
+# canonical key from core.methods. Every reader-facing string is derived from
+# that key, so a driver never invents a second spelling of a method it already
+# has a name for.
 PACKAGE_DEFAULTS = (
-    Backend("pyfixest (within)", "within"),
-    Backend("pyfixest (rust-map)", "rust"),
+    Backend("within", "within"),
+    Backend("rust-map", "rust"),
 )
 
 # The same code path at matched accuracy under one shared iteration budget.
@@ -53,12 +58,10 @@ PACKAGE_DEFAULTS = (
 # rows belong in which table is a curation decision, not a reason to run the
 # same designs twice.
 MATCHED_ACCURACY = (
-    Backend(
-        "pyfixest (rust-map, matched)", "rust", MECHANISM_MAP_TOL, MECHANISM_MAXITER
-    ),
+    Backend("rust-map-matched", "rust", MECHANISM_MAP_TOL, MECHANISM_MAXITER),
     *(
         Backend(
-            f"pyfixest (within-{name})",
+            f"within-{name}",
             f"within-{name}",
             MECHANISM_LSMR_TOL,
             MECHANISM_MAXITER,
@@ -68,8 +71,8 @@ MATCHED_ACCURACY = (
 )
 
 EXTERNAL_FEOLS = (
-    ("fixest-map", FixestFeolsBenchmarker),
-    ("FEM.jl (lsmr)", JuliaFeolsBenchmarker),
+    ("fixest", FixestFeolsBenchmarker),
+    ("FEM.jl", JuliaFeolsBenchmarker),
 )
 
 
@@ -167,8 +170,8 @@ def build_fepois_benchmarkers(
         for spec in _pyfixest_specs(package_defaults, matched_accuracy)
     ]
     if external:
-        benchmarkers.append(FixestFepoisBenchmarker("fixest-fepois"))
-        benchmarkers.append(GLFixedEffectModelsBenchmarker("glfixedeffectmodels.jl"))
+        benchmarkers.append(FixestFepoisBenchmarker("fixest"))
+        benchmarkers.append(GLFixedEffectModelsBenchmarker("GLFEM.jl"))
 
     if not benchmarkers:
         raise ValueError("No requested benchmark backend is available.")

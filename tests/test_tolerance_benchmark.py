@@ -40,12 +40,12 @@ class ToleranceMetricTests(unittest.TestCase):
         self.assertEqual(
             set(METHOD_BY_KEY),
             {
-                "lsmr_off",
-                "lsmr_diagonal",
-                "lsmr_additive",
-                "pyfixest_map",
-                "r_fixest",
-                "julia_fem",
+                "within-off",
+                "within-diagonal",
+                "within-additive",
+                "rust-map",
+                "fixest",
+                "FEM.jl",
             },
         )
         for method in METHOD_BY_KEY.values():

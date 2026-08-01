@@ -14,19 +14,19 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from benchmarks.core.methods import legend_label, linestyle, style
+from benchmarks.core.methods import canonical, legend_label, linestyle, style
 from benchmarks.core.paths import ROOT
 
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
 
 METHOD_ORDER = (
-    "lsmr_off",
-    "lsmr_diagonal",
-    "lsmr_additive",
-    "pyfixest_map",
-    "r_fixest",
-    "julia_fem",
+    "within-off",
+    "within-diagonal",
+    "within-additive",
+    "rust-map",
+    "fixest",
+    "FEM.jl",
 )
 
 METRICS = (
@@ -59,6 +59,10 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tolerance results are missing columns: {missing}")
 
     data = raw.copy()
+    # Result files recorded before the spellings were unified say "lsmr_off"
+    # where new ones say "within-off". Resolve on the way in so one figure can
+    # read both, and so METHOD_ORDER holds canonical names only.
+    data["method"] = data["method"].map(lambda value: canonical(value) or value)
     data["success"] = _coerce_bool_series(data["success"])
     numeric = [
         "tolerance",

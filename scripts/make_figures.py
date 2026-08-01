@@ -23,7 +23,7 @@ matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
 
-from benchmarks.core.methods import inline_label, linestyle, style
+from benchmarks.core.methods import canonical, inline_label, linestyle, style
 from benchmarks.core.paths import ROOT
 
 RESULTS = ROOT / "results" / "runs" / "latest"
@@ -34,38 +34,33 @@ FIGURES = ROOT / "figures" / "results"
 # accuracy fixed, so it isolates the solver and preconditioner. These are the
 # backend names as the result files spell them; every colour, marker, dash and
 # label is derived from the registry, so nothing is restated here.
-CROSS_PACKAGE_BACKENDS = (
-    "pyfixest (rust-map)",
-    "fixest-map",
-    "FEM.jl (lsmr)",
-    "pyfixest (within)",
-)
+CROSS_PACKAGE_BACKENDS = ("rust-map", "fixest", "FEM.jl", "within")
 
 MECHANISM_BACKENDS = (
-    "pyfixest (rust-map, matched)",
-    "pyfixest (within-off)",
-    "pyfixest (within-diagonal)",
-    "pyfixest (within-additive)",
+    "rust-map-matched",
+    "within-off",
+    "within-diagonal",
+    "within-additive",
 )
 
 CROSSOVER_FILES = {
     "OLS": {
         "rust-map": "feols_bench__pyfixest_rust_map.csv",
         "fixest": "feols_bench__fixest_map.csv",
-        "Julia": "feols_bench__fem_jl_lsmr.csv",
+        "FEM.jl": "feols_bench__fem_jl_lsmr.csv",
         "within": "feols_bench__pyfixest_within.csv",
     },
     "PPML": {
         "rust-map": "fepois_bench__pyfixest_rust_map.csv",
         "fixest": "fepois_bench__fixest_fepois.csv",
-        "Julia": "fepois_bench__glfixedeffectmodels_jl.csv",
+        "FEM.jl": "fepois_bench__glfixedeffectmodels_jl.csv",
         "within": "fepois_bench__pyfixest_within.csv",
     },
 }
 
 # The crossover figure draws one series for both Julia packages, so its label
 # names both. Every other series takes the registry's inline label.
-CROSSOVER_LABEL = {"Julia": "FEM.jl / GLFEM.jl — LSMR (diagonal)"}
+CROSSOVER_LABEL = {"FEM.jl": "FEM.jl / GLFEM.jl — LSMR (diagonal)"}
 
 
 def _load_points() -> list[dict]:
@@ -135,7 +130,10 @@ def _runtime_panel(
         usable = [
             row
             for row in points
-            if row["backend"] == raw_name
+            # Resolved, not compared raw: result files recorded before the
+            # spellings were unified still say "pyfixest (rust-map)" where new
+            # ones say "rust-map", and both name the same series.
+            if canonical(row["backend"]) == canonical(raw_name)
             and row.get("gap")
             and row.get("median_time")
             and row["gap"] > 0
@@ -303,7 +301,7 @@ def crossover_figure(
     offsets = {
         "rust-map": -0.075,
         "fixest": -0.025,
-        "Julia": 0.025,
+        "FEM.jl": 0.025,
         "within": 0.075,
     }
     designs = ("simple", "difficult")

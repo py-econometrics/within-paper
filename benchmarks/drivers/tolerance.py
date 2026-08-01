@@ -75,7 +75,7 @@ class MethodSpec:
 
 METHODS = (
     MethodSpec(
-        key="lsmr_off",
+        key="within-off",
         package="PyFixest",
         solver="LSMR",
         preconditioner="off",
@@ -83,7 +83,7 @@ METHODS = (
         tolerances=(1e-4, 1e-6, 1e-8, 1e-10, 1e-12),
     ),
     MethodSpec(
-        key="lsmr_diagonal",
+        key="within-diagonal",
         package="PyFixest",
         solver="LSMR",
         preconditioner="diagonal",
@@ -91,7 +91,7 @@ METHODS = (
         tolerances=(1e-4, 1e-6, 1e-8, 1e-10, 1e-12),
     ),
     MethodSpec(
-        key="lsmr_additive",
+        key="within-additive",
         package="PyFixest",
         solver="LSMR",
         preconditioner="additive",
@@ -99,7 +99,7 @@ METHODS = (
         tolerances=(1e-4, 1e-6, 1e-8, 1e-10, 1e-12),
     ),
     MethodSpec(
-        key="pyfixest_map",
+        key="rust-map",
         package="PyFixest",
         solver="MAP",
         preconditioner="none",
@@ -107,7 +107,7 @@ METHODS = (
         tolerances=(1e-4, 1e-6, 1e-8, 1e-10),
     ),
     MethodSpec(
-        key="r_fixest",
+        key="fixest",
         package="fixest",
         solver="MAP",
         preconditioner="package default",
@@ -115,7 +115,7 @@ METHODS = (
         tolerances=(1e-4, 1e-6, 1e-8, 1e-10),
     ),
     MethodSpec(
-        key="julia_fem",
+        key="FEM.jl",
         package="FixedEffectModels.jl",
         solver="LSMR",
         preconditioner="package default",
@@ -126,14 +126,14 @@ METHODS = (
 
 METHOD_BY_KEY = {method.key: method for method in METHODS}
 PYTHON_METHODS = frozenset(
-    {"lsmr_off", "lsmr_diagonal", "lsmr_additive", "pyfixest_map"}
+    {"within-off", "within-diagonal", "within-additive", "rust-map"}
 )
 EXTERNAL_METHODS = {
-    "r_fixest": (
+    "fixest": (
         ["Rscript"],
         EXTERNAL_DIR / "tolerance_fixest.R",
     ),
-    "julia_fem": (
+    "FEM.jl": (
         ["julia"],
         EXTERNAL_DIR / "tolerance_julia.jl",
     ),
@@ -271,7 +271,7 @@ def _fit_pyfixest(
 
 
 def _reference_solution(frame: pd.DataFrame) -> ReferenceSolution:
-    method = METHOD_BY_KEY["lsmr_additive"]
+    method = METHOD_BY_KEY["within-additive"]
     fit, _ = _fit_pyfixest(
         frame,
         method,
@@ -532,7 +532,7 @@ def _run_external_method(
     config_path.write_text(json.dumps(config), encoding="utf-8")
     command = [*command_prefix, str(script), str(config_path)]
     env = os.environ.copy()
-    if method.key == "julia_fem":
+    if method.key == "FEM.jl":
         env["JULIA_PROJECT"] = str(ROOT / "benchmarks" / "julia-env")
         env["JULIA_NUM_THREADS"] = str(config["thread_count"])
 
