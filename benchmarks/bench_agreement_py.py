@@ -33,7 +33,7 @@ from benchmarks.modular.settings import demeaner_for
 import numpy as np
 import pandas as pd
 import pyfixest as pf
-from benchmarks.core.paths import JULIA_ENV, ROOT
+from benchmarks.core.paths import EXTERNAL_DIR, JULIA_ENV, ROOT
 
 FML = "y ~ x1 | indiv_id + firm_id + year"
 DEPVAR = "y"
@@ -90,9 +90,9 @@ def _external_coefficients(
         "fe_cols": FE_COLS,
     }
     backends = {
-        "fixest": (["Rscript", str(ROOT / "benchmarks" / "bench_agreement_fixest.R")], "Rscript"),
+        "fixest": (["Rscript", str(EXTERNAL_DIR / "agreement_fixest.R")], "Rscript"),
         "FixedEffectModels": (
-            ["julia", f"--project={JULIA_ENV}", str(ROOT / "benchmarks" / "bench_agreement_julia.jl")],
+            ["julia", f"--project={JULIA_ENV}", str(EXTERNAL_DIR / "agreement_julia.jl")],
             "julia",
         ),
     }

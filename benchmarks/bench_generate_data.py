@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-MODULAR_DIR = ROOT / "benchmarks" / "modular"
 
 from benchmarks.modular.dgp_functions import base_dgp
 from benchmarks.core.paths import ROOT

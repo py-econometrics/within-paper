@@ -17,11 +17,11 @@ from benchmarks.modular.feols_benchmarkers import (
     _trim_process_memory,
 )
 from benchmarks.modular.subprocess_backend import (
-    _SCRIPT_DIR,
     JuliaFeolsBenchmarker,
     SubprocessFeolsBenchmarker,
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.core.paths import EXTERNAL_DIR
 class PyFepoisBenchmarkerFullApi:
     """Benchmark one pf.fepois() call with the selected demeaning backend."""
 
@@ -147,7 +147,7 @@ class FixestFepoisBenchmarker(SubprocessFeolsBenchmarker):
         super().__init__(
             name=name or "r.fixest (fepois)",
             command_prefix=["Rscript"],
-            script_path=(script_path or _SCRIPT_DIR / "fixest_bench.R"),
+            script_path=(script_path or EXTERNAL_DIR / "fixest_bench.R"),
             model="fepois",
         )
 
@@ -156,5 +156,5 @@ class GLFixedEffectModelsBenchmarker(JuliaFeolsBenchmarker):
     def __init__(self, name: str | None = None, script_path=None):
         super().__init__(
             name=name or "julia.GLFixedEffectModels (fepois)",
-            script_path=(script_path or _SCRIPT_DIR / "fepois_julia.jl"),
+            script_path=(script_path or EXTERNAL_DIR / "fepois_julia.jl"),
         )

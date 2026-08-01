@@ -44,7 +44,7 @@ from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
-from benchmarks.core.paths import ROOT
+from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
 MODEL_COLUMNS = [*FE_COLS, "x1", "y"]
@@ -131,11 +131,11 @@ PYTHON_METHODS = frozenset(
 EXTERNAL_METHODS = {
     "r_fixest": (
         ["Rscript"],
-        ROOT / "benchmarks" / "modular" / "tolerance_fixest.R",
+        EXTERNAL_DIR / "tolerance_fixest.R",
     ),
     "julia_fem": (
         ["julia"],
-        ROOT / "benchmarks" / "modular" / "tolerance_julia.jl",
+        EXTERNAL_DIR / "tolerance_julia.jl",
     ),
 }
 

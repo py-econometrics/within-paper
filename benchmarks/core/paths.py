@@ -33,3 +33,8 @@ FIGURES_DIR = ROOT / "figures" / "results"
 
 # Pinned Julia depot for the external drivers.
 JULIA_ENV = ROOT / "benchmarks" / "julia-env"
+
+# The R and Julia benchmark drivers. They are executed as scripts, never
+# imported, so they live outside the Python packages rather than beside the
+# module that happens to launch them.
+EXTERNAL_DIR = ROOT / "benchmarks" / "external"

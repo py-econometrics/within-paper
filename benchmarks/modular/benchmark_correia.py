@@ -15,7 +15,7 @@ from benchmarks.modular.subprocess_backend import (
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
-from benchmarks.core.paths import ROOT
+from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -24,7 +24,7 @@ DATA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 METADATA_DIR = DATA_DIR / "metadata"
 OUTPUT_CSV = ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
 RAW_OUTPUT_CSV = ROOT / "benchmarks" / "results" / "correia-benchmarks-raw.csv"
-SCRIPT_DIR = Path(__file__).resolve().parent
+
 N_ITERATIONS = 3
 
 DATASETS = [
@@ -96,11 +96,11 @@ def build_benchmarkers() -> list:
         PyFeolsBenchmarkerFullApi("pyfixest-within", "within"),
         FixestFeolsBenchmarker(
             "fixest",
-            script_path=SCRIPT_DIR / "correia_r.R",
+            script_path=EXTERNAL_DIR / "correia_r.R",
         ),
         JuliaFeolsBenchmarker(
             "FixedEffectModels",
-            script_path=SCRIPT_DIR / "correia_julia.jl",
+            script_path=EXTERNAL_DIR / "correia_julia.jl",
         ),
     ]
 

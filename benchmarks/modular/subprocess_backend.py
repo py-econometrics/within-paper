@@ -28,6 +28,7 @@ from benchmarks.modular.feols_benchmarkers import (
     _result_from_dataset,
     _safe_cast,
 )
+from benchmarks.core.paths import EXTERNAL_DIR
 
 # ---------------------------------------------------------------------------
 
@@ -220,7 +221,7 @@ class SubprocessFeolsBenchmarker:
         )
 
 
-_SCRIPT_DIR = Path(__file__).parent
+
 
 
 def _name_and_script(
@@ -250,7 +251,7 @@ class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
         super().__init__(
             name=name or "r.fixest",
             command_prefix=["Rscript"],
-            script_path=(script_path or _SCRIPT_DIR / "fixest_bench.R"),
+            script_path=(script_path or EXTERNAL_DIR / "fixest_bench.R"),
             model="feols",
         )
 
@@ -265,5 +266,5 @@ class JuliaFeolsBenchmarker(SubprocessFeolsBenchmarker):
         super().__init__(
             name=name or "julia.FixedEffectModels",
             command_prefix=["julia"],
-            script_path=(script_path or _SCRIPT_DIR / "feols_julia.jl"),
+            script_path=(script_path or EXTERNAL_DIR / "feols_julia.jl"),
         )
