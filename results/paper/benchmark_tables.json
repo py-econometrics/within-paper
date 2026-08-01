@@ -1,11 +1,4 @@
 {
-  "legacy_gpu": {
-    "note": "Older PyFixest benchmark run; hardware and software versions unrecorded.",
-    "ols_torch_cuda": {
-      "difficult": "8.73s",
-      "simple": "4.73s"
-    }
-  },
   "prose": {
     "setup_difficult_setup_s": 0.8758755000308156,
     "setup_difficult_share": 0.3319326827636981,
@@ -578,7 +571,7 @@
       "header": [
         "Scenario",
         "Gap (share)",
-        "`rust-map-matched`",
+        "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
         "`within-additive`"
@@ -640,7 +633,7 @@
       "header": [
         "Scenario",
         "Gap (share)",
-        "`rust-map-matched`",
+        "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
         "`within-additive`"

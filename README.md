@@ -37,8 +37,8 @@ describes how the benchmark code is organized.
 ## Repository guide
 
 - `graph_preconditioner_hdfe.typ` is the paper source.
-- `benchmarks/` contains data generators, solver adapters, and benchmark entry
-  points.
+- `benchmarks/` contains run-local data generators, native runners, explicit
+  experiment configs, and the small coordinator.
 - `scripts/` turns recorded measurements into paper tables and figures.
 - `generated/` contains the table fragments and values included by the paper.
 - `within-docs/` contains technical notes about the solver.

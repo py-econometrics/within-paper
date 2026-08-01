@@ -14,8 +14,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from benchmarks.core.methods import canonical, legend_label, linestyle, style
-from benchmarks.core.paths import ROOT
+from scripts.benchmark_methods import legend_label, linestyle, style
+
+ROOT = Path(__file__).absolute().parents[1]
 
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
@@ -45,12 +46,11 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
     """Return one median point per design, method, and tolerance."""
     required = {
         "design",
-        "method",
-        "label",
+        "backend",
         "tolerance",
         "default_tolerance",
-        "time_s",
-        "success",
+        "runtime_s",
+        "converged",
         "coefficient_error_se",
         "residual_error",
     }
@@ -59,27 +59,23 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tolerance results are missing columns: {missing}")
 
     data = raw.copy()
-    # Result files recorded before the spellings were unified say "lsmr_off"
-    # where new ones say "within-off". Resolve on the way in so one figure can
-    # read both, and so METHOD_ORDER holds canonical names only.
-    data["method"] = data["method"].map(lambda value: canonical(value) or value)
-    data["success"] = _coerce_bool_series(data["success"])
+    data["converged"] = _coerce_bool_series(data["converged"])
     numeric = [
         "tolerance",
         "default_tolerance",
-        "time_s",
+        "runtime_s",
         "coefficient_error_se",
         "residual_error",
     ]
     for column in numeric:
         data[column] = pd.to_numeric(data[column], errors="coerce")
 
-    keys = ["design", "method", "label", "tolerance", "default_tolerance"]
+    keys = ["design", "backend", "tolerance", "default_tolerance"]
     rows: list[dict] = []
     for key, group in data.groupby(keys, dropna=False, sort=False):
         successful = group[
-            group["success"]
-            & np.isfinite(group["time_s"])
+            group["converged"]
+            & np.isfinite(group["runtime_s"])
             & np.isfinite(group["coefficient_error_se"])
             & np.isfinite(group["residual_error"])
         ]
@@ -89,7 +85,7 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
                 "n_trials": len(group),
                 "n_success": len(successful),
                 "median_time_s": (
-                    float(successful["time_s"].median())
+                    float(successful["runtime_s"].median())
                     if len(successful)
                     else np.nan
                 ),
@@ -138,7 +134,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         return None
     entries = []
     for method in METHOD_ORDER:
-        subset = failed[failed["method"] == method]
+        subset = failed[failed["backend"] == method]
         if subset.empty:
             continue
         label = legend_label(method).replace("\n", " — ")
@@ -188,7 +184,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             for method in METHOD_ORDER:
                 method_points = points[
                     (points["design"] == design)
-                    & (points["method"] == method)
+                    & (points["backend"] == method)
                     & (points["n_success"] > 0)
                     & np.isfinite(points["median_time_s"])
                     & np.isfinite(points[metric])
@@ -266,7 +262,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
     labels = {
         method: legend_label(method)
         for method in METHOD_ORDER
-        if (points["method"] == method).any()
+        if (points["backend"] == method).any()
     }
     handles = [
         Line2D(

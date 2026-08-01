@@ -23,11 +23,11 @@ matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
 
-from benchmarks.core.methods import canonical, inline_label, linestyle, style
-from benchmarks.core.paths import ROOT
+from scripts.benchmark_methods import inline_label, linestyle, style
+
+ROOT = Path(__file__).absolute().parents[1]
 
 RESULTS = ROOT / "results" / "runs" / "latest"
-BENCHMARK_RESULTS = ROOT / "benchmarks" / "results"
 FIGURES = ROOT / "figures" / "results"
 
 # The left panel compares package defaults. The right panel holds package and
@@ -37,25 +37,15 @@ FIGURES = ROOT / "figures" / "results"
 CROSS_PACKAGE_BACKENDS = ("rust-map", "fixest", "FEM.jl", "within")
 
 MECHANISM_BACKENDS = (
-    "rust-map-matched",
+    "rust-map",
     "within-off",
     "within-diagonal",
     "within-additive",
 )
 
 CROSSOVER_FILES = {
-    "OLS": {
-        "rust-map": "feols_bench__pyfixest_rust_map.csv",
-        "fixest": "feols_bench__fixest_map.csv",
-        "FEM.jl": "feols_bench__fem_jl_lsmr.csv",
-        "within": "feols_bench__pyfixest_within.csv",
-    },
-    "PPML": {
-        "rust-map": "fepois_bench__pyfixest_rust_map.csv",
-        "fixest": "fepois_bench__fixest_fepois.csv",
-        "FEM.jl": "fepois_bench__glfixedeffectmodels_jl.csv",
-        "within": "fepois_bench__pyfixest_within.csv",
-    },
+    "OLS": ("ols.csv", {"rust-map": "rust-map", "fixest": "fixest", "FEM.jl": "FEM.jl", "within": "within"}),
+    "PPML": ("ppml.csv", {"rust-map": "rust-map", "fixest": "fixest", "FEM.jl": "GLFEM.jl", "within": "within"}),
 }
 
 # The crossover figure draws one series for both Julia packages, so its label
@@ -77,30 +67,35 @@ def _load_crossover_results() -> dict[str, dict[str, dict[str, object]]]:
 
     target_n = {"OLS": 10_000_000, "PPML": 1_000_000}
     results: dict[str, dict[str, dict[str, object]]] = {}
-    for model, files in CROSSOVER_FILES.items():
+    for model, (filename, backends) in CROSSOVER_FILES.items():
+        path = RESULTS / filename
+        if not path.exists():
+            raise SystemExit(f"{path} is missing")
+        with path.open(newline="") as stream:
+            rows = list(csv.DictReader(stream))
         model_results: dict[str, dict[str, object]] = {}
-        for backend, filename in files.items():
-            path = BENCHMARK_RESULTS / filename
-            if not path.exists():
-                raise SystemExit(f"{path} is missing")
+        for backend, raw_backend in backends.items():
             grouped = {
                 "simple": {"times": [], "n_trials": 0, "n_success": 0},
                 "difficult": {"times": [], "n_trials": 0, "n_success": 0},
             }
-            with path.open(newline="") as stream:
-                for row in csv.DictReader(stream):
-                    design = row.get("dgp", "")
-                    if design not in grouped:
-                        continue
-                    if int(row["n_obs"]) != target_n[model] or int(row["n_fe"]) != 3:
-                        continue
-                    record = grouped[design]
-                    record["n_trials"] += 1
-                    success = row.get("success", "").lower() in {"true", "1"}
-                    runtime = row.get("time", "")
-                    if success and runtime:
-                        record["times"].append(float(runtime))
-                        record["n_success"] += 1
+            for row in rows:
+                design = row["design"]
+                if design not in grouped:
+                    continue
+                if (
+                    row["backend"] != raw_backend
+                    or int(row["n_obs"]) != target_n[model]
+                    or int(row["n_fe"]) != 3
+                ):
+                    continue
+                record = grouped[design]
+                record["n_trials"] += 1
+                success = row["converged"].lower() in {"true", "1"}
+                runtime = row["runtime_s"]
+                if success and runtime:
+                    record["times"].append(float(runtime))
+                    record["n_success"] += 1
             backend_results: dict[str, object] = {}
             for design, record in grouped.items():
                 times = record.pop("times")
@@ -118,6 +113,7 @@ def _runtime_panel(
     points: list[dict],
     backends: tuple[str, ...],
     *,
+    view: str,
     show_context: bool,
     title: str,
     note: str,
@@ -130,10 +126,8 @@ def _runtime_panel(
         usable = [
             row
             for row in points
-            # Resolved, not compared raw: result files recorded before the
-            # spellings were unified still say "pyfixest (rust-map)" where new
-            # ones say "rust-map", and both name the same series.
-            if canonical(row["backend"]) == canonical(raw_name)
+            if row["backend"] == raw_name
+            and row.get("view") == view
             and row.get("gap")
             and row.get("median_time")
             and row["gap"] > 0
@@ -252,6 +246,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
         axes[0],
         points,
         CROSS_PACKAGE_BACKENDS,
+        view="default",
         show_context=False,
         title="(a) Cross-package defaults",
         note=(
@@ -263,6 +258,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
         axes[1],
         points,
         MECHANISM_BACKENDS,
+        view="matched",
         show_context=False,
         title="(b) Same code path, matched accuracy",
         note=(

@@ -1,16 +1,10 @@
+"""Numerical and paper-facing checks for the compact benchmark code."""
+
 from __future__ import annotations
 
-import ast
-import csv
-import re
-import hashlib
-import json
 import os
-import sys
-import subprocess
-import warnings
+import json
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -19,1292 +13,165 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-
-ROOT = Path(__file__).resolve().parents[1]
-
-from benchmarks.drivers.setup_cost import _setup_share
-from benchmarks.drivers.correia import summarize_results
-from benchmarks.drivers.ppml import (
-    SIZES as FEPOIS_SIZES,
-    SPECS as FEPOIS_SPECS,
-)
-from benchmarks.drivers.ols import SIZES as OLS_SIZES
-from benchmarks.dgp.akm import AKMConfig, simulate_akm_panel
-from benchmarks.dgp.base import paper_base_dgp
-from benchmarks.dgp.scenarios import BaseDGP, _seed_for, get_akm_sweep_scenario_names
-from benchmarks.core.accuracy import (
-    GATE_A_ETA,
-    accuracy_record,
-    external_normal_residuals,
-    pair_edge_stats,
-    projection_errors,
-)
-from benchmarks.solvers.registry import (
-    MATCHED_ACCURACY,
-    PACKAGE_DEFAULTS,
-    build_feols_benchmarkers,
-    build_fepois_benchmarkers,
-    require_multiple_absorbed_factors,
-)
-from benchmarks.solvers.pyfixest_feols import (
-    _external_eta,
-)
-from benchmarks.solvers.common import as_bool, fit_converged
-from benchmarks.solvers.settings import (
-    DEFAULT_WITHIN_PRECONDITIONER,
-    MECHANISM_LSMR_TOL,
-    MECHANISM_MAXITER,
-    WITHIN_PRECONDITIONERS,
-    demeaner_for,
-)
-from benchmarks.core.records import RunRecord
-from benchmarks.core.runtime import configure_benchmark_runtime
-from benchmarks.dgp.samples import FE_COLS, SampleSpec, clear_sample_cache, load_sample
-from benchmarks.solvers.specs import matched_solver_specs
-from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-from benchmarks.core.methods import canonical
-from benchmarks.solvers.subprocess_driver import _parse_subprocess_output
-from benchmarks.solvers.runner import run_benchmarks
-from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
-from benchmarks.core.results import write_rows
-from benchmarks.core.timing import (
-    randomized_order,
-    repetitions_for_runtime,
-    summarize_times,
-    timed,
-)
-from scripts.paper_results import (
-    _iteration_rows,
-    _read_json,
-    _component_share,
-    _largest_metric,
-    _numeric_cell,
-    _render_trial_result,
-    _table_fragment,
-    _validate_ppml_results,
-)
-from scripts.analyze_gap_runtime import _sized_key
-from benchmarks.drivers.hardness import _component_rho
+from benchmarks.accuracy import external_normal_residuals, projection_errors
+from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
+from benchmarks.data import make_base_data, solver_data
+from benchmarks.ols.pyfixest import fit_ols
+from benchmarks.ppml.pyfixest import fit_ppml
+from benchmarks.within.map import map_demean_with_sweeps
+from scripts import compute_hardness
+from scripts import paper_results
+from scripts.paper_results import _render_trial_result
 
 
-def _frame_hash(frame: pd.DataFrame) -> str:
-    metadata = "|".join(frame.columns) + "\n" + "|".join(map(str, frame.dtypes))
-    values = pd.util.hash_pandas_object(frame, index=False).values.tobytes()
-    return hashlib.sha256(metadata.encode() + values).hexdigest()
-
-
-class BenchmarkCorrectnessTests(unittest.TestCase):
-    def test_ols_skips_unreported_one_million_fits(self) -> None:
-        self.assertEqual(OLS_SIZES, [10_000_000])
-        self.assertEqual(FEPOIS_SIZES, [1_000_000])
-
-    def test_akm_scenarios_match_the_paper_sweeps(self) -> None:
+class DataTests(unittest.TestCase):
+    def test_base_data_is_deterministic_and_has_the_paper_columns(self) -> None:
+        first = make_base_data(1_000, "simple", 42)
+        second = make_base_data(1_000, "simple", 42)
+        pd.testing.assert_frame_equal(first, second)
         self.assertEqual(
-            get_akm_sweep_scenario_names(),
-            (
-                "akm_sorting_1",
-                "akm_sorting_2",
-                "akm_sorting_3",
-                "akm_sorting_4",
-                "akm_sorting_5",
-                "akm_mobility_1",
-                "akm_mobility_2",
-                "akm_mobility_3",
-                "akm_mobility_4",
-                "akm_mobility_5",
-                "akm_mobility_6",
-            ),
+            list(first), ["indiv_id", "firm_id", "year", "y", "negbin_y", "x1"]
         )
+        self.assertAlmostEqual(first.iloc[0]["y"], 3.3482659592032387)
 
-    def test_paper_base_dgp_preserves_values_and_six_column_schema(self) -> None:
-        expected = {
-            "simple": "b95147d29c724cf3079a3cc46079369d4da778bf0bccb5af5948f99888e900bb",
-            "difficult": "9ab47efb6b6cc909903555afb8d76e2a976b091f2fe7ba40f00394a2d5c5c64a",
-        }
-        for dgp_type, digest in expected.items():
-            frame = paper_base_dgp(n=2_300, type_=dgp_type, seed=123)
-            self.assertEqual(
-                list(frame.columns),
-                ["indiv_id", "firm_id", "year", "y", "negbin_y", "x1"],
-            )
-            self.assertEqual(_frame_hash(frame), digest)
-
-    def test_base_cache_rejects_an_extra_column(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dgp = BaseDGP(Path(tmpdir), "simple")
-            with patch("builtins.print"):
-                dataset = dgp.generate(n=2_300, n_iters=1, burn_in=0)[0]
-
-                with patch(
-                    "benchmarks.dgp.scenarios.paper_base_dgp", side_effect=AssertionError("cache miss")
-                ):
-                    dgp.generate(n=2_300, n_iters=1, burn_in=0)
-
-                frame = pd.read_parquet(dataset.data_path)
-                frame["unused"] = 0
-                frame.to_parquet(dataset.data_path, index=False)
-                with patch("benchmarks.dgp.scenarios.paper_base_dgp", wraps=paper_base_dgp) as generator:
-                    dgp.generate(n=2_300, n_iters=1, burn_in=0)
-            generator.assert_called_once()
-
-    def test_akm_paper_path_is_deterministic(self) -> None:
-        common = {
-            "n_workers": 100,
-            "n_firms": 20,
-            "n_time": 4,
-            "n_industries": 2,
-            "n_match_bins": 8,
-            "lambda_": 0.8,
-        }
-        cases = (
-            (
-                AKMConfig(**common, rho=20.0, delta=0.1),
-                "c026e83821a4e48924a8a13e06e4abf1f4f8918f4816daabc47ad04afd505b89",
-            ),
-            (
-                AKMConfig(**common, rho=1.0, delta=0.01),
-                "a0ccdf33ab1c7a6c982609bba6ed88eea989aaecae9fd82bfad2cc63f38f561b",
-            ),
+    def test_akm_designs_and_small_draw_are_deterministic(self) -> None:
+        self.assertEqual(len(SCENARIOS), 11)
+        config = AKMConfig(
+            n_workers=8, n_firms=4, n_time=3, n_industries=2, n_match_bins=4
         )
-        for config, digest in cases:
-            frame = simulate_akm_panel(config, seed=123)
-            self.assertEqual(
-                list(frame.columns), ["indiv_id", "firm_id", "year", "x1", "y"]
-            )
-            self.assertEqual(_frame_hash(frame), digest)
+        first = simulate_akm_panel(config, seed=7)
+        second = simulate_akm_panel(config, seed=7)
+        pd.testing.assert_frame_equal(first, second)
+        self.assertEqual(first.shape, (24, 5))
+        self.assertAlmostEqual(first.iloc[0]["x1"], -1.9924197841744944)
 
-    def test_ppml_uses_only_worker_firm_year_fixed_effects(self) -> None:
-        # The order was reconciled with the AKM sweep on 2026-07-26; see
-        # test_absorbed_factor_order_is_the_same_everywhere for why it matters.
-        self.assertEqual(len(FEPOIS_SPECS), 1)
-        self.assertEqual(FEPOIS_SPECS[0].fe_cols, ("indiv_id", "firm_id", "year"))
+    def test_solver_data_factorizes_every_fixed_effect(self) -> None:
+        categories, rhs = solver_data(make_base_data(1_000, "difficult", 43))
+        self.assertEqual(categories.shape, (1_000, 3))
+        self.assertEqual(rhs.shape, (1_000, 2))
+        self.assertTrue(categories.flags.f_contiguous)
+        self.assertTrue(rhs.flags.f_contiguous)
 
-    def test_canonical_ppml_table_contains_only_three_fe_rows(self) -> None:
-        document = json.loads(
-            (ROOT / "results" / "paper" / "benchmark_tables.json").read_text()
+
+class AccuracyTests(unittest.TestCase):
+    def test_exact_demeaning_has_small_external_residual(self) -> None:
+        categories = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+        rhs = np.array([1.0, 2.0, 3.0, 4.0])[:, None]
+        demeaned = np.zeros_like(rhs)
+        self.assertLess(external_normal_residuals(categories, rhs, demeaned)[0], 1e-14)
+
+    def test_projection_error_uses_the_original_rhs_norm(self) -> None:
+        rhs = np.array([3.0, 4.0])[:, None]
+        reference = np.zeros_like(rhs)
+        result = rhs.copy()
+        self.assertAlmostEqual(projection_errors(result, reference, rhs)[0], 1.0)
+
+
+class MapTests(unittest.TestCase):
+    def test_map_reports_the_iteration_cap(self) -> None:
+        categories = np.array([[0, 0], [0, 1], [1, 1], [1, 2]], dtype=np.uint32)
+        result = map_demean_with_sweeps(
+            np.arange(4.0)[:, None], categories, tol=0.0, maxiter=1
         )
-        rows = document["tables"]["ppml"]["rows"]
-        self.assertEqual(len(rows), 2)
-        self.assertEqual({row[1] for row in rows}, {"3"})
+        self.assertEqual(result.iterations, [1])
+        self.assertEqual(result.converged, [False])
 
-    def test_ppml_sync_rejects_old_two_fe_results(self) -> None:
-        rows = [
-            {
-                "_source_file": "benchmarks/results/fepois_bench__example.csv",
-                "n_fe": "2",
-            }
-        ]
-        with self.assertRaisesRegex(ValueError, "only n_fe=3"):
-            _validate_ppml_results(rows)
 
-    def test_named_dgp_seed_is_stable(self) -> None:
-        self.assertEqual(_seed_for("akm_mobility_1", 1_000_000, 1), 100_000_085)
-
-    def test_setup_share_matches_displayed_decomposition(self) -> None:
-        self.assertAlmostEqual(_setup_share(6.4, 1.52), 6.4 / 7.92)
-
-    def test_string_false_is_not_truthy(self) -> None:
-        self.assertFalse(as_bool("false", default=True))
-        self.assertTrue(as_bool("true", default=False))
-
-    def test_correia_summary_retains_trial_counts(self) -> None:
-        frame = pd.DataFrame(
-            [
-                {
-                    "source_dataset_id": "example",
-                    "backend": "fixest",
-                    "n_obs": 100,
-                    "n_fe": 2,
-                    "time": 1.0,
-                    "success": True,
-                    "error": None,
-                },
-                {
-                    "source_dataset_id": "example",
-                    "backend": "fixest",
-                    "n_obs": 100,
-                    "n_fe": 2,
-                    "time": 3.0,
-                    "success": True,
-                    "error": None,
-                },
-                {
-                    "source_dataset_id": "example",
-                    "backend": "fixest",
-                    "n_obs": 100,
-                    "n_fe": 2,
-                    "time": None,
-                    "success": False,
-                    "error": "did not converge",
-                },
-            ]
-        )
-        row = summarize_results(frame).iloc[0]
-        self.assertEqual(row["n_runs"], 3)
-        self.assertEqual(row["n_success"], 2)
-        self.assertFalse(row["success"])
-        self.assertEqual(row["time"], 2.0)
-
-    def test_complete_trial_rendering_preserves_nonconvergence(self) -> None:
-        partial = [
-            {"iter_num": "1", "success": "True", "time": "1.0"},
-            {"iter_num": "2", "success": "True", "time": "3.0"},
-            {"iter_num": "3", "success": "False", "time": ""},
-        ]
-        failed = [
-            {"iter_num": str(i), "success": "False", "time": ""}
-            for i in range(1, 4)
-        ]
-        self.assertEqual(_render_trial_result(partial), "2.00s (2/3)")
-        self.assertEqual(_render_trial_result(failed), "failed (0/3)")
-        self.assertEqual(_render_trial_result(partial[:2]), "incomplete")
-
-    def test_pre_environment_modules_stay_standard_library_only(self) -> None:
-        # scripts/paper_results.py imports these and must keep running before
-        # the Pixi environment exists, so a third-party import in either would
-        # break the pre-environment runtime checks.
-        for relative in ("benchmarks/core/timing.py", "benchmarks/core/paths.py"):
-            with self.subTest(module=relative):
-                tree = ast.parse((ROOT / relative).read_text())
-                imported = set()
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        imported.update(a.name.split(".")[0] for a in node.names)
-                    elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                        imported.add(node.module.split(".")[0])
-                self.assertLessEqual(imported, set(sys.stdlib_module_names))
-
-    def test_shared_root_is_the_repository_root(self) -> None:
-        """paths.ROOT must agree with a root derived independently of it.
-
-        Every module now takes its paths from core.paths rather than counting
-        parent directories itself, so nothing else would notice if that one
-        definition drifted. This test derives the root the old way, from the
-        test file's own location, and is the only place that still does.
-        """
-        from benchmarks.core import paths
-
-        self.assertEqual(paths.ROOT, ROOT)
-        self.assertTrue((paths.ROOT / "pixi.toml").is_file())
-        self.assertEqual(paths.DATA_DIR, ROOT / "benchmarks" / "data")
-        self.assertEqual(paths.LATEST_RUN, ROOT / "results" / "runs" / "latest")
-
-    def test_join_key_is_shared_between_harness_and_analysis(self) -> None:
-        # Pairing a 1M runtime with a 10M gap moved a fitted slope once; the
-        # two sides now build the key from one definition.
-        self.assertEqual(
-            _sized_key("difficult", "1000000"),
-            SampleSpec(design="difficult", n_obs=1_000_000).key,
-        )
-        self.assertEqual(_sized_key("difficult", "not-a-size"), "difficult")
-
-    def test_iteration_units_are_never_mixed(self) -> None:
-        # A MAP sweep is a full pass over the factors; an LSMR iteration is one
-        # operator application. Recording the unit per row is what stops a
-        # later renderer from pooling them into one column.
-        document = _read_json(ROOT / "results" / "paper" / "benchmark_tables.json")
-        header = [cell.replace("`", "") for cell in document["tables"]["iterations"]["header"]]
-        self.assertEqual(header[1], "map (sweeps)")
-
-        with (ROOT / "results" / "runs" / "latest" / "within_preconditioners.csv").open(
-            newline="", encoding="utf-8"
-        ) as handle:
-            rows = list(csv.DictReader(handle))
-        units = {row["solver_label"]: row.get("iteration_unit") for row in rows}
-        self.assertEqual(units.get("map"), "map-sweep")
-        for label in ("within-off", "within-diagonal", "within-additive"):
-            self.assertEqual(units.get(label), "lsmr-iteration", label)
-
-    def test_iteration_table_marks_capped_and_absent_cells(self) -> None:
-        rows = [
-            {"design": "d", "solver_label": "map", "iterations_max": "9000",
-             "censoring": "capped"},
-            {"design": "d", "solver_label": "map", "iterations_max": "10000",
-             "censoring": "capped"},
-            {"design": "d", "solver_label": "within-off", "iterations_max": "40",
-             "censoring": "none"},
-            {"design": "d", "solver_label": "within-diagonal", "iterations_max": "30",
-             "censoring": "none"},
-        ]
-        # map: median 9500 and capped; additive: no rows at all, so absent.
-        self.assertEqual(
-            _iteration_rows(rows),
-            [["d", "9500 (capped)", "40", "30", "#miss"]],
-        )
-
+class HardnessTests(unittest.TestCase):
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
-        # A complete bipartite graph has rank one, so its second singular value is
-        # zero and the gap is one. This catches spurious nonzero values from PROPACK.
-        complete = sp.csr_matrix(np.ones((1000, 500)))
-        self.assertAlmostEqual(_component_rho(complete), 0.0, places=6)
+        block = sp.csr_matrix(np.ones((3, 4)))
+        self.assertAlmostEqual(compute_hardness._component_rho(block), 0.0)
 
-    def test_very_large_block_uses_arpack_only(self) -> None:
-        # Above PROPACK_MAX_MIN_DIM, use only ARPACK; SciPy's PROPACK
-        # implementation can terminate on very large irregular blocks.
-        matrix = sp.eye(20_001, format="csr")
-        calls: list[str] = []
+    def test_sparse_calculation_falls_back_from_propack_to_arpack(self) -> None:
+        calls = []
 
-        def fake_svds(*_args, **kwargs):
-            calls.append(kwargs["solver"])
+        def fake_svds(*args, solver, **kwargs):
+            calls.append(solver)
+            if solver == "propack":
+                raise RuntimeError("not available")
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
-            self.assertEqual(_component_rho(matrix), 0.25)
-        self.assertEqual(calls, ["arpack"])
-
-    def test_sparse_block_uses_propack_first(self) -> None:
-        # This block is too large for dense SVD but small enough for PROPACK.
-        # A successful PROPACK call should not fall back to ARPACK.
-        matrix = sp.eye(5_000, format="csr")
-        calls: list[str] = []
-
-        def fake_svds(*_args, **kwargs):
-            calls.append(kwargs["solver"])
-            return np.array([0.5, 1.0])
-
-        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
-            self.assertEqual(_component_rho(matrix), 0.25)
-        self.assertEqual(calls, ["propack"])
-
-    def test_sparse_block_falls_back_to_arpack(self) -> None:
-        matrix = sp.eye(5_000, format="csr")
-        calls: list[str] = []
-
-        def fake_svds(*_args, **kwargs):
-            calls.append(kwargs["solver"])
-            if kwargs["solver"] == "propack":
-                raise RuntimeError("PROPACK did not converge")
-            return np.array([0.5, 1.0])
-
-        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
-            self.assertEqual(_component_rho(matrix), 0.25)
+        block = sp.eye(100, format="csr")
+        with (
+            patch.object(compute_hardness, "DENSE_MAX_ENTRIES", 0),
+            patch.object(compute_hardness, "svds", side_effect=fake_svds),
+        ):
+            self.assertAlmostEqual(compute_hardness._component_rho(block), 0.25)
         self.assertEqual(calls, ["propack", "arpack"])
 
-    def test_prose_values_select_the_named_backend_and_largest_metric(self) -> None:
-        rows = [
-            ["#agreement-simple", "`fixest`", "", "$1.1 times 10^(-14)$"],
-            ["#agreement-difficult", "`fixest`", "", "$1.9 times 10^(-7)$"],
-        ]
-        self.assertEqual(_numeric_cell(rows[0][3]), 1.1e-14)
-        self.assertEqual(
-            _largest_metric(rows, 3, backend="fixest"), "$1.9 times 10^(-7)$"
-        )
 
-    def test_component_share_ignores_scientific_exponent(self) -> None:
-        self.assertEqual(
-            _component_share("$5.12 times 10^(-4)$ (0.30)"), 0.30
-        )
+class PythonFitTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        os.environ.setdefault("BENCH_THREADS", "1")
+        os.environ.setdefault("RAYON_NUM_THREADS", "1")
 
-    def test_agreement_rowspan_is_rendered_as_typst_code(self) -> None:
-        table = {
-            "columns": "(1fr, 1fr)",
-            "align": "(left, left)",
-            "header": ["Design", "Backend"],
-            "rows": [
-                ["#agreement-simple", "`rust-map`"],
-                ["", "`within`"],
-            ],
-        }
-        fragment = _table_fragment("agreement", table)
-        self.assertIn(
-            "table.cell(rowspan: 4)[simple], [PyFixest #linebreak() MAP #linebreak() none]",
-            fragment,
-        )
-        self.assertNotIn("[table.cell(rowspan: 4)[simple]]", fragment)
-        self.assertIn(
-            "\n  [PyFixest #linebreak() LSMR #linebreak() factor-pair],",
-            fragment,
-        )
-        self.assertNotIn(
-            "\n  [], [PyFixest #linebreak() LSMR #linebreak() factor-pair],",
-            fragment,
-        )
+    def test_direct_ols_fit_has_named_x1_coefficient(self) -> None:
+        frame = make_base_data(2_000, "simple", 12)
+        fit = fit_ols(frame, "rust-map", ("indiv_id", "firm_id", "year"))
+        self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
 
-    def test_demeaner_backend_labels_map_to_preconditioners(self) -> None:
-        rust = demeaner_for("rust")
-        self.assertEqual(rust.kind, "map")
-        self.assertEqual(rust.backend, "rust")
-
-        alias = demeaner_for("within")
-        self.assertEqual(alias.kind, "lsmr")
-        self.assertEqual(alias.preconditioner, DEFAULT_WITHIN_PRECONDITIONER)
-        self.assertEqual(alias.fixef_atol, alias.fixef_btol)
-
-        for name in WITHIN_PRECONDITIONERS:
-            demeaner = demeaner_for(f"within-{name}")
-            self.assertEqual(demeaner.preconditioner, name)
-            self.assertEqual(demeaner.fixef_atol, 1e-8)
-            self.assertEqual(demeaner.fixef_btol, 1e-8)
-
-        with self.assertRaisesRegex(ValueError, "Unknown within preconditioner"):
-            demeaner_for("within-bogus")
-
-    def test_both_views_are_measured_in_one_pass(self) -> None:
-        """One sweep produces the cross-package rows and the mechanism rows.
-
-        The two views differ only in stopping rule, so they are separate labels
-        on one run rather than separate drivers over the same designs. Distinct
-        labels are what lets the curation step tell them apart.
-        """
-        self.assertEqual(
-            [spec.label for spec in MATCHED_ACCURACY],
-            [
-                "rust-map-matched",
-                "within-off",
-                "within-diagonal",
-                "within-additive",
-            ],
-        )
-        default_labels = {spec.label for spec in PACKAGE_DEFAULTS}
-        matched_labels = {spec.label for spec in MATCHED_ACCURACY}
-        self.assertEqual(default_labels & matched_labels, set())
-
-        both = build_feols_benchmarkers(matched_accuracy=True, external=False)
-        self.assertEqual(
-            [b.name for b in both],
-            [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)],
-        )
-        defaults_only = build_feols_benchmarkers(external=False)
-        self.assertEqual(len(defaults_only), len(PACKAGE_DEFAULTS))
-        self.assertEqual(
-            [backend.name for backend in build_feols_benchmarkers()],
-            ["within", "rust-map", "fixest", "FEM.jl"],
-        )
-        self.assertEqual(
-            [backend.name for backend in build_fepois_benchmarkers()],
-            ["within", "rust-map", "fixest", "GLFEM.jl"],
-        )
-
-    def test_preconditioner_comparison_needs_two_factors(self) -> None:
-        require_multiple_absorbed_factors(FeolsSpec("y", ["x1"], ["a", "b"], "iid"))
-        with self.assertRaisesRegex(ValueError, "at least two absorbed factors"):
-            require_multiple_absorbed_factors(FeolsSpec("y", ["x1"], ["a"], "iid"))
-
-    def test_matched_arms_share_one_iteration_budget(self) -> None:
-        """MAP must not be handed ten times the budget it is compared against.
-
-        The package defaults give MAP 10,000 iterations and LSMR 1,000. At 1M
-        that asymmetry censored within-off in 30 of 33 trials, every one at its
-        own lower cap, which would make "unpreconditioned LSMR does not remove
-        the slow directions" a statement about the budget rather than about the
-        preconditioner.
-        """
-        budgets = set()
-        matched = build_feols_benchmarkers(
-            package_defaults=False, matched_accuracy=True, external=False
-        )
-        for benchmarker in matched:
-            demeaner = demeaner_for(
-                benchmarker._demeaner_backend,
-                tol=benchmarker._tol,
-                maxiter=benchmarker._maxiter,
-            )
-            budgets.add(demeaner.fixef_maxiter)
-        self.assertEqual(budgets, {MECHANISM_MAXITER})
-
-        # The cross-package view keeps each package's documented default.
-        default_lsmr = demeaner_for("within")
-        self.assertEqual(default_lsmr.fixef_maxiter, 1_000)
-
-    def test_external_residual_is_small_for_exact_demeaning(self) -> None:
-        rng = np.random.default_rng(0)
-        n = 400
-        categories = np.column_stack(
-            [
-                rng.integers(0, 25, n),
-                rng.integers(0, 18, n),
-                rng.integers(0, 4, n),
-            ]
-        )
-        # Construct rhs = D alpha + noise orthogonalized by a tight solve.
-        from within import LsmrOptions, PreconditionerConfig, solve_batch
-
-        rhs = rng.standard_normal((n, 2))
-        result = solve_batch(
-            np.asfortranarray(categories.astype(np.uint32)),
-            np.asfortranarray(rhs),
-            LsmrOptions(tol=1e-12, maxiter=2_000),
-            preconditioner=PreconditionerConfig.Additive,
-        )
-        eta = external_normal_residuals(categories, rhs, result.demeaned)
-        self.assertTrue(np.all(eta <= GATE_A_ETA))
-        delta = projection_errors(result.demeaned, result.demeaned, rhs)
-        self.assertTrue(np.all(delta == 0.0))
-        record = accuracy_record(
-            categories=categories,
-            rhs=rhs,
-            demeaned=result.demeaned,
-            reference_demeaned=result.demeaned,
-            beta=np.array([1.0]),
-            beta_star=np.array([1.0]),
-            se_star=np.array([0.5]),
-        )
-        self.assertTrue(record.gate_a_components_measured)
-        self.assertTrue(record.clears_gate_a)
-
-    def test_map_censoring_marks_capped_runs(self) -> None:
-        # Path-like worker-firm incidence: MAP needs many sweeps at tight tol.
-        n_nodes = 80
-        worker = np.arange(n_nodes)
-        firm = np.arange(n_nodes)
-        # Two observations per edge of a path, plus the reverse orientation.
-        categories = np.column_stack(
-            [
-                np.concatenate([worker[:-1], firm[1:]]),
-                np.concatenate([firm[1:], worker[:-1]]),
-            ]
-        )
-        rhs = np.linspace(-1.0, 1.0, categories.shape[0]).reshape(-1, 1)
-        capped = map_demean_with_sweeps(rhs, categories, tol=1e-12, maxiter=3)
-        self.assertTrue(capped.any_capped)
-        self.assertEqual(capped.iterations, [3])
-        self.assertEqual(capped.censoring, ["capped"])
-        self.assertFalse(capped.converged[0])
-
-        easy_categories = np.column_stack(
-            [np.repeat(np.arange(20), 10), np.tile(np.arange(10), 20)]
-        )
-        easy = map_demean_with_sweeps(
-            np.linspace(-1.0, 1.0, easy_categories.shape[0]).reshape(-1, 1),
-            easy_categories,
-            tol=1e-8,
-            maxiter=100,
-        )
-        self.assertEqual(easy.n_converged, 1)
-        self.assertFalse(easy.any_capped)
-        self.assertEqual(easy.censoring, ["none"])
-
-    def test_pair_edge_stats_count_unique_edges(self) -> None:
-        categories = np.array(
-            [
-                [0, 0],
-                [0, 1],
-                [1, 0],
-                [0, 0],  # duplicate edge
-            ]
-        )
-        stats = pair_edge_stats(categories)
-        self.assertEqual(len(stats), 1)
-        self.assertEqual(stats[0]["n_edges"], 3)
-        self.assertEqual(stats[0]["max_edges"], 4)
-
-    def test_repetition_counts_follow_the_runtime_bands(self) -> None:
-        # PROTOCOL.md R1/R2/R3. The flatness claim needs many trials on the
-        # subsecond cells, where the differences it rests on are milliseconds.
-        self.assertEqual(repetitions_for_runtime(0.3), 20)
-        self.assertEqual(repetitions_for_runtime(0.999), 20)
-        self.assertEqual(repetitions_for_runtime(1.0), 7)
-        self.assertEqual(repetitions_for_runtime(9.999), 7)
-        self.assertEqual(repetitions_for_runtime(10.0), 3)
-        self.assertEqual(repetitions_for_runtime(350.0), 3)
-        with self.assertRaises(ValueError):
-            repetitions_for_runtime(-1.0)
-
-    def test_failed_trials_stay_in_the_denominator(self) -> None:
-        # A failure must not be dropped before the median: reporting the median
-        # of the survivors without the count is a selected estimator.
-        summary = summarize_times([1.0, 2.0, None, 4.0, 3.0])
-        self.assertEqual(summary.n_attempted, 5)
-        self.assertEqual(summary.n_converged, 4)
-        self.assertFalse(summary.is_complete)
-        self.assertAlmostEqual(summary.median_s, 2.5)
-        self.assertAlmostEqual(summary.iqr_s, 1.5)
-
-        all_failed = summarize_times([None, None, None])
-        self.assertIsNone(all_failed.median_s)
-        self.assertEqual(all_failed.n_attempted, 3)
-        self.assertEqual(all_failed.n_converged, 0)
-
-    def test_backend_order_is_shuffled_but_reproducible(self) -> None:
-        backends = ["a", "b", "c", "d", "e", "f"]
-        first = randomized_order(backends, 20260726)
-        self.assertEqual(first, randomized_order(backends, 20260726))
-        self.assertCountEqual(first, backends)
-        self.assertNotEqual(
-            first, randomized_order(backends, 20260727), "seeds must differ"
-        )
-
-    def test_absorbed_factor_order_is_the_same_everywhere(self) -> None:
-        # MAP cycles through factors in the given order, so a table that
-        # absorbs in a different order is not comparing the same specification.
-        from benchmarks.drivers.akm_sweep import SPECS as AKM_SPECS
-        from benchmarks.drivers.ppml import SPECS as PPML_SPECS
-        from benchmarks.drivers.ols import SPECS as MAIN_SPECS
-
-        expected = ("indiv_id", "firm_id", "year")
-        for label, specs in (
-            ("main", MAIN_SPECS),
-            ("fepois", PPML_SPECS),
-            ("akm", AKM_SPECS),
-        ):
-            for spec in specs:
-                self.assertEqual(spec.fe_cols, expected, label)
-
-    def test_matched_arms_do_not_collapse_onto_default_cells(self) -> None:
-        """Both views share a sweep, so the renderer must keep them apart.
-
-        canonical() must keep the matched-accuracy arms distinct from the
-        package-default arms they share a solver with. Folding them together
-        put four within variants and two MAP variants into the same cell, whose
-        duplicate trial ids then rendered as "incomplete".
-        """
-        self.assertEqual(canonical("pyfixest (within)"), "within")
-        self.assertEqual(canonical("pyfixest (rust-map)"), "rust-map")
-        for preconditioner in ("off", "diagonal", "additive"):
-            self.assertEqual(
-                canonical(f"pyfixest (within-{preconditioner})"),
-                f"within-{preconditioner}",
-            )
-        self.assertEqual(
-            canonical("pyfixest (rust-map, matched)"), "rust-map-matched"
-        )
-
-        names = {canonical(spec.label) for spec in PACKAGE_DEFAULTS}
-        matched = {canonical(spec.label) for spec in MATCHED_ACCURACY}
-        self.assertEqual(names & matched, set())
-
-    def test_unmeasured_gate_a_components_do_not_pass(self) -> None:
-        """An absent metric is not a passing metric."""
-        rng = np.random.default_rng(0)
-        n = 300
-        categories = np.column_stack(
-            [rng.integers(0, 20, n), rng.integers(0, 12, n), rng.integers(0, 3, n)]
-        )
-        from within import LsmrOptions, PreconditionerConfig, solve_batch
-
-        rhs = rng.standard_normal((n, 2))
-        result = solve_batch(
-            np.asfortranarray(categories.astype(np.uint32)),
-            np.asfortranarray(rhs),
-            LsmrOptions(tol=1e-12, maxiter=2_000),
-            preconditioner=PreconditionerConfig.Additive,
-        )
-        # eta only: delta and slope were never computed.
-        eta_only = accuracy_record(
-            categories=categories, rhs=rhs, demeaned=result.demeaned
-        )
-        self.assertTrue(eta_only.gate_a_eta)
-        self.assertFalse(eta_only.clears_gate_a)
-        self.assertFalse(eta_only.gate_a_components_measured)
-
-    def test_sized_design_key_separates_sample_sizes(self) -> None:
-        """simple/difficult run at three sizes with very different gaps.
-
-        The difficult worker-firm gap is 1.7e-3 at 100K, 1.7e-5 at 1M and
-        1.7e-7 at 10M, so a join on the family name alone pairs a 1M runtime
-        with a 10M gap.
-        """
-        from scripts.analyze_gap_runtime import _design_key_from_hardness, _sized_key
-
-        self.assertEqual(_design_key_from_hardness("difficult_10000000_k1_iter_1"), "difficult")
-        self.assertNotEqual(
-            _sized_key("difficult", 10_000_000), _sized_key("difficult", 1_000_000)
-        )
-        self.assertEqual(_sized_key("difficult", 1_000_000), "difficult@1000000")
-        # An unparseable size degrades to the bare family rather than raising.
-        self.assertEqual(_sized_key("enron", None), "enron")
-
-    def test_runtime_rising_with_gap_is_the_counterexample(self) -> None:
-        """Sorted by increasing gap, better connectivity should mean less work.
-
-        A falling series is the expected pattern; flagging it inverted the
-        counterexample list.
-        """
-        import pandas as pd
-
-        from scripts.analyze_gap_runtime import _counter_examples
-
-        def frame(times):
-            return pd.DataFrame(
-                {
-                    "family": ["akm_sorting_1", "akm_sorting_2", "akm_sorting_3"],
-                    "design": ["akm_sorting_1@1", "akm_sorting_2@1", "akm_sorting_3@1"],
-                    "backend": ["b"] * 3,
-                    "gap": [1e-4, 1e-3, 1e-2],
-                    "median_time": times,
-                    "component_share": [1.0] * 3,
-                }
-            )
-
-        expected = [name["name"] for name in _counter_examples(frame([3.0, 2.0, 1.0]))]
-        self.assertNotIn("sorting_non_monotonic", expected)
-        flagged = [name["name"] for name in _counter_examples(frame([1.0, 2.0, 3.0]))]
-        self.assertIn("sorting_non_monotonic", flagged)
-
-    def test_sample_seed_ignores_the_repetition_index(self) -> None:
-        """Repeated timings must run on one fixed sample.
-
-        Two drivers previously derived the seed from the repetition counter, so
-        each "repetition" measured a different draw and solver variance was
-        confounded with DGP variance (PROTOCOL.md section 2).
-        """
-        spec = SampleSpec(design="difficult", n_obs=5_000)
-        self.assertEqual(spec.seed, SampleSpec(design="difficult", n_obs=5_000).seed)
-        self.assertNotEqual(spec.seed, SampleSpec(design="simple", n_obs=5_000).seed)
-        self.assertNotEqual(spec.seed, SampleSpec(design="difficult", n_obs=6_000).seed)
-
-    def test_repeated_loads_return_the_identical_sample(self) -> None:
-        clear_sample_cache()
-        spec = SampleSpec(design="simple", n_obs=3_000)
-        first = load_sample(spec)
-        second = load_sample(spec)
-        self.assertEqual(first.sample_hash, second.sample_hash)
-        # Identity, not just equality: the cache hands back the same arrays.
-        self.assertIs(first.categories, second.categories)
-        self.assertEqual(len(FE_COLS), first.categories.shape[1])
-        clear_sample_cache()
-
-    def test_sized_sample_key_distinguishes_scales(self) -> None:
-        self.assertEqual(SampleSpec("difficult", 1_000_000).key, "difficult@1000000")
-        self.assertNotEqual(
-            SampleSpec("difficult", 1_000_000).key,
-            SampleSpec("difficult", 10_000_000).key,
-        )
-
-    def test_standalone_settings_match_the_end_to_end_ablation(self) -> None:
-        """The two halves of the mechanism evidence must share a stopping rule.
-
-        The standalone diagnostics ran at the package defaults while the
-        ablation was frozen at the matched settings, so their iteration counts
-        described different problems.
-        """
-        specs = matched_solver_specs()
-        self.assertEqual(
-            [spec.preconditioner for spec in specs], list(WITHIN_PRECONDITIONERS)
-        )
-        for spec in specs:
-            self.assertEqual(spec.maxiter, MECHANISM_MAXITER)
-            self.assertEqual(spec.tol, MECHANISM_LSMR_TOL)
-
-    def test_run_record_rejects_incomplete_measurements(self) -> None:
-        """A record missing a protocol-required field must not write silently."""
-
-        def record(**overrides):
-            base = dict(
-                design="difficult",
-                n_obs=1_000,
-                sample_hash="abc",
-                config_id="additive/tol=1e-12/maxiter=10000",
-                solver_label="within-additive",
-                view="matched-accuracy",
-                repetition=0,
-                setup_s=0.1,
-                solve_s=0.2,
-                total_s=0.3,
-                converged=True,
-                censoring="none",
-                max_eta=1e-12,
-            )
-            base.update(overrides)
-            return RunRecord(**base)
-
-        self.assertEqual(record().validate(), [])
-        self.assertIn("max_eta missing: no external accuracy was recorded",
-                      record(max_eta=None).validate())
-        self.assertIn("converged missing", record(converged=None).validate())
-        self.assertTrue(
-            any("capped or failed" in problem
-                for problem in record(converged=False).validate())
-        )
-        self.assertTrue(
-            any("sample_hash" in problem for problem in record(sample_hash="").validate())
-        )
-        self.assertTrue(
-            any("Gate A components" in problem
-                for problem in record(clears_gate_a=True).validate())
-        )
-        # setup + solve may not exceed the reported total.
-        self.assertTrue(
-            any("exceeds total" in problem
-                for problem in record(setup_s=1.0, solve_s=1.0, total_s=0.5).validate())
-        )
-        self.assertTrue(
-            any("extra must not overwrite" in problem
-                for problem in record(extra={"total_s": 999}).validate())
-        )
-
-    def test_headline_fits_carry_an_accuracy_record(self) -> None:
-        """Every timed fit must be able to report the accuracy it achieved.
-
-        A runtime on its own cannot answer whether a speedup is a tolerance
-        artifact, because each package stops on its own quantity. The recomputed
-        eta has to track the requested tolerance, and it has to be measured on
-        the rows the model actually kept.
-        """
-        import warnings
-
-        import pyfixest as pf
-
-        frame = pd.read_parquet(ROOT / "benchmarks" / "data" / "difficult_100k.parquet")
-        formula = "y ~ x1 | indiv_id + firm_id + year"
-
-        def eta_at(backend: str, tol: float | None) -> float:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                fit = pf.feols(
-                    formula,
-                    data=frame,
-                    vcov="iid",
-                    demeaner=demeaner_for(backend, tol=tol),
-                )
-            value = _external_eta(fit, frame, "y", ["x1"])
-            self.assertIsNotNone(value)
-            return value
-
-        tight = eta_at("within-additive", 1e-12)
-        loose = eta_at("within-additive", None)
-        self.assertLess(tight, GATE_A_ETA)
-        # The package default does not reach the gate; that is the finding the
-        # calibration pilot froze, and it must remain visible.
-        self.assertGreater(loose, GATE_A_ETA)
-        self.assertLess(tight, loose)
-
-    def test_accuracy_record_is_absent_rather_than_wrong(self) -> None:
-        """A model this cannot measure yields None, never a plausible number."""
-
-        class NotAModel:
-            pass
-
-        self.assertIsNone(_external_eta(NotAModel(), pd.DataFrame({"y": [1.0]}), "y", []))
+    def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
+        frame = make_base_data(2_000, "simple", 13)
+        fit = fit_ppml(frame, "rust-map")
+        self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
 
 
-class TypedDemeanerTests(unittest.TestCase):
-    """Every fit goes through a typed demeaner, not the deprecated strings."""
-
-    def test_no_source_file_passes_the_deprecated_arguments(self) -> None:
-        # PyFixest 0.60 deprecated demeaner_backend/fixef_tol/fixef_maxiter on
-        # feols and fepois. They remain valid as typed-constructor keywords, so
-        # only the call-site form is banned.
-        offenders = []
-        for path in sorted((ROOT / "benchmarks").rglob("*.py")):
-            for number, line in enumerate(path.read_text().splitlines(), start=1):
-                # Prose that names the deprecated argument is fine; a call
-                # that passes it is not.
-                if "`demeaner_backend=`" in line or line.lstrip().startswith("#"):
-                    continue
-                if "demeaner_backend=" in line:
-                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
-        self.assertEqual(offenders, [], "pass a typed demeaner= instead")
-
-    def test_rust_cg_resolves_to_the_within_lsmr_backend(self) -> None:
-        # Pre-0.60 alias. It was not conjugate gradient by then: PyFixest
-        # mapped it onto the within backend with preconditioner "auto", and the
-        # agreement check depends on that being what it compares against.
-        demeaner = demeaner_for("rust-cg")
-        self.assertEqual(demeaner.backend, "within")
-        self.assertEqual(demeaner.preconditioner, "auto")
-        self.assertEqual(demeaner.precision, "float64")
-
-    def test_named_configurations_build_the_expected_demeaner(self) -> None:
-        self.assertEqual(demeaner_for("rust").backend, "rust")
-        self.assertEqual(demeaner_for("within").preconditioner, "additive")
-        for name in ("off", "diagonal", "additive"):
-            self.assertEqual(demeaner_for(f"within-{name}").preconditioner, name)
-        self.assertEqual(demeaner_for("torch_mps").precision, "float32")
-
-
-class SubprocessOutputTests(unittest.TestCase):
-    """Parsing the records a driver emits, including the unhappy paths."""
-
+class PaperResultTests(unittest.TestCase):
     @staticmethod
-    def _datasets():
+    def _rows(experiment: str, design: str, backend: str, n_obs: int, n_fe: int, view: str):
         return [
-            BenchmarkDataset("d1", Path("/tmp/x.parquet"), "simple", 1, 100, "trial", 1),
-            BenchmarkDataset("d2", Path("/tmp/x.parquet"), "simple", 1, 100, "trial", 2),
+            {
+                "experiment": experiment, "design": design, "backend": backend,
+                "repetition": repetition, "n_planned": 3, "runtime_s": repetition + 1,
+                "converged": True, "n_obs": n_obs, "n_fe": n_fe, "model_k": 1,
+                "view": view,
+            }
+            for repetition in range(3)
         ]
 
-    def _parse(self, stdout: str, returncode: int = 0):
-        spec = FeolsSpec(depvar="y", covariates=["x1"], fe_cols=["a", "b"], vcov="iid")
-        completed = subprocess.CompletedProcess(
-            args=[], returncode=returncode, stdout=stdout, stderr=""
-        )
-        return _parse_subprocess_output(
-            datasets=self._datasets(), spec=spec, backend="r.fixest",
-            completed_process=completed,
-        )
-
-    def test_a_trial_the_driver_never_reported_is_a_failure(self) -> None:
-        # Not a reused timing from the trial that did run.
-        line = json.dumps(
-            {"dataset_id": "d1", "iter_num": 1, "time": 1.5, "success": "true"}
-        )
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            results = self._parse(line + "\n")
-        self.assertTrue(results[0].success)
-        self.assertAlmostEqual(results[0].time, 1.5)
-        self.assertFalse(results[1].success)
-        self.assertIsNone(results[1].time)
-        self.assertTrue(any("1/2" in str(w.message) for w in caught))
-
-    def test_string_success_flags_are_coerced(self) -> None:
-        rows = "\n".join(
-            json.dumps({"dataset_id": d, "iter_num": i, "time": 1.0, "success": flag})
-            for d, i, flag in (("d1", 1, "true"), ("d2", 2, "false"))
-        )
-        results = self._parse(rows + "\n")
-        self.assertTrue(results[0].success)
-        self.assertFalse(results[1].success)
-
-    def test_conflicting_duplicate_records_fail_loudly(self) -> None:
-        rows = "\n".join(
-            (
-                json.dumps({"dataset_id": "d1", "iter_num": 1, "time": 1.0}),
-                json.dumps({"dataset_id": "d1", "iter_num": 1, "time": 2.0}),
-            )
-        )
-        with self.assertRaisesRegex(ValueError, "conflicting records"):
-            self._parse(rows)
-
-
-class RunnerCacheTests(unittest.TestCase):
-    """Reuse only a result produced for the exact requested benchmark."""
-
-    class _CountingBenchmarker:
-        name = "counting"
-
-        def __init__(self) -> None:
-            self.calls = 0
-
-        def cache_key(self) -> dict[str, str]:
-            return {"adapter": "test", "setting": "fixed"}
-
-        def run(
-            self, datasets: list[BenchmarkDataset], spec: FeolsSpec
-        ) -> list[FeolsResult]:
-            self.calls += 1
-            return [
-                FeolsResult(
-                    source_dataset_id=dataset.dataset_id,
-                    source_k=dataset.k,
-                    iter_type=dataset.iter_type,
-                    iter_num=dataset.iter_num,
-                    dgp=dataset.dgp,
-                    model_k=spec.k,
-                    n_obs=dataset.n_obs,
-                    n_fe=spec.n_fe,
-                    backend=self.name,
-                    time=0.01,
-                    success=True,
-                )
-                for dataset in datasets
-            ]
-
-    def test_reuse_requires_a_matching_specification(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp)
-            data_path = directory / "sample.csv"
-            data_path.write_text("y,x1,a,b\n1,2,1,1\n", encoding="utf-8")
-            dataset = BenchmarkDataset(
-                "sample", data_path, "simple", 1, 1, "trial", 1
-            )
-            benchmarker = self._CountingBenchmarker()
-            output = directory / "results.csv"
-            iid_spec = FeolsSpec("y", ["x1"], ["a", "b"], "iid")
-
-            run_benchmarks([benchmarker], [dataset], [iid_spec], output)
-            run_benchmarks(
-                [benchmarker], [dataset], [iid_spec], output, reuse_existing=True
-            )
-            self.assertEqual(benchmarker.calls, 1)
-
-            hetero_spec = FeolsSpec("y", ["x1"], ["a", "b"], "hetero")
-            run_benchmarks(
-                [benchmarker], [dataset], [hetero_spec], output, reuse_existing=True
-            )
-            self.assertEqual(benchmarker.calls, 2)
-
-
-class RuntimeConfigurationTests(unittest.TestCase):
-    def test_one_benchmark_setting_configures_every_solver_runtime(self) -> None:
-        with patch.dict(
-            os.environ,
+    def test_one_sample_with_three_repetitions_is_complete(self) -> None:
+        rows = [
             {
-                "BENCH_THREADS": "3",
-                "JULIA_NUM_THREADS": "1",
-                "RAYON_NUM_THREADS": "1",
-            },
-            clear=False,
-        ):
-            self.assertEqual(configure_benchmark_runtime(), 3)
-            self.assertEqual(os.environ["JULIA_NUM_THREADS"], "3")
-            self.assertEqual(os.environ["RAYON_NUM_THREADS"], "3")
+                "repetition": str(index), "n_planned": "3",
+                "runtime_s": str(index + 1), "converged": "true",
+            }
+            for index in range(3)
+        ]
+        self.assertEqual(_render_trial_result(rows), "2.00s")
 
-    def test_missing_benchmark_setting_is_rejected(self) -> None:
-        with patch.dict(os.environ, {"BENCH_THREADS": ""}, clear=False):
-            with self.assertRaisesRegex(RuntimeError, "BENCH_THREADS"):
-                configure_benchmark_runtime()
+    def test_failed_trials_remain_in_the_denominator(self) -> None:
+        rows = [
+            {"repetition": "0", "n_planned": "3", "runtime_s": "1", "converged": "true"},
+            {"repetition": "1", "n_planned": "3", "runtime_s": "2", "converged": "false"},
+            {"repetition": "2", "n_planned": "3", "runtime_s": "3", "converged": "true"},
+        ]
+        self.assertEqual(_render_trial_result(rows), "2.00s (2/3)")
 
-
-class SharedPrimitiveTests(unittest.TestCase):
-    """The timing and result-IO primitives every driver now goes through."""
-
-    def test_timed_block_reports_its_own_duration(self) -> None:
-        with timed(collect=False) as elapsed:
-            self.assertIsNone(elapsed.seconds)
-            time.sleep(0.01)
-        self.assertIsNotNone(elapsed.seconds)
-        self.assertGreaterEqual(elapsed.seconds, 0.01)
-
-    def test_timed_block_records_time_even_when_the_fit_raises(self) -> None:
-        # A backend that throws still consumed wall time, and a driver that
-        # wants to record the failure needs the duration rather than nothing.
-        with self.assertRaises(RuntimeError):
-            with timed(collect=False) as elapsed:
-                time.sleep(0.01)
-                raise RuntimeError("backend failed")
-        self.assertIsNotNone(elapsed.seconds)
-        self.assertGreaterEqual(elapsed.seconds, 0.01)
-
-    def test_writer_unions_keys_so_optional_fields_stay_aligned(self) -> None:
-        # An optional diagnostic recorded for only some rows must widen the
-        # table, not truncate it to the first row's columns.
-        rows = [{"a": 1}, {"a": 2, "b": 3}]
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "nested" / "rows.csv"
-            write_rows(out, rows)
-            with out.open(newline="", encoding="utf-8") as handle:
-                written = list(csv.DictReader(handle))
-        self.assertEqual([row["a"] for row in written], ["1", "2"])
-        self.assertEqual([row["b"] for row in written], ["", "3"])
-
-    def test_writer_honours_a_pinned_column_order(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "rows.csv"
-            write_rows(out, [{"b": 1, "a": 2}], fieldnames=["a", "b"])
-            self.assertEqual(out.read_text().splitlines()[0], "a,b")
-
-    def test_writer_refuses_an_empty_result_set(self) -> None:
-        # A header-only file reads downstream as a completed run that measured
-        # nothing, which is exactly the failure it should surface instead.
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaises(ValueError):
-                write_rows(Path(tmp) / "rows.csv", [])
-
-
-class PackageLayeringTests(unittest.TestCase):
-    """The dependency direction is a build failure, not a review comment.
-
-    core <- dgp <- solvers <- drivers, and scripts/ reaches only core. The
-    layering was already correct before it was named; writing it down here is
-    what keeps it correct once the directories stop being self-evident.
-    """
-
-    # package -> the packages it is allowed to import from
-    ALLOWED = {
-        "core": set(),
-        "dgp": {"core"},
-        "solvers": {"core", "dgp"},
-        "drivers": {"core", "dgp", "solvers", "drivers"},
-    }
-
-    def _imports(self, path: Path) -> set[str]:
-        found = set()
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            module = None
-            if isinstance(node, ast.ImportFrom) and node.level == 0:
-                module = node.module
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("benchmarks."):
-                        found.add(alias.name.split(".")[1])
-                continue
-            if module and module.startswith("benchmarks."):
-                found.add(module.split(".")[1])
-        return found
-
-    def test_no_package_imports_from_a_layer_above_it(self) -> None:
-        violations = []
-        for package, allowed in self.ALLOWED.items():
-            for path in (ROOT / "benchmarks" / package).glob("*.py"):
-                for imported in self._imports(path) - allowed - {package}:
-                    violations.append(
-                        f"{path.relative_to(ROOT)} imports benchmarks.{imported}"
-                    )
-        self.assertEqual(violations, [], f"layering violations: {violations}")
-
-    def test_scripts_reach_only_the_core_primitives(self) -> None:
-        violations = []
-        for path in (ROOT / "scripts").glob("*.py"):
-            for imported in self._imports(path) - {"core"}:
-                violations.append(f"{path.relative_to(ROOT)} imports benchmarks.{imported}")
-        self.assertEqual(violations, [], f"scripts reached past core: {violations}")
-
-    def test_nothing_outside_drivers_imports_a_driver(self) -> None:
-        """A driver is run, never imported. Only tests may reach into one."""
-        violations = []
-        for package in ("core", "dgp", "solvers"):
-            for path in (ROOT / "benchmarks" / package).glob("*.py"):
-                if "drivers" in self._imports(path):
-                    violations.append(str(path.relative_to(ROOT)))
-        for path in (ROOT / "scripts").glob("*.py"):
-            if "drivers" in self._imports(path):
-                violations.append(str(path.relative_to(ROOT)))
-        self.assertEqual(violations, [], f"library code imports a driver: {violations}")
-
-
-class BackendRegistryTests(unittest.TestCase):
-    """The two registries a new backend has to appear in must agree.
-
-    Adding a backend means declaring how to run it (solvers/registry.py) and
-    how to name and colour it (core/methods.py). Nothing links the two, so a
-    backend added to one and not the other used to fail as a missing figure
-    series or a table cell rendering "incomplete" rather than as an error.
-    """
-
-    def test_every_runnable_backend_has_a_presentation_record(self) -> None:
-        from benchmarks.solvers.registry import MATCHED_ACCURACY, PACKAGE_DEFAULTS
-
-        for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY):
-            with self.subTest(label=spec.label):
-                self.assertIsNotNone(
-                    canonical(spec.label),
-                    f"{spec.label!r} runs but core.methods cannot name it",
-                )
-
-    def test_no_driver_invents_a_spelling(self) -> None:
-        """Every name a driver records must already be canonical.
-
-        The alias table exists only to read result files written before the
-        names were unified. If a new arm needs an alias to be understood, the
-        arm is spelled wrong, not the table incomplete: that is how "rust-map"
-        came to have five spellings, one per driver that wrote it.
-        """
-        from benchmarks.core.methods import METHODS
-        from benchmarks.drivers.tolerance import METHOD_BY_KEY
-        from benchmarks.solvers.registry import (
-            EXTERNAL_BACKENDS,
-            MATCHED_ACCURACY,
-            PACKAGE_DEFAULTS,
-        )
-
-        recorded = (
-            [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)]
-            + [backend.label for backend in EXTERNAL_BACKENDS]
-            + list(METHOD_BY_KEY)
-        )
-        aliased = sorted(name for name in recorded if name not in METHODS)
-        self.assertEqual(
-            aliased, [], f"these are recorded but are not canonical keys: {aliased}"
-        )
-
-    def test_every_recorded_backend_is_registered(self) -> None:
-        """Whatever the drivers actually wrote must still resolve.
-
-        This is the check that catches a backend renamed in one place. It reads
-        the raw result files, so it only asserts on what is present locally.
-        """
-        spellings = set()
-        for pattern in ("benchmarks/results/*.csv", "results/runs/latest/*.csv"):
-            for path in ROOT.glob(pattern):
-                with path.open(newline="", encoding="utf-8") as handle:
-                    for row in csv.DictReader(handle):
-                        for column in ("backend", "algo"):
-                            if row.get(column):
-                                spellings.add(row[column])
-        if not spellings:
-            self.skipTest("no raw benchmark results present")
-        unmapped = sorted(s for s in spellings if canonical(s) is None)
-        self.assertEqual(unmapped, [], f"unregistered backends in results: {unmapped}")
-
-
-class DriverEntryPointTests(unittest.TestCase):
-    """Importing a driver must never run it.
-
-    bench_memory_py once had no __main__ guard, so importing the module ran
-    all eight benchmarks and overwrote results/runs/latest/memory.csv with
-    whatever the import happened to produce. Anything that imports broadly
-    (a test collector, a dead-code sweep, an IDE) could destroy a recorded
-    result that way, and results/runs is not tracked, so there is no undo.
-    """
-
-    DRIVERS = sorted(
-        path
-        for path in (ROOT / "benchmarks").rglob("*.py")
-        if path.name != "__init__.py"
-    ) + sorted((ROOT / "scripts").glob("*.py"))
-
-    # matplotlib.use() and the rcParams assignment have to run before pyplot is
-    # imported, so they are legitimately module level. Nothing else here is.
-    IMPORT_TIME_SETUP = ("matplotlib.use", "matplotlib.rcParams")
-
-    def test_no_driver_executes_work_at_module_level(self) -> None:
-        offenders = []
-        for path in self.DRIVERS:
-            source = path.read_text(encoding="utf-8")
-            for node in ast.parse(source).body:
-                # Loops and bare calls at module level run on import.
-                # Assignments, imports, defs and classes are declarations.
-                if not isinstance(node, (ast.Expr, ast.For, ast.While, ast.With)):
-                    continue
-                # A module docstring is an Expr but does nothing.
-                if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-                    continue
-                text = ast.get_source_segment(source, node) or ""
-                if text.startswith(self.IMPORT_TIME_SETUP):
-                    continue
-                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-        self.assertEqual(offenders, [], f"module-level work on import: {offenders}")
-
-    def test_every_driver_guards_its_entry_point(self) -> None:
-        """A driver with argparse must reach it only through __main__."""
-        offenders = []
-        for path in self.DRIVERS:
-            source = path.read_text(encoding="utf-8")
-            if "argparse.ArgumentParser(" not in source:
-                continue
-            if 'if __name__ == "__main__":' not in source:
-                offenders.append(str(path.relative_to(ROOT)))
-        self.assertEqual(offenders, [], f"argparse without a guard: {offenders}")
-
-    def test_every_driver_still_imports(self) -> None:
-        """Import each driver for real, not just parse it.
-
-        Guards make importing a driver harmless, which makes this affordable,
-        and it is the only check that catches a name used at module level but
-        never imported. One driver interpolated DATA_DIR into a subprocess
-        template while the import for it had been placed inside that template,
-        so the module raised NameError and nothing noticed: no test imports the
-        drivers, and the AST checks above parse without executing.
-        """
-        import importlib
-
-        for path in sorted((ROOT / "benchmarks" / "drivers").glob("*.py")):
-            if path.name == "__init__.py":
-                continue
-            name = f"benchmarks.drivers.{path.stem}"
-            with self.subTest(driver=name):
-                importlib.import_module(name)
-
-
-class ConvergenceCheckTests(unittest.TestCase):
-    """Convergence must be read through the helper, not off a raw attribute.
-
-    PyFixest defines `.convergence` on Feglm (PPML) but not on Feols, so
-    `fit.convergence` on a linear fit raises AttributeError rather than
-    reporting non-convergence. Two standalone drivers did exactly that, which
-    made every one of their runs fail at the check.
-    """
-
-    def test_no_driver_reads_convergence_off_a_fit_directly(self) -> None:
-        offenders = []
-        for path in DriverEntryPointTests.DRIVERS:
-            for number, line in enumerate(
-                path.read_text(encoding="utf-8").splitlines(), start=1
-            ):
-                if re.search(r"\bfit\w*\.convergence\b", line):
-                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
-        self.assertEqual(offenders, [], f"use fit_converged instead: {offenders}")
-
-    def test_helper_tolerates_a_model_with_no_flag(self) -> None:
-        class LinearFit:  # Feols exposes no convergence attribute at all
-            pass
-
-        class PoissonFit:  # Feglm does
-            convergence = False
-
-        self.assertTrue(fit_converged(LinearFit()))
-        self.assertFalse(fit_converged(PoissonFit()))
+    def test_all_four_final_runtime_files_feed_the_paper_reader(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            latest = Path(directory)
+            fixtures = {
+                "ols.csv": self._rows("ols", "simple", "rust-map", 10_000_000, 3, "default"),
+                "ppml.csv": self._rows("ppml", "simple", "rust-map", 1_000_000, 3, "default"),
+                "akm.csv": [
+                    *self._rows("akm", "akm_mobility_1", "rust-map", 1_000_000, 3, "default"),
+                    *self._rows("akm", "akm_mobility_1", "rust-map", 1_000_000, 3, "matched"),
+                ],
+                "correia.csv": self._rows(
+                    "correia", "synthetic-complete", "rust-map", 1_000, 2, "default"
+                ),
+            }
+            for filename, rows in fixtures.items():
+                pd.DataFrame(rows).to_csv(latest / filename, index=False)
+            document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+            with patch.object(paper_results, "LATEST_RUN", latest):
+                paper_results._synchronize_canonical_tables(document, write=False)
+            self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
+            self.assertEqual(document["tables"]["ppml"]["rows"][0][2], "2.00s")
+            self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][2], "2.00s")
+            self.assertEqual(document["tables"]["mechanism_mobility"]["rows"][0][2], "2.00s")
+            self.assertEqual(document["tables"]["correia_synthetic"]["rows"][0][2], "2.00s")
 
 
 if __name__ == "__main__":

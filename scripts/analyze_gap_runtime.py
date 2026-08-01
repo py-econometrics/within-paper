@@ -6,8 +6,7 @@ Pools existing hardness and runtime CSVs and reports:
 - named counter-examples (sorting non-monotonicity; akm_mobility_4 vs _5;
   directors' small component share)
 
-Inputs already exist under ``benchmarks/results/`` and
-``results/runs/latest/hardness.csv``. No new solves are required.
+Inputs live under ``results/runs/latest/``. No new solves are required.
 
 Run with:
 
@@ -18,16 +17,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from benchmarks.core.paths import ROOT
+ROOT = Path(__file__).absolute().parents[1]
 
 DEFAULT_HARDNESS = ROOT / "results" / "runs" / "latest" / "hardness.csv"
-DEFAULT_RESULTS_DIR = ROOT / "benchmarks" / "results"
+DEFAULT_RESULTS_DIR = ROOT / "results" / "runs" / "latest"
 DEFAULT_OUT = ROOT / "results" / "runs" / "latest" / "gap_runtime_analysis.json"
 
 # Worker-firm is the economically meaningful pair for AKM designs; for Correia
@@ -41,6 +39,7 @@ WORKER_FIRM_PAIRS = {
 @dataclass(frozen=True)
 class BackendSlope:
     backend: str
+    view: str
     n_points: int
     slope: float | None
     intercept: float | None
@@ -49,9 +48,9 @@ class BackendSlope:
 
 
 def _median_runtime(frame: pd.DataFrame) -> pd.DataFrame:
-    """One median runtime per (dgp, backend), keeping failure counts."""
+    """One median runtime per design and backend, keeping failure counts."""
     rows = []
-    group_cols = ["dgp", "backend"]
+    group_cols = ["design", "backend", "view"]
     if "n_obs" in frame.columns:
         group_cols.append("n_obs")
     if "n_fe" in frame.columns:
@@ -60,8 +59,8 @@ def _median_runtime(frame: pd.DataFrame) -> pd.DataFrame:
         if not isinstance(keys, tuple):
             keys = (keys,)
         record = dict(zip(group_cols, keys, strict=True))
-        times = pd.to_numeric(group["time"], errors="coerce")
-        success = group["success"].astype(str).str.lower().isin({"true", "1"})
+        times = pd.to_numeric(group["runtime_s"], errors="coerce")
+        success = group["converged"].astype(str).str.lower().isin({"true", "1"})
         converged_times = times[success & times.notna()]
         record["n_trials"] = int(len(group))
         record["n_success"] = int(success.sum())
@@ -79,18 +78,14 @@ def _median_runtime(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _load_runtime_tables(results_dir: Path) -> pd.DataFrame:
     frames = []
-    for path in sorted(results_dir.glob("*.csv")):
-        if path.name.endswith("_summary.csv"):
+    for filename in ("ols.csv", "ppml.csv", "akm.csv", "correia.csv"):
+        path = results_dir / filename
+        if not path.exists():
             continue
-        try:
-            frame = pd.read_csv(path)
-        except Exception:
-            continue
-        required = {"dgp", "backend", "time", "success"}
+        frame = pd.read_csv(path)
+        required = {"design", "backend", "view", "runtime_s", "converged"}
         if not required.issubset(frame.columns):
             continue
-        frame = frame.copy()
-        frame["_source_file"] = path.name
         frames.append(frame)
     if not frames:
         return pd.DataFrame()
@@ -99,14 +94,8 @@ def _load_runtime_tables(results_dir: Path) -> pd.DataFrame:
 
 def _design_key_from_hardness(dataset_id: str) -> str:
     """Map a hardness dataset_id to the runtime design label."""
-    # akm_*_1000000_k1_iter_1 -> akm_*
-    match = re.match(r"(akm_[a-z]+_\d+)_", dataset_id)
-    if match:
-        return match.group(1)
-    # simple_10000000 / difficult_10000000 style ids
-    match = re.match(r"(simple|difficult)", dataset_id)
-    if match:
-        return match.group(1)
+    if dataset_id.startswith("memory_"):
+        return dataset_id.split("_")[1]
     return dataset_id
 
 
@@ -194,7 +183,7 @@ def _counter_examples(joined: pd.DataFrame) -> list[dict]:
                 )
 
     # Mobility 4 vs 5: nearly identical gaps, nearly identical runtimes.
-    for backend, group in joined.groupby("backend"):
+    for (backend, view), group in joined.groupby(["backend", "view"]):
         m4 = group[group["family"] == "akm_mobility_4"]
         m5 = group[group["family"] == "akm_mobility_5"]
         if len(m4) == 1 and len(m5) == 1:
@@ -251,10 +240,10 @@ def analyze(
     if runtimes.empty:
         raise FileNotFoundError(f"no runtime CSVs with required columns in {results_dir}")
     medians = _median_runtime(runtimes)
-    medians["family"] = medians["dgp"].astype(str)
+    medians["family"] = medians["design"].astype(str)
     medians["design"] = [
-        _sized_key(str(dgp), n_obs)
-        for dgp, n_obs in zip(medians["dgp"], medians["n_obs"], strict=True)
+        _sized_key(str(design), n_obs)
+        for design, n_obs in zip(medians["design"], medians["n_obs"], strict=True)
     ]
 
     gap_cols = gaps[
@@ -279,6 +268,7 @@ def analyze(
         slopes.append(
             BackendSlope(
                 backend=str(backend),
+                view=str(view),
                 n_points=int(len(usable)),
                 slope=slope,
                 intercept=intercept,
@@ -293,6 +283,7 @@ def analyze(
             {
                 "design": row["design"],
                 "backend": row["backend"],
+                "view": row["view"],
                 "gap": float(row["gap"]) if pd.notna(row["gap"]) else None,
                 "worst_component_obs_share": (
                     float(row["worst_component_obs_share"])

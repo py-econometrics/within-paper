@@ -25,15 +25,11 @@ from statistics import median
 from pathlib import Path
 
 
-# The timing rules live with the benchmark harness that produces the numbers,
-# not beside the renderer that formats them, so that "median over converged
-# trials, failures kept in the denominator" has one implementation rather than
-# one per consumer. The module is standard-library only, which is what lets
-# this script keep running before the Pixi environment exists; a test pins
-# that property.
-from benchmarks.core.timing import summarize_times
-from benchmarks.core.methods import METHOD_TABLE_HEADER, canonical
-from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
+from scripts.benchmark_methods import METHOD_TABLE_HEADER
+
+ROOT = Path(__file__).absolute().parents[1]
+LATEST_RUN = ROOT / "results" / "runs" / "latest"
+CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
@@ -480,19 +476,14 @@ def archive_legacy_results(_: argparse.Namespace) -> None:
 
 def _rows_from_csvs() -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    for pattern in ("benchmarks/results/*.csv",):
-        for path in ROOT.glob(pattern):
-            try:
-                with path.open(newline="", encoding="utf-8") as handle:
-                    rows.extend(
-                        {
-                            **row,
-                            "_source_file": str(path.relative_to(ROOT)),
-                        }
-                        for row in csv.DictReader(handle)
-                    )
-            except (OSError, UnicodeDecodeError):
-                continue
+    for filename in ("ols.csv", "ppml.csv", "akm.csv", "correia.csv"):
+        path = _latest(filename)
+        if not path.exists():
+            continue
+        with path.open(newline="", encoding="utf-8") as handle:
+            rows.extend(
+                {**row, "_source_file": filename} for row in csv.DictReader(handle)
+            )
     return rows
 
 
@@ -506,49 +497,23 @@ def _format_seconds(value: float) -> str:
 
 
 def _row_success(row: dict[str, str]) -> bool:
-    return str(row.get("success", "True")).strip().lower() in {"true", "1"}
+    return str(row.get("converged", "")).strip().lower() in {"true", "1"}
+
+
+def _row_time(row: dict[str, str]) -> str:
+    return row.get("runtime_s", "")
 
 
 def _cell_is_complete(candidates: list[dict[str, str]]) -> bool:
-    """Whether a cell holds every trial it was supposed to.
-
-    A cell used to be three trials, full stop. With the R1/R2/R3 rule it is one
-    group of repetitions per DGP replicate, and the repetition count is chosen
-    per replicate from its own runtime, so the plan is a property of the
-    replicate rather than of the cell. Checking the recorded plan against the
-    pooled total would call a perfectly good cell incomplete: three replicates
-    of seven repetitions is twenty-one rows against a plan of seven.
-
-    Rows carrying no plan are pre-rule results, where one row per replicate and
-    three replicates is the whole cell.
-    """
-    by_replicate: dict[int | None, list[dict[str, str]]] = {}
-    for row in candidates:
-        by_replicate.setdefault(_integer_field(row, "iter_num"), []).append(row)
-
-    if not any(_integer_field(row, "n_planned") for row in candidates):
-        return len(candidates) == EXPECTED_TRIALS
-
-    if len(by_replicate) != EXPECTED_TRIALS:
-        return False
-    for rows in by_replicate.values():
-        planned = {_integer_field(row, "n_planned") for row in rows}
-        planned.discard(None)
-        # One replicate runs under one plan, and must deliver exactly it.
-        if len(planned) != 1 or len(rows) != planned.pop():
-            return False
-    return True
+    planned = {_integer_field(row, "n_planned") for row in candidates}
+    planned.discard(None)
+    expected = planned.pop() if len(planned) == 1 else EXPECTED_TRIALS
+    repetitions = {_integer_field(row, "repetition") for row in candidates}
+    return len(planned) == 0 and repetitions == set(range(expected))
 
 
-def _trial_key(row: dict[str, str]) -> tuple[int | None, int]:
-    """Identify a trial by DGP replicate and timing repetition.
-
-    Repetitions on one fixed sample and replicates of the DGP are different
-    things (PROTOCOL.md section 2), so they are separate coordinates. Rows
-    without a repetition are pre-rule results and count as repetition zero.
-    """
-    repetition = _integer_field(row, "repetition")
-    return (_integer_field(row, "iter_num"), 0 if repetition is None else repetition)
+def _trial_key(row: dict[str, str]) -> int | None:
+    return _integer_field(row, "repetition")
 
 
 def _render_trial_result(candidates: list[dict[str, str]]) -> str:
@@ -556,52 +521,28 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
     if not candidates:
         return "#miss"
 
-    summarized = [row for row in candidates if row.get("n_runs", "")]
-    if summarized:
-        if len(candidates) != 1:
-            return "incomplete"
-        row = summarized[0]
-        total = _integer_field(row, "n_runs")
-        successful = _integer_field(row, "n_success")
-        values = []
-        try:
-            if row.get("time", ""):
-                values.append(float(row["time"]))
-        except (TypeError, ValueError):
-            return "incomplete"
-    else:
-        trial_ids = [_trial_key(row) for row in candidates]
-        if any(replicate is None for replicate, _ in trial_ids):
-            return "incomplete"
-        if len(set(trial_ids)) != len(trial_ids):
-            return "incomplete"
-        total = len(candidates)
-        successful_rows = [row for row in candidates if _row_success(row)]
-        successful = len(successful_rows)
-        values = []
-        for row in successful_rows:
-            try:
-                values.append(float(row["time"]))
-            except (KeyError, TypeError, ValueError):
-                return "incomplete"
-
-    if successful is None or not 0 <= successful <= total:
+    trial_ids = [_trial_key(row) for row in candidates]
+    if None in trial_ids or len(set(trial_ids)) != len(trial_ids):
         return "incomplete"
-    if not summarized and not _cell_is_complete(candidates):
+    if not _cell_is_complete(candidates):
         return "incomplete"
-    summary = summarize_times(values, n_attempted=total)
+    total = len(candidates)
+    successful_rows = [row for row in candidates if _row_success(row)]
+    successful = len(successful_rows)
+    try:
+        values = [float(_row_time(row)) for row in successful_rows]
+    except (TypeError, ValueError):
+        return "incomplete"
     if successful == 0:
         return f"failed (0/{total})"
-    if summary.median_s is None:
-        return "incomplete"
-    rendered = _format_seconds(summary.median_s)
+    rendered = _format_seconds(median(values))
     if successful < total:
         return f"{rendered} ({successful}/{total})"
     return rendered
 
 
 def _runtime_dataset(row: dict[str, str]) -> str | None:
-    return row.get("dgp") or row.get("source_dataset_id") or row.get("dataset")
+    return row.get("design") or row.get("dgp") or row.get("source_dataset_id") or row.get("dataset")
 
 
 def _integer_field(row: dict[str, str], name: str) -> int | None:
@@ -616,15 +557,14 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
         {
             str(row.get("n_fe") or "missing")
             for row in rows
-            if "fepois_bench__" in row.get("_source_file", "")
+            if row.get("experiment") == "ppml"
             and _integer_field(row, "n_fe") != 3
         }
     )
     if unexpected:
         raise ValueError(
             "PPML result files must contain only n_fe=3 rows; found "
-            f"{', '.join(unexpected)}. Archive old results and rerun without "
-            "--reuse-existing."
+            f"{', '.join(unexpected)}."
         )
 
 
@@ -641,12 +581,13 @@ def _paper_runtime_target(
         "mechanism_mobility",
         "mechanism_sorting",
     }:
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": 3}, "feols_akm_sweep__"
+        view = "matched" if table_name.startswith("mechanism_") else "default"
+        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": 3}, f"akm.csv:{view}"
     if table_name == "ols":
-        return dataset, {"n_obs": 10_000_000, "model_k": 1, "n_fe": 3}, "feols_bench__"
+        return dataset, {"n_obs": 10_000_000, "model_k": 1, "n_fe": 3}, "ols.csv:default"
     if table_name == "ppml":
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": int(row[1])}, "fepois_bench__"
-    return dataset, {"model_k": 1, "n_fe": 2}, "correia-benchmarks.csv"
+        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": int(row[1])}, "ppml.csv:default"
+    return dataset, {"model_k": 1, "n_fe": 2}, "correia.csv:default"
 
 
 def _matches_runtime_target(
@@ -656,11 +597,13 @@ def _matches_runtime_target(
     requirements: dict[str, int],
     source_marker: str,
 ) -> bool:
-    if source_marker not in row.get("_source_file", ""):
+    filename, view = source_marker.split(":", 1)
+    if row.get("_source_file") != filename or row.get("view") != view:
         return False
     if _runtime_dataset(row) != dataset:
         return False
-    if canonical(row.get("backend") or row.get("algo") or "") != backend:
+    raw_backend = row.get("backend", "")
+    if raw_backend != backend:
         return False
     return all(_integer_field(row, field) == value for field, value in requirements.items())
 
@@ -777,10 +720,10 @@ def _synchronize_hardness(document: dict) -> int:
     ):
         for row in document["tables"][table_name]["rows"]:
             scenario = _clean_cell(row[0])
-            changed += update(table_name, f"{scenario}_1000000_k1_iter_1", row)
+            changed += update(table_name, scenario, row)
     for row in document["tables"]["ols"]["rows"]:
         family = row[0].split()[0]
-        changed += update("ols", f"{family}_10000000_k1_iter_1", row)
+        changed += update("ols", family, row)
     for table_name in ("correia_synthetic", "correia_real"):
         for row in document["tables"][table_name]["rows"]:
             changed += update(table_name, _clean_cell(row[0]), row)
@@ -788,7 +731,7 @@ def _synchronize_hardness(document: dict) -> int:
         if row[0].startswith("#"):
             continue
         family = row[0].split()[0]
-        size = "100000" if index < 4 else "1000000"
+        size = "100k" if index < 4 else "1m"
         changed += update("memory", f"memory_{family}_{size}", row)
     return changed
 
@@ -798,9 +741,8 @@ def _synchronize_agreement(document: dict) -> int:
     if observations is None:
         return 0
     by_key = {
-        (row["dgp"], canonical(row["backend"])): row
+        (row["design"], row["backend"]): row
         for row in observations
-        if canonical(row["backend"]) and _integer_field(row, "model_k") == 1
     }
     changed = 0
     dgp = ""
@@ -813,7 +755,7 @@ def _synchronize_agreement(document: dict) -> int:
         source = by_key.get((dgp, backend))
         if source is None:
             replacement = ["#miss", "#miss"]
-        elif source.get("success", "").lower() != "true":
+        elif not _row_success(source):
             replacement = ["failed", "failed"]
         else:
             replacement = [
@@ -828,26 +770,23 @@ def _synchronize_agreement(document: dict) -> int:
 
 
 def _synchronize_setup_cost(document: dict) -> int:
-    rows = _latest_rows("within_setup_cost_summary.csv")
+    rows = _latest_rows("within_setup_cost.csv")
     if rows is None:
         return 0
-    summary = {row["dgp"]: row for row in rows}
     prose = document.setdefault("prose", {})
     changed = 0
     for dgp in ("simple", "difficult"):
-        row = summary.get(dgp)
-        if row is None or _integer_field(row, "k") != 1:
-            raise ValueError(f"Missing one-covariate setup summary for {dgp}")
-        if _integer_field(row, "n_runs") != EXPECTED_TRIALS:
-            raise ValueError(f"Setup summary for {dgp} does not contain {EXPECTED_TRIALS} runs")
-        if row.get("all_converged_reused", "").lower() != "true" or row.get(
-            "all_converged_oneshot", ""
-        ).lower() != "true":
+        group = [row for row in rows if row["design"] == dgp]
+        if len(group) != EXPECTED_TRIALS:
+            raise ValueError(f"Setup results for {dgp} do not contain {EXPECTED_TRIALS} runs")
+        if not all(_row_success(row) for row in group):
             raise ValueError(f"Setup benchmark did not converge for {dgp}")
+        setup = median(float(row["setup_s"]) for row in group)
+        solve = median(float(row["solve_s"]) for row in group)
         fields = {
-            f"setup_{dgp}_setup_s": float(row["median_setup_wall_s"]),
-            f"setup_{dgp}_solve_s": float(row["median_solve_after_setup_wall_s"]),
-            f"setup_{dgp}_share": float(row["median_setup_share_of_reused_total"]),
+            f"setup_{dgp}_setup_s": setup,
+            f"setup_{dgp}_solve_s": solve,
+            f"setup_{dgp}_share": setup / (setup + solve),
         }
         for key, value in fields.items():
             if prose.get(key) != value:
@@ -870,17 +809,14 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
         return 0
     rows = [row for row in measured if _row_success(row)]
 
-    labels = {
-        "pyfixest-rust-map": "`rust-map`",
-        "pyfixest-within-additive": "`within-additive`",
-    }
+    labels = {"rust-map": "`rust-map`", "within-additive": "`within-additive`"}
     rendered: list[list[str]] = []
     for design in ("simple", "difficult"):
-        for package, label in labels.items():
+        for backend, label in labels.items():
             matching = [
                 row
                 for row in rows
-                if row.get("dgp") == design and row.get("package") == package
+                if row.get("design") == design and row.get("backend") == backend
             ]
             for index, row in enumerate(
                 sorted(matching, key=lambda r: float(r["max_eta"]), reverse=True)
@@ -890,8 +826,8 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
                     [
                         f"{design}" if index == 0 and label == list(labels.values())[0] else "",
                         label if index == 0 else "",
-                        row["setting"].split("=")[-1],
-                        _format_seconds(float(row["time_s"])),
+                        row["tolerance"],
+                        _format_seconds(float(row["runtime_s"])),
                         _format_typst_scientific(eta),
                     ]
                 )
@@ -916,7 +852,7 @@ def _synchronize_ppml_inner_outer(document: dict) -> int:
     rendered: list[list[str]] = []
     for design in ("simple", "difficult"):
         first = True
-        for row in [r for r in rows if r.get("dgp") == design]:
+        for row in [r for r in rows if r.get("design") == design]:
             converged = str(row.get("outer_converged", "")).lower() in {"true", "1"}
             steps = row.get("outer_iterations", "")
             rendered.append(
@@ -1015,7 +951,7 @@ def _synchronize_amortization(document: dict) -> int:
 
 
 ITERATION_COLUMNS = (
-    ("map", "map-sweep"),
+    ("rust-map", "map-sweep"),
     ("within-off", "lsmr-iteration"),
     ("within-diagonal", "lsmr-iteration"),
     ("within-additive", "lsmr-iteration"),
@@ -1052,7 +988,7 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
     for design in designs:
         cells = [design]
         for label, _unit in ITERATION_COLUMNS:
-            trials = [r for r in rows if r["design"] == design and r["solver_label"] == label]
+            trials = [r for r in rows if r["design"] == design and r["backend"] == label]
             counts = [
                 float(r["iterations_max"]) for r in trials if r.get("iterations_max", "")
             ]
@@ -1063,7 +999,7 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
                 continue
             # A capped cell keeps its count and says so. Dropping it would make
             # a solver that never converged look like the fastest one.
-            capped = any(r.get("censoring") == "capped" for r in trials)
+            capped = any(str(r.get("capped", "")).lower() in {"true", "1"} for r in trials)
             value = f"{median(counts):.0f}"
             cells.append(f"{value} (capped)" if capped else value)
         rendered.append(cells)
@@ -1075,21 +1011,16 @@ def _synchronize_zigzag(document: dict) -> int:
 
     Read both times directly from the raw benchmark output.
     """
-    path = ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
-    if not path.exists():
+    rows = _latest_rows("correia.csv")
+    if rows is None:
         return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = [
-            row
-            for row in csv.DictReader(handle)
-            if row.get("dataset") == "synthetic-zigzag"
-        ]
+    rows = [row for row in rows if row.get("design") == "synthetic-zigzag"]
     times: dict[str, float] = {}
     for row in rows:
-        backend = canonical(row.get("algo") or "")
-        if backend in {"within", "FEM.jl"} and str(row.get("success", "")).lower() == "true":
+        backend = row.get("backend", "")
+        if backend in {"within", "FEM.jl"} and _row_success(row):
             try:
-                times[backend] = float(row["time"])
+                times[backend] = float(_row_time(row))
             except (KeyError, TypeError, ValueError):
                 continue
     prose = document.setdefault("prose", {})
@@ -1139,8 +1070,13 @@ def _synchronize_canonical_tables(
     if document is None:
         document = _read_json(TABLES_PATH)
     changed = 0
+    runtime_tables = {
+        "ols", "ppml", "akm_mobility", "akm_sorting",
+        "mechanism_mobility", "mechanism_sorting",
+        "correia_synthetic", "correia_real",
+    }
     for name, table in document["tables"].items():
-        if name in {"memory", "agreement"}:
+        if name not in runtime_tables:
             continue
         headers = [_clean_cell(cell) for cell in table["header"]]
         for row in table["rows"]:
@@ -1166,11 +1102,11 @@ def _synchronize_canonical_tables(
                 continue
             dgp = row[0].split()[0]
             size = "100k" if index < 4 else "1m"
-            for column, backend in ((2, "rust"), (3, "rust-cg")):
+            for column, backend in ((2, "rust-map"), (3, "within")):
                 candidates = [
                     item
                     for item in measurements
-                    if item["dgp"] == dgp
+                    if item["design"] == dgp
                     and item["size"] == size
                     and item["backend"] == backend
                     and _integer_field(item, "model_k") == 1
@@ -1179,7 +1115,7 @@ def _synchronize_canonical_tables(
                     (
                         item
                         for item in candidates
-                        if item["success"].lower() == "true"
+                        if _row_success(item)
                     ),
                     None,
                 )

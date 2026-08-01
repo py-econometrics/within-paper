@@ -31,3 +31,6 @@ academic-voice/
 
 # local assistant/project metadata
 .claude/
+BENCHMARK_BACKLOG.md
+BENCHMARK_ESSENTIALS_PLAN.md
+BENCHMARK_SIMPLIFICATION_PLAN.md

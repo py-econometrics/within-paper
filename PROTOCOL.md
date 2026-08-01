@@ -145,15 +145,12 @@ fitted values, demeaned variables, slopes, scores, and objectives.
 - `max_j delta_j <= 1e-7`
 - slope difference below `1e-4` reference standard errors
 
-All three must be measured. A record that did not compute one of them has not cleared
-Gate A; `AccuracyRecord.clears_gate_a` requires all three to be present and passing, and
-`gate_a_components_measured` reports whether they were computed at all. The standalone
-preconditioner benchmark and the calibration pilot currently measure only `eta` and
-`delta`, so they report a gate result for those two and are not full Gate A records.
+All three must be measured before a result is said to clear Gate A. The standalone
+preconditioner benchmark measures `eta` and `delta`, but not the slope difference, so it
+does not report a full Gate A result.
 
-Frozen by `pixi run pilot-calibration` on the 100K simple and difficult designs. The
-thresholds are unchanged from the provisional values; what the pilot settled is the
-tolerance needed to reach them.
+The thresholds were frozen from a one-time calibration on the 100K simple and difficult
+designs. Focused tests retain the dense-residual, projection, and cap-reporting checks.
 
 **A nominal tolerance is not an achieved accuracy.** The LSMR stopping rule bounds a
 relative normal-equation residual recovered from the bidiagonalization scalars, which is
@@ -279,7 +276,7 @@ corroborates it.
 Resolved before the production runs, and struck from this list when done:
 
 - [x] Validate Gate A on the 100K pilot and freeze the thresholds. Done 2026-07-26;
-      `pixi run pilot-calibration` regenerates the evidence in section 5.
+      the numerical checks now live in the test suite rather than a public benchmark.
 - [x] Verify that all three within configurations reach the same projection. Done.
 - [x] Test MAP and LSMR failure and cap reporting. Done.
 - [x] Reconcile the factor order between the OLS/PPML specs and the AKM sweep spec. Done
