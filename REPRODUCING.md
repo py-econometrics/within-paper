@@ -11,7 +11,6 @@ thread counts used by the benchmark drivers:
 
 ```bash
 export BENCH_THREADS=10
-export JULIA_NUM_THREADS=10
 ```
 
 Install the R packages in the system R library:
@@ -28,5 +27,13 @@ environment before running Julia benchmark drivers:
 julia --project=benchmarks/julia-env -e 'using Pkg; Pkg.instantiate()'
 ```
 
-Use `pixi run compile` to build the paper. Later benchmark stages add commands that check
-the external R and Julia installations before executing a production run.
+Use `pixi run test` to run the checks and `pixi run compile` to build the paper
+from the recorded results. To regenerate the benchmark results, figures,
+tables, and PDF, run:
+
+```bash
+pixi run reproduce-paper
+```
+
+This command checks the external R and Julia installations before starting the
+long-running benchmark suite.

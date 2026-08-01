@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import gc
-import hashlib
 import time
 import warnings
 from dataclasses import dataclass
@@ -28,8 +27,8 @@ import pandas as pd
 
 
 from benchmarks.core.cli import add_dgps_arg
-from benchmarks.dgp.samples import FE_COLS
-from benchmarks.solvers.pyfixest_feols import _fit_converged
+from benchmarks.dgp.samples import FE_COLS, dataframe_hash
+from benchmarks.solvers.common import fit_converged
 from benchmarks.core.results import write_rows
 from benchmarks.core.accuracy import accuracy_record
 from benchmarks.dgp.base import paper_base_dgp
@@ -40,8 +39,10 @@ from benchmarks.solvers.settings import (
     demeaner_for,
 )
 from benchmarks.core.paths import ROOT
+from benchmarks.solvers.specs import paper_ols_spec
 
-FML = "y ~ x1 | indiv_id + firm_id + year"
+OLS_SPEC = paper_ols_spec()
+FML = OLS_SPEC.formula
 
 
 @dataclass(frozen=True)
@@ -54,9 +55,7 @@ class ToleranceSetting:
 
 
 def _sample_hash(frame: pd.DataFrame) -> str:
-    cols = ["y", "x1", *FE_COLS]
-    values = pd.util.hash_pandas_object(frame.loc[:, cols], index=False).values.tobytes()
-    return hashlib.sha256(values).hexdigest()
+    return dataframe_hash(frame, (OLS_SPEC.depvar, *OLS_SPEC.covariates, *OLS_SPEC.fe_cols))
 
 
 def _categories_and_rhs(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
@@ -187,7 +186,7 @@ def _run_pyfixest_setting(
 ) -> dict:
     try:
         fit, elapsed = _fit_pyfixest(frame, setting)
-        converged = _fit_converged(fit)
+        converged = fit_converged(fit)
         eta = _external_eta_from_fit(frame, fit) if converged else None
         beta = float(np.asarray(fit.coef())[0]) if converged else None
         row = {

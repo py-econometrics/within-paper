@@ -2,26 +2,25 @@ from __future__ import annotations
 
 import time
 import warnings
+from typing import Any
 
-from benchmarks.solvers.pyfixest_feols import (
-    _TablePrinter,
-    _beta_x1,
-    demeaner_for,
-    _dgp_width,
-    _fit_converged,
-    _group_key,
-    _preconditioner_build_s,
-    _read_data_columns,
-    _result_from_dataset,
-    _retained_rows,
-    _trim_process_memory,
-)
-from benchmarks.solvers.subprocess_driver import (
-    JuliaFeolsBenchmarker,
-    SubprocessFeolsBenchmarker,
-)
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-from benchmarks.core.paths import EXTERNAL_DIR
+from benchmarks.core.runtime import configure_benchmark_runtime
+from benchmarks.solvers.common import (
+    TablePrinter,
+    beta_x1,
+    dgp_width,
+    fit_converged,
+    group_key,
+    preconditioner_build_s,
+    read_data_columns,
+    result_from_dataset,
+    retained_rows,
+    trim_process_memory,
+)
+from benchmarks.solvers.settings import demeaner_for
+
+
 class PyFepoisBenchmarkerFullApi:
     """Benchmark one pf.fepois() call with the selected demeaning backend."""
 
@@ -44,9 +43,21 @@ class PyFepoisBenchmarkerFullApi:
     def name(self) -> str:
         return self._name
 
+    def cache_key(self) -> dict[str, Any]:
+        """Settings that make this backend's result file reusable."""
+        return {
+            "adapter": "pyfixest-fepois",
+            "name": self.name,
+            "demeaner_backend": self._demeaner_backend,
+            "iwls_maxiter": self._iwls_maxiter,
+            "tol": self._tol,
+            "maxiter": self._maxiter,
+        }
+
     def run(
         self, datasets: list[BenchmarkDataset], spec: FeolsSpec
     ) -> list[FeolsResult]:
+        configure_benchmark_runtime()
         import pyfixest as pf
 
         demeaner = demeaner_for(
@@ -56,7 +67,7 @@ class PyFepoisBenchmarkerFullApi:
         results: list[FeolsResult] = []
         all_cols = [spec.depvar, *spec.covariates, *spec.fe_cols]
 
-        tbl = _TablePrinter(_dgp_width(datasets))
+        tbl = TablePrinter(dgp_width(datasets))
         tbl.print_header(self.name)
 
         group_buf: list[FeolsResult] = []
@@ -66,7 +77,7 @@ class PyFepoisBenchmarkerFullApi:
             n_obs_for_result = dataset.n_obs
             df = None
             try:
-                df = _read_data_columns(dataset.data_path, all_cols)
+                df = read_data_columns(dataset.data_path, all_cols)
                 n_obs_for_result = len(df)
 
                 t0 = time.perf_counter()
@@ -85,7 +96,7 @@ class PyFepoisBenchmarkerFullApi:
                         demeaner=demeaner,
                         iwls_maxiter=self._iwls_maxiter,
                     )
-                    if not _fit_converged(fit):
+                    if not fit_converged(fit):
                         raise RuntimeError("PyFixest PPML model did not converge")
                 elapsed = time.perf_counter() - t0
 
@@ -95,7 +106,7 @@ class PyFepoisBenchmarkerFullApi:
                 # invent them. Standalone within PPML diagnostics fill the gap.
                 deviance = getattr(fit, "deviance", None)
                 loglik = getattr(fit, "_loglik", None)
-                result = _result_from_dataset(
+                result = result_from_dataset(
                     dataset,
                     spec,
                     backend=self.name,
@@ -105,15 +116,15 @@ class PyFepoisBenchmarkerFullApi:
                     outer_iterations=None,
                     inner_iterations_sum=None,
                     inner_iterations_max=None,
-                    preconditioner_build_s=_preconditioner_build_s(fit),
+                    preconditioner_build_s=preconditioner_build_s(fit),
                     deviance=float(deviance) if deviance is not None else None,
                     loglik=float(loglik) if loglik is not None else None,
-                    beta_x1=_beta_x1(fit),
-                    n_retained=_retained_rows(fit),
+                    beta_x1=beta_x1(fit),
+                    n_retained=retained_rows(fit),
                     censoring="none",
                 )
             except Exception as exc:
-                result = _result_from_dataset(
+                result = result_from_dataset(
                     dataset,
                     spec,
                     backend=self.name,
@@ -124,12 +135,12 @@ class PyFepoisBenchmarkerFullApi:
                 )
             finally:
                 del df
-                _trim_process_memory(self._demeaner_backend)
+                trim_process_memory(self._demeaner_backend)
 
             results.append(result)
 
             if result.iter_type != "burnin":
-                key = _group_key(result)
+                key = group_key(result)
                 if prev_key is not None and key != prev_key and group_buf:
                     tbl.print_row(group_buf)
                     group_buf = []
@@ -140,21 +151,3 @@ class PyFepoisBenchmarkerFullApi:
             tbl.print_row(group_buf)
 
         return results
-
-
-class FixestFepoisBenchmarker(SubprocessFeolsBenchmarker):
-    def __init__(self, name: str | None = None, script_path=None):
-        super().__init__(
-            name=name or "r.fixest (fepois)",
-            command_prefix=["Rscript"],
-            script_path=(script_path or EXTERNAL_DIR / "fixest_bench.R"),
-            model="fepois",
-        )
-
-
-class GLFixedEffectModelsBenchmarker(JuliaFeolsBenchmarker):
-    def __init__(self, name: str | None = None, script_path=None):
-        super().__init__(
-            name=name or "julia.GLFixedEffectModels (fepois)",
-            script_path=(script_path or EXTERNAL_DIR / "fepois_julia.jl"),
-        )

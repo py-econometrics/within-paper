@@ -60,6 +60,13 @@ class RunRecord:
     def validate(self) -> list[str]:
         """Names of the protocol requirements this record does not meet."""
         problems: list[str] = []
+        reserved = set(self.__dataclass_fields__) - {"extra"}
+        overlapping_extra = sorted(reserved & set(self.extra))
+        if overlapping_extra:
+            problems.append(
+                "extra must not overwrite record fields: "
+                + ", ".join(overlapping_extra)
+            )
         if not self.sample_hash:
             problems.append("sample_hash missing: the sample is not identified")
         if self.total_s is None:
@@ -83,6 +90,9 @@ class RunRecord:
         return problems
 
     def to_row(self) -> dict:
+        problems = self.validate()
+        if problems:
+            raise ValueError("record cannot be serialized: " + "; ".join(problems))
         row = asdict(self)
         row.pop("extra")
         row.update(self.extra)

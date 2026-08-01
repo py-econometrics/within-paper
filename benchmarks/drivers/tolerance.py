@@ -13,14 +13,13 @@ and
 The default run covers mobility designs 1, 3, and 5 at one million observations,
 with one discarded warm-up and three timed repetitions per setting:
 
-    BENCH_THREADS=10 JULIA_NUM_THREADS=10 pixi run bench-tolerance
+    BENCH_THREADS=10 pixi run bench-tolerance
 """
 
 from __future__ import annotations
 
 import argparse
 import gc
-import hashlib
 import json
 import os
 import random
@@ -40,14 +39,17 @@ from pyfixest.core.detect_singletons import detect_singletons
 
 from benchmarks.core.methods import inline_label, resolve
 from benchmarks.core.accuracy import external_normal_residuals
-from benchmarks.dgp.samples import FE_COLS
-from benchmarks.solvers.pyfixest_feols import _fit_converged
+from benchmarks.core.runtime import benchmark_threads
+from benchmarks.dgp.samples import FE_COLS, dataframe_hash
+from benchmarks.solvers.common import fit_converged
 from benchmarks.solvers.settings import demeaner_for
+from benchmarks.solvers.specs import paper_ols_spec
 from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
-FORMULA = "y ~ x1 | indiv_id + firm_id + year"
-MODEL_COLUMNS = [*FE_COLS, "x1", "y"]
+OLS_SPEC = paper_ols_spec()
+FORMULA = OLS_SPEC.formula
+MODEL_COLUMNS = [*OLS_SPEC.fe_cols, *OLS_SPEC.covariates, OLS_SPEC.depvar]
 DEFAULT_DESIGNS = (1, 3, 5)
 DEFAULT_N_OBS = 1_000_000
 DEFAULT_REPETITIONS = 3
@@ -208,10 +210,7 @@ def residual_error(residual: np.ndarray, residual_ref: np.ndarray) -> float:
 
 
 def _sample_hash(frame: pd.DataFrame) -> str:
-    values = pd.util.hash_pandas_object(
-        frame.loc[:, MODEL_COLUMNS], index=False
-    ).values.tobytes()
-    return hashlib.sha256(values).hexdigest()
+    return dataframe_hash(frame, MODEL_COLUMNS)
 
 
 def _drop_recursive_singletons(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
@@ -263,7 +262,7 @@ def _fit_pyfixest(
             store_data=False,
             demeaner=demeaner,
         )
-        converged = _fit_converged(fit)
+        converged = fit_converged(fit)
     elapsed = time.perf_counter() - start
     if not converged:
         raise RuntimeError("PyFixest model did not converge")
@@ -617,21 +616,7 @@ def _parse_method_keys(values: list[str]) -> list[MethodSpec]:
 
 
 def _validate_threads() -> int:
-    value = os.environ.get("BENCH_THREADS")
-    if value is None:
-        raise RuntimeError(
-            "BENCH_THREADS must be set. The paper protocol uses BENCH_THREADS=10."
-        )
-    try:
-        threads = int(value)
-    except ValueError as exc:
-        raise RuntimeError("BENCH_THREADS must be a positive integer") from exc
-    if threads < 1:
-        raise RuntimeError("BENCH_THREADS must be a positive integer")
-    julia_threads = os.environ.get("JULIA_NUM_THREADS")
-    if julia_threads is not None and int(julia_threads) != threads:
-        raise RuntimeError("BENCH_THREADS and JULIA_NUM_THREADS must agree")
-    return threads
+    return benchmark_threads()
 
 
 def _run_plot(input_path: Path, output_path: Path) -> None:

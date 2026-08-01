@@ -6,7 +6,7 @@ from pathlib import Path
 from benchmarks.core.cli import add_output_args
 from benchmarks.solvers.registry import build_feols_benchmarkers
 from benchmarks.dgp.scenarios import BaseDGP
-from benchmarks.core.interfaces import FeolsSpec
+from benchmarks.solvers.specs import paper_ols_spec
 from benchmarks.solvers.runner import generate_datasets, run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT
 
@@ -26,16 +26,7 @@ DGPS = [
     BaseDGP(DATA_DIR, "difficult"),
 ]
 
-SPECS = [
-    FeolsSpec(
-        depvar="y",
-        covariates=[f"x{i}" for i in range(1, k + 1)],
-        fe_cols=fe_cols,
-        vcov="iid",
-    )
-    for k in K_VALUES
-    for fe_cols in (["indiv_id", "firm_id", "year"],)
-]
+SPECS = [paper_ols_spec()]
 
 # ---------------------------------------------------------------------------
 # Run
@@ -51,7 +42,7 @@ if __name__ == "__main__":
     # matched_accuracy=True, but at 10M the unpreconditioned and MAP arms run
     # for hours against the cap, so that is an explicit decision rather than a
     # default.
-    bundle = build_feols_benchmarkers()
+    benchmarkers = build_feols_benchmarkers()
     run_benchmarks(
-        bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
+        benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )

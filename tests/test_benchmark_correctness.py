@@ -5,6 +5,7 @@ import csv
 import re
 import hashlib
 import json
+import os
 import sys
 import subprocess
 import warnings
@@ -42,13 +43,13 @@ from benchmarks.solvers.registry import (
     MATCHED_ACCURACY,
     PACKAGE_DEFAULTS,
     build_feols_benchmarkers,
+    build_fepois_benchmarkers,
     require_multiple_absorbed_factors,
 )
 from benchmarks.solvers.pyfixest_feols import (
-    _as_bool,
     _external_eta,
-    _fit_converged,
 )
+from benchmarks.solvers.common import as_bool, fit_converged
 from benchmarks.solvers.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     MECHANISM_LSMR_TOL,
@@ -57,11 +58,13 @@ from benchmarks.solvers.settings import (
     demeaner_for,
 )
 from benchmarks.core.records import RunRecord
+from benchmarks.core.runtime import configure_benchmark_runtime
 from benchmarks.dgp.samples import FE_COLS, SampleSpec, clear_sample_cache, load_sample
 from benchmarks.solvers.specs import matched_solver_specs
-from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 from benchmarks.core.methods import canonical
 from benchmarks.solvers.subprocess_driver import _parse_subprocess_output
+from benchmarks.solvers.runner import run_benchmarks
 from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
 from benchmarks.core.results import write_rows
 from benchmarks.core.timing import (
@@ -174,7 +177,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         # The order was reconciled with the AKM sweep on 2026-07-26; see
         # test_absorbed_factor_order_is_the_same_everywhere for why it matters.
         self.assertEqual(len(FEPOIS_SPECS), 1)
-        self.assertEqual(FEPOIS_SPECS[0].fe_cols, ["indiv_id", "firm_id", "year"])
+        self.assertEqual(FEPOIS_SPECS[0].fe_cols, ("indiv_id", "firm_id", "year"))
 
     def test_canonical_ppml_table_contains_only_three_fe_rows(self) -> None:
         document = json.loads(
@@ -201,8 +204,8 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertAlmostEqual(_setup_share(6.4, 1.52), 6.4 / 7.92)
 
     def test_string_false_is_not_truthy(self) -> None:
-        self.assertFalse(_as_bool("false", default=True))
-        self.assertTrue(_as_bool("true", default=False))
+        self.assertFalse(as_bool("false", default=True))
+        self.assertTrue(as_bool("true", default=False))
 
     def test_correia_summary_retains_trial_counts(self) -> None:
         frame = pd.DataFrame(
@@ -458,11 +461,19 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
 
         both = build_feols_benchmarkers(matched_accuracy=True, external=False)
         self.assertEqual(
-            [b.name for b in both.benchmarkers],
+            [b.name for b in both],
             [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)],
         )
         defaults_only = build_feols_benchmarkers(external=False)
-        self.assertEqual(len(defaults_only.benchmarkers), len(PACKAGE_DEFAULTS))
+        self.assertEqual(len(defaults_only), len(PACKAGE_DEFAULTS))
+        self.assertEqual(
+            [backend.name for backend in build_feols_benchmarkers()],
+            ["within", "rust-map", "fixest", "FEM.jl"],
+        )
+        self.assertEqual(
+            [backend.name for backend in build_fepois_benchmarkers()],
+            ["within", "rust-map", "fixest", "GLFEM.jl"],
+        )
 
     def test_preconditioner_comparison_needs_two_factors(self) -> None:
         require_multiple_absorbed_factors(FeolsSpec("y", ["x1"], ["a", "b"], "iid"))
@@ -482,7 +493,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         matched = build_feols_benchmarkers(
             package_defaults=False, matched_accuracy=True, external=False
         )
-        for benchmarker in matched.benchmarkers:
+        for benchmarker in matched:
             demeaner = demeaner_for(
                 benchmarker._demeaner_backend,
                 tol=benchmarker._tol,
@@ -620,7 +631,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         from benchmarks.drivers.ppml import SPECS as PPML_SPECS
         from benchmarks.drivers.ols import SPECS as MAIN_SPECS
 
-        expected = ["indiv_id", "firm_id", "year"]
+        expected = ("indiv_id", "firm_id", "year")
         for label, specs in (
             ("main", MAIN_SPECS),
             ("fepois", PPML_SPECS),
@@ -807,6 +818,10 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             any("exceeds total" in problem
                 for problem in record(setup_s=1.0, solve_s=1.0, total_s=0.5).validate())
         )
+        self.assertTrue(
+            any("extra must not overwrite" in problem
+                for problem in record(extra={"total_s": 999}).validate())
+        )
 
     def test_headline_fits_carry_an_accuracy_record(self) -> None:
         """Every timed fit must be able to report the accuracy it achieved.
@@ -931,6 +946,95 @@ class SubprocessOutputTests(unittest.TestCase):
         self.assertTrue(results[0].success)
         self.assertFalse(results[1].success)
 
+    def test_conflicting_duplicate_records_fail_loudly(self) -> None:
+        rows = "\n".join(
+            (
+                json.dumps({"dataset_id": "d1", "iter_num": 1, "time": 1.0}),
+                json.dumps({"dataset_id": "d1", "iter_num": 1, "time": 2.0}),
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "conflicting records"):
+            self._parse(rows)
+
+
+class RunnerCacheTests(unittest.TestCase):
+    """Reuse only a result produced for the exact requested benchmark."""
+
+    class _CountingBenchmarker:
+        name = "counting"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def cache_key(self) -> dict[str, str]:
+            return {"adapter": "test", "setting": "fixed"}
+
+        def run(
+            self, datasets: list[BenchmarkDataset], spec: FeolsSpec
+        ) -> list[FeolsResult]:
+            self.calls += 1
+            return [
+                FeolsResult(
+                    source_dataset_id=dataset.dataset_id,
+                    source_k=dataset.k,
+                    iter_type=dataset.iter_type,
+                    iter_num=dataset.iter_num,
+                    dgp=dataset.dgp,
+                    model_k=spec.k,
+                    n_obs=dataset.n_obs,
+                    n_fe=spec.n_fe,
+                    backend=self.name,
+                    time=0.01,
+                    success=True,
+                )
+                for dataset in datasets
+            ]
+
+    def test_reuse_requires_a_matching_specification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            data_path = directory / "sample.csv"
+            data_path.write_text("y,x1,a,b\n1,2,1,1\n", encoding="utf-8")
+            dataset = BenchmarkDataset(
+                "sample", data_path, "simple", 1, 1, "trial", 1
+            )
+            benchmarker = self._CountingBenchmarker()
+            output = directory / "results.csv"
+            iid_spec = FeolsSpec("y", ["x1"], ["a", "b"], "iid")
+
+            run_benchmarks([benchmarker], [dataset], [iid_spec], output)
+            run_benchmarks(
+                [benchmarker], [dataset], [iid_spec], output, reuse_existing=True
+            )
+            self.assertEqual(benchmarker.calls, 1)
+
+            hetero_spec = FeolsSpec("y", ["x1"], ["a", "b"], "hetero")
+            run_benchmarks(
+                [benchmarker], [dataset], [hetero_spec], output, reuse_existing=True
+            )
+            self.assertEqual(benchmarker.calls, 2)
+
+
+class RuntimeConfigurationTests(unittest.TestCase):
+    def test_one_benchmark_setting_configures_every_solver_runtime(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BENCH_THREADS": "3",
+                "JULIA_NUM_THREADS": "1",
+                "RAYON_NUM_THREADS": "1",
+            },
+            clear=False,
+        ):
+            self.assertEqual(configure_benchmark_runtime(), 3)
+            self.assertEqual(os.environ["JULIA_NUM_THREADS"], "3")
+            self.assertEqual(os.environ["RAYON_NUM_THREADS"], "3")
+
+    def test_missing_benchmark_setting_is_rejected(self) -> None:
+        with patch.dict(os.environ, {"BENCH_THREADS": ""}, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "BENCH_THREADS"):
+                configure_benchmark_runtime()
+
 
 class SharedPrimitiveTests(unittest.TestCase):
     """The timing and result-IO primitives every driver now goes through."""
@@ -959,7 +1063,8 @@ class SharedPrimitiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "nested" / "rows.csv"
             write_rows(out, rows)
-            written = list(csv.DictReader(out.open()))
+            with out.open(newline="", encoding="utf-8") as handle:
+                written = list(csv.DictReader(handle))
         self.assertEqual([row["a"] for row in written], ["1", "2"])
         self.assertEqual([row["b"] for row in written], ["", "3"])
 
@@ -1068,14 +1173,14 @@ class BackendRegistryTests(unittest.TestCase):
         from benchmarks.core.methods import METHODS
         from benchmarks.drivers.tolerance import METHOD_BY_KEY
         from benchmarks.solvers.registry import (
-            EXTERNAL_FEOLS,
+            EXTERNAL_BACKENDS,
             MATCHED_ACCURACY,
             PACKAGE_DEFAULTS,
         )
 
         recorded = (
             [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)]
-            + [label for label, _ in EXTERNAL_FEOLS]
+            + [backend.label for backend in EXTERNAL_BACKENDS]
             + list(METHOD_BY_KEY)
         )
         aliased = sorted(name for name in recorded if name not in METHODS)
@@ -1189,7 +1294,7 @@ class ConvergenceCheckTests(unittest.TestCase):
             ):
                 if re.search(r"\bfit\w*\.convergence\b", line):
                     offenders.append(f"{path.relative_to(ROOT)}:{number}")
-        self.assertEqual(offenders, [], f"use _fit_converged instead: {offenders}")
+        self.assertEqual(offenders, [], f"use fit_converged instead: {offenders}")
 
     def test_helper_tolerates_a_model_with_no_flag(self) -> None:
         class LinearFit:  # Feols exposes no convergence attribute at all
@@ -1198,8 +1303,8 @@ class ConvergenceCheckTests(unittest.TestCase):
         class PoissonFit:  # Feglm does
             convergence = False
 
-        self.assertTrue(_fit_converged(LinearFit()))
-        self.assertFalse(_fit_converged(PoissonFit()))
+        self.assertTrue(fit_converged(LinearFit()))
+        self.assertFalse(fit_converged(PoissonFit()))
 
 
 if __name__ == "__main__":

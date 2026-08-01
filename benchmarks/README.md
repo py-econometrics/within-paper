@@ -27,8 +27,9 @@ Three edits. Say you are adding Stata.
    `external/fixest_bench.R`; `solvers/subprocess_driver.py` is what launches it
    and parses the records back.
 
-2. **Say how to run it.** One entry in `solvers/registry.py`, next to
-   `PACKAGE_DEFAULTS` and `EXTERNAL_FEOLS`.
+2. **Say how to run it.** One `ExternalBackend(...)` entry in
+   `solvers/registry.py`. List the models it supports (`feols`, `fepois`, or
+   both); the OLS and PPML runners then pick it up automatically.
 
 3. **Say how to name it.** One `Method(...)` in `core/methods.py` giving the
    package, algorithm, preconditioner, colour and marker. Add any spelling the
@@ -41,11 +42,16 @@ spelling appearing in the raw results must resolve to one.
 
 ## Running
 
-`pixi task list` shows every driver. The sweeps that feed the paper's tables are
+`pixi task list` shows the individual benchmark commands. The main sweeps are
 `bench-main` (OLS), `bench-fepois` (PPML), `bench-akm-sweep`, and
-`bench-correia`; `bench-all` runs everything, and `reproduce-paper` runs the
-benchmarks, renders the tables and builds the PDF.
+`bench-correia`. For a complete run, use `reproduce-paper`; it runs every
+required benchmark, generates the figures, renders the tables, and builds the
+PDF.
 
-Set `BENCH_THREADS` and `JULIA_NUM_THREADS` to the same value before any sweep.
-`check-external-runtimes` verifies that, along with the R and Julia versions,
-and refuses a run that would not be comparable.
+Set `BENCH_THREADS` before any sweep. The benchmark launcher uses that one value
+for R fixest, Julia, and the Rust solver. `check-external-runtimes` verifies the
+R and Julia versions and thread settings before a production run.
+
+With `--reuse-existing`, the runner reuses a result only when its backend
+settings, benchmark files, and model specification still match. It writes a
+small metadata file beside each CSV and reruns stale output automatically.

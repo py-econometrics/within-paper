@@ -5,15 +5,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.solvers.pyfixest_feols import (
-    PyFeolsBenchmarkerFullApi,
-    _fmt_time,
-)
-from benchmarks.solvers.subprocess_driver import (
-    FixestFeolsBenchmarker,
-    JuliaFeolsBenchmarker,
-)
-from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.solvers.pyfixest_feols import PyFeolsBenchmarkerFullApi
+from benchmarks.solvers.common import format_time
+from benchmarks.solvers.subprocess_driver import SubprocessFeolsBenchmarker
+from benchmarks.core.interfaces import BenchmarkDataset
+from benchmarks.solvers.specs import correia_ols_spec
 from benchmarks.solvers.runner import run_benchmarks
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
@@ -44,12 +40,7 @@ DATASETS = [
     "schools",
     "directors",
 ]
-SPEC = FeolsSpec(
-    depvar="y",
-    covariates=["x1"],
-    fe_cols=["id1", "id2"],
-    vcov="iid",
-)
+SPEC = correia_ols_spec()
 LANGUAGE = {
     "rust-map": "Python",
     "within": "Python",
@@ -94,12 +85,14 @@ def build_benchmarkers() -> list:
     return [
         PyFeolsBenchmarkerFullApi("rust-map", "rust"),
         PyFeolsBenchmarkerFullApi("within", "within"),
-        FixestFeolsBenchmarker(
-            "fixest",
+        SubprocessFeolsBenchmarker(
+            name="fixest",
+            command_prefix=("Rscript",),
             script_path=EXTERNAL_DIR / "correia_r.R",
         ),
-        JuliaFeolsBenchmarker(
-            "FEM.jl",
+        SubprocessFeolsBenchmarker(
+            name="FEM.jl",
+            command_prefix=("julia",),
             script_path=EXTERNAL_DIR / "correia_julia.jl",
         ),
     ]
@@ -176,7 +169,7 @@ def print_runtime_summary(results_df: pd.DataFrame) -> None:
     for _, row in summary_df.iterrows():
         ok = bool(row["success"])
         elapsed = row["time"]
-        time_text = _fmt_time(elapsed) if ok and pd.notna(elapsed) else "—"
+        time_text = format_time(elapsed) if ok and pd.notna(elapsed) else "—"
         status = "ok" if ok else str(row["error"])[:40]
         print(
             "  "

@@ -1,50 +1,25 @@
 from __future__ import annotations
 
-import ctypes
-import gc
-import statistics
 import sys
 import time
 import warnings
-from contextlib import suppress
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any
 
-import pandas as pd
-
-from benchmarks.solvers.settings import (
-    DEFAULT_WITHIN_PRECONDITIONER,
-    LSMR_SETTINGS,
-    MAP_SETTINGS,
-    MECHANISM_LSMR_TOL,
-    MECHANISM_MAP_TOL,
-    MECHANISM_MAXITER,
-    WITHIN_PRECONDITIONERS,
-    demeaner_for,
-)
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.core.runtime import configure_benchmark_runtime
 from benchmarks.core.timing import repetitions_for_runtime
-_MIN_DGP_WIDTH = 16
-
-
-def _trim_process_memory(demeaner_backend: str) -> None:
-    """Return unused Python and native allocator memory after large benchmark cases."""
-    gc.collect()
-
-    if demeaner_backend.startswith("torch"):
-        try:
-            import torch
-        except ImportError:
-            pass
-        else:
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.ipc_collect()
-
-    if sys.platform.startswith("linux"):
-        with suppress(Exception):
-            ctypes.CDLL("libc.so.6").malloc_trim(0)
+from benchmarks.solvers.common import (
+    TablePrinter,
+    dgp_width,
+    fit_converged,
+    group_key,
+    read_data_columns,
+    result_from_dataset,
+    retained_rows,
+    trim_process_memory,
+)
+from benchmarks.solvers.settings import demeaner_for
 
 
 @dataclass(frozen=True)
@@ -74,143 +49,6 @@ def detect_torch_runtime_availability() -> TorchRuntimeAvailability:
         has_mps=has_mps,
         has_cuda=has_cuda,
     )
-
-
-def _fmt_time(t: float) -> str:
-    if t < 1:
-        return f"{t * 1000:.1f}ms"
-    return f"{t:.3f}s"
-
-
-def _dgp_width(datasets: list[BenchmarkDataset]) -> int:
-    return max(
-        _MIN_DGP_WIDTH, max((len(d.dgp) for d in datasets), default=_MIN_DGP_WIDTH)
-    )
-
-
-class _TablePrinter:
-    """Format benchmark tables with a DGP column wide enough for the labels."""
-
-    def __init__(self, dgp_w: int):
-        self._w = dgp_w
-        self._hdr = (
-            f"{'dgp':<{dgp_w}} {'k':>3} {'n_obs':>12} {'n_fe':>4} "
-            f"{'min':>10} {'median':>10} {'max':>10}  status"
-        )
-        self._sep = "-" * len(self._hdr)
-
-    def print_header(self, name: str) -> None:
-        print(f"\n  {name}", flush=True)
-        print(f"  {self._sep}", flush=True)
-        print(f"  {self._hdr}", flush=True)
-        print(f"  {self._sep}", flush=True)
-
-    def _row_prefix(self, r: FeolsResult) -> str:
-        return f"{r.dgp:<{self._w}} {r.model_k:>3} {r.n_obs:>12,} {r.n_fe:>4}"
-
-    def print_row(self, results: list[FeolsResult]) -> None:
-        columns, status = _time_columns(results)
-        print(f"  {self._row_prefix(results[0])} {columns}  {status}", flush=True)
-
-
-def _time_columns(results: list[FeolsResult]) -> tuple[str, str]:
-    times = [r.time for r in results if r.success and r.time is not None]
-    if times:
-        mn, md, mx = min(times), statistics.median(times), max(times)
-        columns = f"{_fmt_time(mn):>10} {_fmt_time(md):>10} {_fmt_time(mx):>10}"
-        return columns, "ok"
-    errs = [r.error for r in results if r.error]
-    status = errs[0][:30] if errs else "FAIL"
-    columns = f"{'—':>10} {'—':>10} {'—':>10}"
-    return columns, status
-
-
-def _group_key(r: FeolsResult) -> tuple[str, int, int, int]:
-    return (r.dgp, r.model_k, r.n_obs, r.n_fe)
-
-
-def _result_from_dataset(
-    dataset: BenchmarkDataset,
-    spec: FeolsSpec,
-    *,
-    backend: str,
-    elapsed: float | None,
-    success: bool,
-    error: str | None = None,
-    n_obs_override: int | None = None,
-    **diagnostics,
-) -> FeolsResult:
-    return FeolsResult(
-        source_dataset_id=dataset.dataset_id,
-        source_k=dataset.k,
-        iter_type=dataset.iter_type,
-        iter_num=dataset.iter_num,
-        dgp=dataset.dgp,
-        model_k=spec.k,
-        n_obs=n_obs_override if n_obs_override is not None else dataset.n_obs,
-        n_fe=spec.n_fe,
-        backend=backend,
-        time=elapsed,
-        success=success,
-        error=error,
-        **diagnostics,
-    )
-
-
-def _preconditioner_build_s(fit: Any) -> float | None:
-    """Read preconditioner setup time when PyFixest exposes it."""
-    pc = getattr(fit, "preconditioner", None)
-    if pc is None:
-        return None
-    value = getattr(pc, "build_time_seconds", None)
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _beta_x1(fit: Any) -> float | None:
-    try:
-        coef = fit.coef()
-        names = [str(name) for name in list(getattr(fit, "_coefnames", []) or [])]
-        if hasattr(coef, "tolist"):
-            values = list(coef.tolist())
-        else:
-            values = list(coef)
-        values = [float(v) for v in values]
-        if "x1" in names:
-            return values[names.index("x1")]
-        if len(values) == 1:
-            return values[0]
-    except Exception:
-        return None
-    return None
-
-
-_T = TypeVar("_T")
-
-
-def _safe_cast(val: Any, type_fn: Callable[[Any], _T]) -> _T | None:
-    if val is None:
-        return None
-    try:
-        return type_fn(val)
-    except (TypeError, ValueError):
-        return None
-
-
-def _as_bool(value: Any, *, default: bool) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1"}:
-            return True
-        if normalized in {"false", "0"}:
-            return False
-    return bool(value)
 
 
 _WARNED: set[str] = set()
@@ -301,44 +139,6 @@ def _external_eta(fit: Any, frame: "pd.DataFrame", depvar: str, covariates: list
         return None
 
 
-def _retained_rows(fit: Any) -> int | None:
-    """Rows the backend kept after singleton dropping.
-
-    Recorded per trial because a comparison across backends is only a
-    comparison if they retained the same sample.
-    """
-    value = getattr(fit, "_N", None)
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _fit_converged(fit: Any) -> bool:
-    """Read the convergence flag exposed by current PyFixest models."""
-    for name in ("convergence", "_convergence", "converged"):
-        value = getattr(fit, name, None)
-        if value is not None:
-            return bool(value)
-    return True
-
-
-def _normalize_vcov(vcov: str | dict[str, str]) -> str:
-    """Normalize vcov spec to a simple string for subprocess backends.
-
-    Returns "iid", "hetero", or "cluster:<colname>".
-    """
-    if isinstance(vcov, dict) and "CRV1" in vcov:
-        return f"cluster:{vcov['CRV1']}"
-    return vcov
-
-
-def _read_data_columns(data_path: Path, columns: list[str]) -> pd.DataFrame:
-    if data_path.suffix.lower() == ".csv":
-        return pd.read_csv(data_path, usecols=columns)
-    return pd.read_parquet(data_path, columns=columns)
-
-
 # Solver settings are pinned here rather than left to package defaults, so that
 # an upstream default change cannot silently alter a published timing. The MAP
 # and LSMR numbers are not comparable to each other: the two monitor different
@@ -366,9 +166,21 @@ class PyFeolsBenchmarkerFullApi:
     def name(self) -> str:
         return self._name
 
+    def cache_key(self) -> dict[str, Any]:
+        """Settings that make this backend's result file reusable."""
+        return {
+            "adapter": "pyfixest-feols",
+            "name": self.name,
+            "demeaner_backend": self._demeaner_backend,
+            "tol": self._tol,
+            "maxiter": self._maxiter,
+            "repetitions": self._repetitions,
+        }
+
     def run(
         self, datasets: list[BenchmarkDataset], spec: FeolsSpec
     ) -> list[FeolsResult]:
+        configure_benchmark_runtime()
         import pyfixest as pf
 
         demeaner = demeaner_for(
@@ -383,7 +195,7 @@ class PyFeolsBenchmarkerFullApi:
             if cluster_col not in all_cols:
                 all_cols.append(cluster_col)
 
-        tbl = _TablePrinter(_dgp_width(datasets))
+        tbl = TablePrinter(dgp_width(datasets))
         tbl.print_header(self.name)
 
         group_buf: list[FeolsResult] = []
@@ -393,7 +205,7 @@ class PyFeolsBenchmarkerFullApi:
             n_obs_for_result = dataset.n_obs
             df = None
             try:
-                df = _read_data_columns(dataset.data_path, all_cols)
+                df = read_data_columns(dataset.data_path, all_cols)
                 n_obs_for_result = len(df)
 
                 # One timed fit first, then as many more as the R1/R2/R3 rule
@@ -420,7 +232,7 @@ class PyFeolsBenchmarkerFullApi:
                                 store_data=False,
                                 demeaner=demeaner,
                             )
-                            if not _fit_converged(fit):
+                            if not fit_converged(fit):
                                 raise RuntimeError("PyFixest model did not converge")
                         elapsed = time.perf_counter() - t0
                         trials.append((elapsed, fit, None))
@@ -440,7 +252,7 @@ class PyFeolsBenchmarkerFullApi:
 
                 for repetition, (elapsed, fit, error) in enumerate(trials):
                     if error is None:
-                        result = _result_from_dataset(
+                        result = result_from_dataset(
                             dataset,
                             spec,
                             backend=self.name,
@@ -449,7 +261,7 @@ class PyFeolsBenchmarkerFullApi:
                             n_obs_override=n_obs_for_result,
                             repetition=repetition,
                             n_planned=planned,
-                            n_retained=_retained_rows(fit),
+                            n_retained=retained_rows(fit),
                             # Computed after the clock stops, so it never enters
                             # the reported runtime. Deterministic given the fit,
                             # so only the first repetition pays for it.
@@ -460,7 +272,7 @@ class PyFeolsBenchmarkerFullApi:
                             ),
                         )
                     else:
-                        result = _result_from_dataset(
+                        result = result_from_dataset(
                             dataset,
                             spec,
                             backend=self.name,
@@ -475,7 +287,7 @@ class PyFeolsBenchmarkerFullApi:
                     dataset_results.append(result)
             except Exception as exc:
                 dataset_results = [
-                    _result_from_dataset(
+                    result_from_dataset(
                         dataset,
                         spec,
                         backend=self.name,
@@ -489,13 +301,13 @@ class PyFeolsBenchmarkerFullApi:
                 results.extend(dataset_results)
             finally:
                 del df
-                _trim_process_memory(self._demeaner_backend)
+                trim_process_memory(self._demeaner_backend)
 
             # Every repetition reaches the printer, so the live min/median/max
             # shows the spread the repetition rule exists to measure.
             for result in dataset_results:
                 if result.iter_type != "burnin":
-                    key = _group_key(result)
+                    key = group_key(result)
                     if prev_key is not None and key != prev_key and group_buf:
                         tbl.print_row(group_buf)
                         group_buf = []

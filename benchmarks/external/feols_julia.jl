@@ -24,8 +24,8 @@ function main()
     fe_cols = String.(config[:fe_cols])
 
     lhs_term = term(Symbol(depvar))
-    rhs_expr = foldl(+, [term(Symbol(c)) for c in covariates])
-    fe_expr = foldl(+, [fe(Symbol(col)) for col in fe_cols])
+    rhs_expr = sum_terms([term(Symbol(c)) for c in covariates])
+    fe_expr = sum_terms([fe(Symbol(col)) for col in fe_cols])
     formula = lhs_term ~ rhs_expr + fe_expr
 
     run_manifest(config, "julia.FixedEffectModels (feols)") do df, nthreads

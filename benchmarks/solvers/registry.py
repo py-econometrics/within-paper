@@ -1,32 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import NamedTuple
 
+from benchmarks.core.interfaces import FeolsBenchmarkerProtocol
+from benchmarks.core.paths import EXTERNAL_DIR
 from benchmarks.solvers.pyfixest_feols import (
     PyFeolsBenchmarkerFullApi,
     detect_torch_runtime_availability,
 )
-from benchmarks.solvers.subprocess_driver import (
-    FixestFeolsBenchmarker,
-    JuliaFeolsBenchmarker,
-)
+from benchmarks.solvers.subprocess_driver import SubprocessFeolsBenchmarker
 from benchmarks.solvers.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
 )
-from benchmarks.solvers.pyfixest_fepois import (
-    FixestFepoisBenchmarker,
-    GLFixedEffectModelsBenchmarker,
-    PyFepoisBenchmarkerFullApi,
-)
-
-
-@dataclass(frozen=True)
-class BenchmarkerBundle:
-    benchmarkers: list
+from benchmarks.solvers.pyfixest_fepois import PyFepoisBenchmarkerFullApi
 
 
 class Backend(NamedTuple):
@@ -70,10 +61,50 @@ MATCHED_ACCURACY = (
     ),
 )
 
-EXTERNAL_FEOLS = (
-    ("fixest", FixestFeolsBenchmarker),
-    ("FEM.jl", JuliaFeolsBenchmarker),
+@dataclass(frozen=True)
+class ExternalBackend:
+    """A standalone implementation and the models it can estimate."""
+
+    label: str
+    command_prefix: tuple[str, ...]
+    script_path: Path
+    models: frozenset[str]
+
+    def build(self, model: str) -> SubprocessFeolsBenchmarker:
+        if model not in self.models:
+            raise ValueError(f"{self.label} does not support {model}")
+        return SubprocessFeolsBenchmarker(
+            name=self.label,
+            command_prefix=self.command_prefix,
+            script_path=self.script_path,
+            model=model,
+        )
+
+
+EXTERNAL_BACKENDS = (
+    ExternalBackend(
+        "fixest",
+        ("Rscript",),
+        EXTERNAL_DIR / "fixest_bench.R",
+        frozenset(("feols", "fepois")),
+    ),
+    ExternalBackend(
+        "FEM.jl",
+        ("julia",),
+        EXTERNAL_DIR / "feols_julia.jl",
+        frozenset(("feols",)),
+    ),
+    ExternalBackend(
+        "GLFEM.jl",
+        ("julia",),
+        EXTERNAL_DIR / "fepois_julia.jl",
+        frozenset(("fepois",)),
+    ),
 )
+
+
+def external_benchmarkers(model: str) -> list[SubprocessFeolsBenchmarker]:
+    return [backend.build(model) for backend in EXTERNAL_BACKENDS if model in backend.models]
 
 
 def require_multiple_absorbed_factors(spec) -> None:
@@ -97,7 +128,7 @@ def _torch_benchmarkers() -> list:
         print("[bench] skipping Torch backends: Torch is not installed", flush=True)
         return []
 
-    benchmarkers = [PyFeolsBenchmarkerFullApi("pyfixest (torch-cpu)", "torch_cpu")]
+    benchmarkers = [PyFeolsBenchmarkerFullApi("torch-cpu", "torch_cpu")]
     for device, available in (
         ("mps", availability.has_mps),
         ("cuda", availability.has_cuda),
@@ -105,7 +136,7 @@ def _torch_benchmarkers() -> list:
         if available:
             benchmarkers.append(
                 PyFeolsBenchmarkerFullApi(
-                    f"pyfixest (torch-{device})", f"torch_{device}"
+                    f"torch-{device}", f"torch_{device}"
                 )
             )
         else:
@@ -128,7 +159,7 @@ def build_feols_benchmarkers(
     matched_accuracy: bool = False,
     external: bool = True,
     torch: bool = False,
-) -> BenchmarkerBundle:
+) -> list[FeolsBenchmarkerProtocol]:
     """Assemble the feols backends for one experiment family.
 
     Views are selected here rather than split across drivers. A measurement is
@@ -144,11 +175,11 @@ def build_feols_benchmarkers(
     if torch:
         benchmarkers.extend(_torch_benchmarkers())
     if external:
-        benchmarkers.extend(cls(label) for label, cls in EXTERNAL_FEOLS)
+        benchmarkers.extend(external_benchmarkers("feols"))
 
     if not benchmarkers:
         raise ValueError("No requested benchmark backend is available.")
-    return BenchmarkerBundle(benchmarkers=benchmarkers)
+    return benchmarkers
 
 
 def build_fepois_benchmarkers(
@@ -157,7 +188,7 @@ def build_fepois_benchmarkers(
     matched_accuracy: bool = False,
     external: bool = True,
     iwls_maxiter: int = 100,
-) -> BenchmarkerBundle:
+) -> list[FeolsBenchmarkerProtocol]:
     """The same composition for PPML."""
     benchmarkers = [
         PyFepoisBenchmarkerFullApi(
@@ -170,9 +201,8 @@ def build_fepois_benchmarkers(
         for spec in _pyfixest_specs(package_defaults, matched_accuracy)
     ]
     if external:
-        benchmarkers.append(FixestFepoisBenchmarker("fixest"))
-        benchmarkers.append(GLFixedEffectModelsBenchmarker("GLFEM.jl"))
+        benchmarkers.extend(external_benchmarkers("fepois"))
 
     if not benchmarkers:
         raise ValueError("No requested benchmark backend is available.")
-    return BenchmarkerBundle(benchmarkers=benchmarkers)
+    return benchmarkers

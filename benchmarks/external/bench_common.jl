@@ -19,13 +19,13 @@ using Printf
 using Statistics
 
 function benchmark_threads()
-    requested = tryparse(Int, get(ENV, "JULIA_NUM_THREADS", ""))
+    requested = tryparse(Int, get(ENV, "BENCH_THREADS", ""))
     if requested === nothing || requested < 1
-        error("JULIA_NUM_THREADS must be set to a positive integer before running benchmarks")
+        error("BENCH_THREADS must be set to a positive integer before running benchmarks")
     end
     actual = Threads.nthreads()
     if actual != requested
-        error("Julia started with $actual thread(s), but JULIA_NUM_THREADS=$requested; set it before Julia starts")
+        error("Julia started with $actual thread(s), but BENCH_THREADS=$requested")
     end
     return actual
 end
@@ -88,6 +88,11 @@ function parse_vcov(vcov_type::String)
     else
         error("Unknown vcov_type: $vcov_type")
     end
+end
+
+function sum_terms(terms)
+    isempty(terms) && return ConstantTerm(1)
+    return foldl(+, terms)
 end
 
 """

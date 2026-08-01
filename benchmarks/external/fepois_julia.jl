@@ -20,13 +20,6 @@ include(joinpath(@__DIR__, "bench_common.jl"))
 # is not interleaved with them.
 Logging.disable_logging(Logging.Info)
 
-function sum_terms(terms)
-    if isempty(terms)
-        return ConstantTerm(1)
-    end
-    return foldl(+, terms)
-end
-
 function main()
     if length(ARGS) != 1
         error("Expected exactly one argument: path to JSON config.")

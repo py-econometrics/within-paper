@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Protocol
 
 
@@ -34,9 +35,27 @@ class FeolsSpec:
     """Settings for one feols call."""
 
     depvar: str
-    covariates: list[str]
-    fe_cols: list[str]
+    covariates: Sequence[str]
+    fe_cols: Sequence[str]
     vcov: str | dict[str, str]
+
+    def __post_init__(self) -> None:
+        """Freeze column names and reject malformed specifications early."""
+        covariates = tuple(self.covariates)
+        fe_cols = tuple(self.fe_cols)
+        for name, columns in (("covariates", covariates), ("fe_cols", fe_cols)):
+            if any(not column for column in columns):
+                raise ValueError(f"{name} must not contain empty column names")
+            if len(set(columns)) != len(columns):
+                raise ValueError(f"{name} must not contain duplicate column names")
+        if not self.depvar:
+            raise ValueError("depvar must not be empty")
+        if self.depvar in covariates or self.depvar in fe_cols:
+            raise ValueError("depvar must not also appear as a covariate or fixed effect")
+        if isinstance(self.vcov, dict) and set(self.vcov) != {"CRV1"}:
+            raise ValueError("vcov dictionaries must contain exactly the CRV1 cluster column")
+        object.__setattr__(self, "covariates", covariates)
+        object.__setattr__(self, "fe_cols", fe_cols)
 
     @property
     def formula(self) -> str:
@@ -97,10 +116,36 @@ class FeolsResult:
     beta_x1: float | None = None
     censoring: str | None = None
 
+    def validate(self) -> list[str]:
+        """Return record problems before the runner writes a result file."""
+        problems: list[str] = []
+        if not self.source_dataset_id:
+            problems.append("source_dataset_id is missing")
+        if not self.backend:
+            problems.append("backend is missing")
+        if self.n_obs < 0 or self.n_fe < 0 or self.model_k < 0:
+            problems.append("model dimensions must be nonnegative")
+        if self.time is not None and self.time < 0:
+            problems.append("time must be nonnegative")
+        if self.success and self.time is None:
+            problems.append("a successful result must record its time")
+        if self.repetition < 0:
+            problems.append("repetition must be nonnegative")
+        if self.n_planned is not None:
+            if self.n_planned < 1:
+                problems.append("n_planned must be positive")
+            elif self.repetition >= self.n_planned:
+                problems.append("repetition must be smaller than n_planned")
+        if self.n_retained is not None and not 0 <= self.n_retained <= self.n_obs:
+            problems.append("n_retained must lie between zero and n_obs")
+        return problems
+
 
 class FeolsBenchmarkerProtocol(Protocol):
     @property
     def name(self) -> str: ...
+
+    def cache_key(self) -> dict: ...
 
     def run(
         self, datasets: list[BenchmarkDataset], spec: FeolsSpec

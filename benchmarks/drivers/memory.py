@@ -10,14 +10,15 @@ from pathlib import Path
 
 from benchmarks.core.paths import DATA_DIR, ROOT
 from benchmarks.core.results import write_rows
+from benchmarks.solvers.specs import paper_ols_spec
 
 
-FML = "y ~ x1 | indiv_id + firm_id + year"
+FML = paper_ols_spec().formula
 
 SCRIPT = f"""\
 import resource, sys, time, warnings, gc
 from pathlib import Path
-from benchmarks.solvers.pyfixest_feols import _fit_converged
+from benchmarks.solvers.common import fit_converged
 from benchmarks.solvers.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf
@@ -31,7 +32,7 @@ with warnings.catch_warnings():
     fit = pf.feols("{FML}", data=df, vcov="iid",
                    demeaner=demeaner_for(backend),
                    copy_data=False, store_data=False)
-if not _fit_converged(fit):
+if not fit_converged(fit):
     raise RuntimeError("PyFixest model did not converge")
 elapsed = time.perf_counter() - t0
 divisor = 1024 * 1024 if sys.platform == "darwin" else 1024

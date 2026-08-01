@@ -28,16 +28,18 @@ from pathlib import Path
 
 from benchmarks.core.results import write_rows
 from benchmarks.dgp.samples import FE_COLS
-from benchmarks.solvers.pyfixest_feols import _fit_converged
+from benchmarks.solvers.common import fit_converged
 from benchmarks.solvers.settings import demeaner_for
+from benchmarks.solvers.specs import paper_ols_spec
 import numpy as np
 import pandas as pd
 import pyfixest as pf
 from benchmarks.core.paths import EXTERNAL_DIR, JULIA_ENV, ROOT
 
-FML = "y ~ x1 | indiv_id + firm_id + year"
-DEPVAR = "y"
-COVARIATES = ["x1"]
+OLS_SPEC = paper_ols_spec()
+FML = OLS_SPEC.formula
+DEPVAR = OLS_SPEC.depvar
+COVARIATES = list(OLS_SPEC.covariates)
 OUTPUT_PATH = ROOT / os.environ.get("RESULTS_OUT", "results/runs/latest/agreement.csv")
 OUTPUT_ROWS: list[dict[str, object]] = []
 
@@ -155,7 +157,7 @@ def main() -> None:
             fit_within = pf.feols(FML, data=df, vcov="iid",
                                   demeaner=demeaner_for("rust-cg"),
                                   copy_data=False, store_data=True)
-        if not _fit_converged(fit_map) or not _fit_converged(fit_within):
+        if not fit_converged(fit_map) or not fit_converged(fit_within):
             raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
 
         # Coefficient differences

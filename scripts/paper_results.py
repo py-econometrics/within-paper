@@ -79,8 +79,10 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _run(command: list[str]) -> str:
-    return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT).strip()
+def _run(command: list[str], *, env: dict[str, str] | None = None) -> str:
+    return subprocess.check_output(
+        command, text=True, stderr=subprocess.STDOUT, env=env
+    ).strip()
 
 
 def _git_dirty() -> bool:
@@ -105,8 +107,8 @@ def check_external_runtimes(_: argparse.Namespace) -> None:
     config = _read_json(RUNTIME_CONFIG)
     failures: list[str] = []
     bench_threads, bench_threads_error = _positive_thread_setting("BENCH_THREADS")
-    julia_threads, julia_threads_error = _positive_thread_setting("JULIA_NUM_THREADS")
-    failures.extend(error for error in (bench_threads_error, julia_threads_error) if error)
+    if bench_threads_error:
+        failures.append(bench_threads_error)
     if shutil.which("Rscript") is None:
         failures.append("Rscript is not on PATH")
     else:
@@ -163,21 +165,31 @@ def check_external_runtimes(_: argparse.Namespace) -> None:
             with (project / "Manifest.toml").open("rb") as handle:
                 expected_julia = tomllib.load(handle).get("julia_version")
             try:
-                julia_version = _run(["julia", "--version"])
+                julia_env = dict(os.environ)
+                if bench_threads is not None:
+                    julia_env["JULIA_NUM_THREADS"] = str(bench_threads)
+                julia_version = _run(["julia", "--version"], env=julia_env)
                 if expected_julia and expected_julia not in julia_version:
                     failures.append(
                         f"Julia runtime: expected {expected_julia} from Manifest.toml, found {julia_version}"
                     )
-                if julia_threads is not None:
-                    configured_threads = _run(["julia", "-e", "print(Threads.nthreads())"])
-                    if configured_threads.strip() != str(julia_threads):
+                if bench_threads is not None:
+                    configured_threads = _run(
+                        ["julia", "-e", "print(Threads.nthreads())"], env=julia_env
+                    )
+                    if configured_threads.strip() != str(bench_threads):
                         failures.append(
                             f"Julia is using {configured_threads.strip()} thread(s), "
-                            f"but JULIA_NUM_THREADS={julia_threads}"
+                            f"but BENCH_THREADS={bench_threads}"
                         )
                     else:
                         print(f"Julia threads: {configured_threads.strip()}")
-                print(_run(["julia", f"--project={project}", "-e", "using Pkg; Pkg.status()"] ))
+                print(
+                    _run(
+                        ["julia", f"--project={project}", "-e", "using Pkg; Pkg.status()"],
+                        env=julia_env,
+                    )
+                )
             except subprocess.CalledProcessError as exc:
                 failures.append(f"Julia project check failed: {exc.output.strip()}")
     if failures:

@@ -53,8 +53,9 @@ come from the same retained sample as its comparators is not a comparison.
 - **Factor order.** Worker, firm, year, in that order, for every experiment. MAP is
   sensitive to the cycling order, so it must not vary across tables. Reconciled
   2026-07-26; the OLS and PPML tables predate it and must be regenerated.
-- **Threads.** `BENCH_THREADS=10` and `JULIA_NUM_THREADS=10` on the ten-core reference
-  machine. `check-external-runtimes` verifies both and stops on a mismatch.
+- **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
+  launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
+  `check-external-runtimes` verifies the R and Julia settings before a production run.
 - **Data.** A fixed stored dataset per design, generated once and reused for every
   repetition. Regenerating the sample per repetition confounds solver variance with DGP
   variance; DGP replication is a separate robustness exercise with its own rows.

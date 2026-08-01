@@ -9,9 +9,10 @@ from benchmarks.solvers.registry import (
     require_multiple_absorbed_factors,
 )
 from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
-from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset
 from benchmarks.solvers.runner import run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT
+from benchmarks.solvers.specs import paper_ols_spec
 
 
 # ---------------------------------------------------------------------------
@@ -24,14 +25,7 @@ OUTPUT_CSV = ROOT / "benchmarks" / "results" / "feols_akm_sweep.csv"
 
 DGPS = get_akm_sweep_scenarios(DATA_DIR)
 
-SPECS = [
-    FeolsSpec(
-        depvar="y",
-        covariates=["x1"],
-        fe_cols=["indiv_id", "firm_id", "year"],
-        vcov="iid",
-    ),
-]
+SPECS = [paper_ols_spec()]
 
 
 def generate_akm_datasets() -> list[BenchmarkDataset]:
@@ -58,7 +52,7 @@ if __name__ == "__main__":
     # Both views in one pass: package defaults for the cross-package tables and
     # the matched-accuracy arms for the mechanism figures. The AKM sweep is
     # where the mechanism experiment lives, so it always measures both.
-    bundle = build_feols_benchmarkers(matched_accuracy=True)
+    benchmarkers = build_feols_benchmarkers(matched_accuracy=True)
     run_benchmarks(
-        bundle.benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
+        benchmarkers, datasets, SPECS, output_csv, reuse_existing=args.reuse_existing
     )

@@ -14,21 +14,21 @@ from __future__ import annotations
 
 import json
 import subprocess
-import warnings
 import sys
 import tempfile
+import warnings
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-
-from benchmarks.solvers.pyfixest_feols import (
-    _as_bool,
-    _normalize_vcov,
-    _result_from_dataset,
-    _safe_cast,
+from benchmarks.core.runtime import configure_benchmark_runtime
+from benchmarks.solvers.common import (
+    as_bool,
+    normalize_vcov,
+    result_from_dataset,
+    safe_cast,
 )
-from benchmarks.core.paths import EXTERNAL_DIR
 
 # ---------------------------------------------------------------------------
 
@@ -54,10 +54,19 @@ def _parse_subprocess_output(
             entry = json.loads(payload)
         except json.JSONDecodeError:
             continue
+        if not isinstance(entry, dict):
+            continue
         dataset_id = entry.get("dataset_id")
         if isinstance(dataset_id, str):
-            iter_num = _safe_cast(entry.get("iter_num"), int)
-            parsed_by_key[(dataset_id, iter_num)] = entry
+            iter_num = safe_cast(entry.get("iter_num"), int)
+            key = (dataset_id, iter_num)
+            previous = parsed_by_key.get(key)
+            if previous is not None and previous != entry:
+                raise ValueError(
+                    "Subprocess emitted conflicting records for "
+                    f"dataset_id={dataset_id!r}, iter_num={iter_num!r}"
+                )
+            parsed_by_key[key] = entry
 
     # Warn when a successful subprocess omits one or more datasets.
     n_emitted = len(parsed_by_key)
@@ -84,7 +93,7 @@ def _parse_subprocess_output(
         if entry is None:
             missing_error = default_error or "The subprocess returned no result for this dataset."
             results.append(
-                _result_from_dataset(
+                result_from_dataset(
                     dataset,
                     spec,
                     backend=backend,
@@ -95,22 +104,56 @@ def _parse_subprocess_output(
             )
             continue
 
-        elapsed = _safe_cast(entry.get("time"), float)
-        n_obs_override = _safe_cast(entry.get("n_obs"), int)
+        elapsed = safe_cast(entry.get("time"), float)
+        n_obs_override = safe_cast(entry.get("n_obs"), int)
 
         results.append(
-            _result_from_dataset(
+            result_from_dataset(
                 dataset,
                 spec,
                 backend=backend,
                 elapsed=elapsed,
-                success=_as_bool(entry.get("success"), default=elapsed is not None),
+                success=as_bool(entry.get("success"), default=elapsed is not None),
                 error=entry.get("error"),
                 n_obs_override=n_obs_override,
+                **_diagnostics_from_entry(entry),
             )
         )
 
     return results
+
+
+def _diagnostics_from_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Keep optional diagnostics an external driver records in the common result."""
+    integer_fields = (
+        "n_retained",
+        "outer_iterations",
+        "inner_iterations_sum",
+        "inner_iterations_max",
+    )
+    float_fields = (
+        "preconditioner_build_s",
+        "deviance",
+        "loglik",
+        "max_eta",
+        "beta_x1",
+    )
+    diagnostics: dict[str, Any] = {
+        field: value
+        for field in integer_fields
+        if (value := safe_cast(entry.get(field), int)) is not None
+    }
+    diagnostics.update(
+        {
+            field: value
+            for field in float_fields
+            if (value := safe_cast(entry.get(field), float)) is not None
+        }
+    )
+    censoring = entry.get("censoring")
+    if isinstance(censoring, str):
+        diagnostics["censoring"] = censoring
+    return diagnostics
 
 
 class SubprocessFeolsBenchmarker:
@@ -134,9 +177,20 @@ class SubprocessFeolsBenchmarker:
     def name(self) -> str:
         return self._name
 
+    def cache_key(self) -> dict[str, Any]:
+        """Settings that make one subprocess result file reusable."""
+        return {
+            "adapter": "subprocess",
+            "name": self.name,
+            "command_prefix": self._command_prefix,
+            "script_path": str(self._script_path),
+            "model": self._model,
+        }
+
     def run(
         self, datasets: list[BenchmarkDataset], spec: FeolsSpec
     ) -> list[FeolsResult]:
+        configure_benchmark_runtime()
         manifest = [
             {
                 "dataset_id": dataset.dataset_id,
@@ -158,10 +212,10 @@ class SubprocessFeolsBenchmarker:
                         "manifest": manifest,
                         "formula": spec.formula,
                         "depvar": spec.depvar,
-                        "covariates": spec.covariates,
-                        "fe_cols": spec.fe_cols,
+                        "covariates": list(spec.covariates),
+                        "fe_cols": list(spec.fe_cols),
                         "vcov": spec.vcov,
-                        "vcov_type": _normalize_vcov(spec.vcov),
+                        "vcov_type": normalize_vcov(spec.vcov),
                         "model": self._model,
                         # Julia PPML can run for several minutes. Write each result
                         # to a file in case the process exits before flushing stdout.
@@ -196,7 +250,7 @@ class SubprocessFeolsBenchmarker:
                     )
             except Exception as exc:
                 return [
-                    _result_from_dataset(
+                    result_from_dataset(
                         dataset,
                         spec,
                         backend=self.name,
@@ -218,53 +272,4 @@ class SubprocessFeolsBenchmarker:
             spec=spec,
             backend=self.name,
             completed_process=completed,
-        )
-
-
-
-
-
-def _name_and_script(
-    name: str | Path | None, script_path: Path | None, owner: str
-) -> tuple[str | None, Path | None]:
-    """Sort a first positional argument that may be either name or script.
-
-    The presets are built both ways: benchmark_correia passes a name and a
-    keyword script, while other callers pass the script alone as the first
-    argument. Accepting both here keeps each preset to the two lines that
-    actually differ between them.
-    """
-    if not isinstance(name, Path):
-        return name, script_path
-    if script_path is not None:
-        raise TypeError(f"script_path must not be provided twice for {owner}.")
-    return None, name
-
-
-class FixestFeolsBenchmarker(SubprocessFeolsBenchmarker):
-    def __init__(
-        self,
-        name: str | Path | None = None,
-        script_path: Path | None = None,
-    ):
-        name, script_path = _name_and_script(name, script_path, type(self).__name__)
-        super().__init__(
-            name=name or "r.fixest",
-            command_prefix=["Rscript"],
-            script_path=(script_path or EXTERNAL_DIR / "fixest_bench.R"),
-            model="feols",
-        )
-
-
-class JuliaFeolsBenchmarker(SubprocessFeolsBenchmarker):
-    def __init__(
-        self,
-        name: str | Path | None = None,
-        script_path: Path | None = None,
-    ):
-        name, script_path = _name_and_script(name, script_path, type(self).__name__)
-        super().__init__(
-            name=name or "julia.FixedEffectModels",
-            command_prefix=["julia"],
-            script_path=(script_path or EXTERNAL_DIR / "feols_julia.jl"),
         )

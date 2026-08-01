@@ -84,6 +84,17 @@ def sample_hash(categories: np.ndarray, rhs: np.ndarray) -> str:
     return hasher.hexdigest()
 
 
+def dataframe_hash(frame, columns: Iterable[str]) -> str:
+    """Stable hash of the exact columns a dataframe-backed benchmark uses."""
+    import pandas as pd
+
+    selected = list(columns)
+    values = pd.util.hash_pandas_object(
+        frame.loc[:, selected], index=False
+    ).values.tobytes()
+    return hashlib.sha256(values).hexdigest()
+
+
 _SAMPLE_CACHE: dict[tuple[str, int, int, tuple[str, ...]], Sample] = {}
 
 

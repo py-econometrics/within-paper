@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from benchmarks.core.interfaces import FeolsSpec
 from benchmarks.solvers.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
@@ -22,6 +23,23 @@ from benchmarks.solvers.settings import (
 # itself lives with the pinned solver settings, so the ablation arms and the
 # demeaner factory cannot come to disagree about which preconditioners exist.
 PRECONDITIONERS = WITHIN_PRECONDITIONERS
+
+PAPER_FE_COLS = ("indiv_id", "firm_id", "year")
+
+
+def paper_ols_spec() -> FeolsSpec:
+    """The one-covariate OLS specification used throughout the paper."""
+    return FeolsSpec("y", ("x1",), PAPER_FE_COLS, "iid")
+
+
+def paper_ppml_spec() -> FeolsSpec:
+    """The one-covariate PPML specification used throughout the paper."""
+    return FeolsSpec("negbin_y", ("x1",), PAPER_FE_COLS, "iid")
+
+
+def correia_ols_spec() -> FeolsSpec:
+    """The two-way OLS specification for the Correia collection."""
+    return FeolsSpec("y", ("x1",), ("id1", "id2"), "iid")
 
 
 def preconditioner_config(name: str) -> "PreconditionerConfig":
