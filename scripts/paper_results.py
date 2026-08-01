@@ -18,14 +18,13 @@ import re
 import shutil
 import subprocess
 import tomllib
-import time
 import urllib.request
 import zipfile
 from statistics import median
 from pathlib import Path
 
 
-from scripts.benchmark_methods import METHOD_TABLE_HEADER
+from scripts.benchmark_methods import METHODS
 
 ROOT = Path(__file__).absolute().parents[1]
 LATEST_RUN = ROOT / "results" / "runs" / "latest"
@@ -240,15 +239,20 @@ def _display_header(cell: str) -> str:
     if cell == "Backend":
         return "Configuration"
     key = cell.strip("`")
-    return METHOD_TABLE_HEADER.get(key, cell)
+    return _method_header(key) if key in METHODS else cell
 
 
 def _display_method_cell(cell: str) -> str:
     """Format an exact internal method key when it occurs in a table body."""
     key = cell.strip("`")
-    if cell.startswith("`") and cell.endswith("`"):
-        return METHOD_TABLE_HEADER.get(key, cell)
+    if cell.startswith("`") and cell.endswith("`") and key in METHODS:
+        return _method_header(key)
     return cell
+
+
+def _method_header(key: str) -> str:
+    label = METHODS[key][0]
+    return label.replace(" ", " #linebreak() ", 1) if " " in label else label
 
 
 def _table_fragment(name: str, table: dict) -> str:
@@ -424,54 +428,6 @@ def collect(_: argparse.Namespace) -> None:
         )
     updated = _synchronize_canonical_tables()
     print(f"[collect] updated {updated} paper table cells")
-
-
-def _is_git_tracked(path: Path) -> bool:
-    try:
-        subprocess.run(
-            ["git", "ls-files", "--error-unmatch", str(path.relative_to(ROOT))],
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except subprocess.CalledProcessError:
-        return False
-    return True
-
-
-def archive_legacy_results(_: argparse.Namespace) -> None:
-    """Archive untracked generated files without touching input caches."""
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    archive_root = ROOT / "results" / "legacy" / stamp
-    sources = (
-        ROOT / "benchmarks" / "results",
-        ROOT / "figures" / "benchmarks",
-        ROOT / "results" / "runs",
-    )
-    moved = 0
-    skipped: list[Path] = []
-    for source in sources:
-        if not source.exists():
-            continue
-        for path in sorted(source.rglob("*")):
-            if not path.is_file():
-                continue
-            if _is_git_tracked(path):
-                skipped.append(path)
-                continue
-            destination = archive_root / path.relative_to(ROOT)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(path), str(destination))
-            moved += 1
-    if moved:
-        print(f"[archive] moved {moved} generated files to {archive_root}")
-    else:
-        print("[archive] no untracked generated files found")
-    if skipped:
-        print("[archive] left tracked files in place:")
-        for path in skipped:
-            print(f"  {path.relative_to(ROOT)}")
 
 
 def _rows_from_csvs() -> list[dict[str, str]]:
@@ -1152,7 +1108,6 @@ def main() -> None:
     fetch.add_argument("--offline", action="store_true", help="Validate local CSVs without network access")
     fetch.set_defaults(func=fetch_correia)
     sub.add_parser("collect").set_defaults(func=collect)
-    sub.add_parser("archive-legacy-results").set_defaults(func=archive_legacy_results)
     render_parser = sub.add_parser("render")
     render_parser.add_argument("--output-dir", type=Path)
     render_parser.set_defaults(func=render)

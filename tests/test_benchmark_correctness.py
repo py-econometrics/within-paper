@@ -15,12 +15,11 @@ import scipy.sparse as sp
 
 from benchmarks.accuracy import external_normal_residuals, projection_errors
 from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
-from benchmarks.data import make_base_data, solver_data
+from benchmarks.data import drop_singletons, make_base_data, solver_data
 from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ppml.pyfixest import fit_ppml
 from benchmarks.within.map import map_demean_with_sweeps
-from scripts import compute_hardness
-from scripts import paper_results
+from scripts import analyze_gap_runtime, compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
 
 
@@ -51,6 +50,14 @@ class DataTests(unittest.TestCase):
         self.assertEqual(rhs.shape, (1_000, 2))
         self.assertTrue(categories.flags.f_contiguous)
         self.assertTrue(rhs.flags.f_contiguous)
+
+    def test_singleton_pruning_returns_the_retained_frame(self) -> None:
+        frame = pd.DataFrame(
+            {"a": [1, 1, 2], "b": [1, 1, 2], "value": [4, 5, 6]}
+        )
+        retained, dropped = drop_singletons(frame, ("a", "b"))
+        self.assertEqual(dropped, 1)
+        self.assertEqual(retained["value"].tolist(), [4, 5])
 
 
 class AccuracyTests(unittest.TestCase):
@@ -98,6 +105,49 @@ class HardnessTests(unittest.TestCase):
         ):
             self.assertAlmostEqual(compute_hardness._component_rho(block), 0.25)
         self.assertEqual(calls, ["propack", "arpack"])
+
+
+class GapAnalysisTests(unittest.TestCase):
+    def test_final_runtime_rows_join_to_hardness_points(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            results = root / "results"
+            results.mkdir()
+            hardness = root / "hardness.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "dataset_id": "simple",
+                        "n_obs_raw": 1_000,
+                        "fe_a": "indiv_id",
+                        "fe_b": "firm_id",
+                        "one_minus_rho": 0.25,
+                        "worst_component_obs_share": 1.0,
+                        "rho_qr": 0.75,
+                        "kind": "base",
+                    }
+                ]
+            ).to_csv(hardness, index=False)
+            pd.DataFrame(
+                [
+                    {
+                        "design": "simple",
+                        "backend": "rust-map",
+                        "view": "default",
+                        "runtime_s": runtime,
+                        "converged": True,
+                        "n_obs": 1_000,
+                        "n_fe": 3,
+                    }
+                    for runtime in (1.0, 2.0)
+                ]
+            ).to_csv(results / "ols.csv", index=False)
+
+            report = analyze_gap_runtime.analyze(hardness, results)
+
+        self.assertEqual(len(report["points"]), 1)
+        self.assertEqual(report["points"][0]["view"], "default")
+        self.assertEqual(report["points"][0]["median_time"], 1.5)
 
 
 class PythonFitTests(unittest.TestCase):

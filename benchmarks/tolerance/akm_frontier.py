@@ -9,13 +9,16 @@ from benchmarks.tolerance.measure import measure
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
+REPETITIONS = 3
 
 
 def main() -> None:
     rows = []
     for number in (1, 3, 5):
         design = f"akm_mobility_{number}"
-        rows.append(measure(make_akm_data(design), design))
+        rows.append(
+            measure(make_akm_data(design), design, repetitions=REPETITIONS)
+        )
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     pd.concat(rows, ignore_index=True).to_csv(OUTPUT, index=False)
 

@@ -10,27 +10,3 @@ METHODS = {
     "FEM.jl": ("FEM.jl", "#ca8a04", "P", "-"),
     "GLFEM.jl": ("GLFEM.jl", "#ca8a04", "P", "-"),
 }
-
-
-def style(key: str) -> tuple[str, str]:
-    return METHODS[key][1:3]
-
-
-def linestyle(key: str) -> str:
-    return METHODS[key][3]
-
-
-def legend_label(key: str) -> str:
-    return METHODS[key][0]
-
-
-def inline_label(key: str) -> str:
-    return METHODS[key][0]
-
-
-def table_header(key: str) -> str:
-    label = METHODS[key][0]
-    return label.replace(" ", " #linebreak() ", 1) if " " in label else label
-
-
-METHOD_TABLE_HEADER = {key: table_header(key) for key in METHODS}

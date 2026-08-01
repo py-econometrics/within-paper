@@ -4,7 +4,7 @@ from functools import partial
 
 import pandas as pd
 
-from benchmarks.data import make_base_data
+from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.ols.run import LATEST, run_experiment
 
 
@@ -13,9 +13,9 @@ def main() -> None:
         experiment="agreement",
         designs=[
             (name, partial(make_base_data, 100_000, name, seed))
-            for name, seed in (("simple", 42), ("difficult", 43))
+            for name, seed in BASE_DESIGNS
         ],
-        output=LATEST / "agreement-raw.csv",
+        output=None,
         repetitions=1,
     )
     rows = []

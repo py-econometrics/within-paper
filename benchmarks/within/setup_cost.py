@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.data import make_base_data, solver_data
+from benchmarks.data import BASE_DESIGNS, make_base_data, solver_data
 from within import LsmrOptions, Solver, solve_batch
 
 ROOT = Path(__file__).absolute().parents[2]
@@ -18,7 +18,7 @@ REPETITIONS = 3
 
 def main() -> None:
     rows = []
-    for design, seed in (("simple", 42), ("difficult", 43)):
+    for design, seed in BASE_DESIGNS:
         categories, rhs = solver_data(make_base_data(N_OBS, design, seed))
         options = LsmrOptions()
         solve_batch(categories, rhs, options)

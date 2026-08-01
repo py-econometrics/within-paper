@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.data import make_base_data
+from benchmarks.data import BASE_DESIGNS, make_base_data
 
 ROOT = Path(__file__).absolute().parents[1]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "memory.csv"
@@ -57,7 +57,7 @@ def main() -> None:
     context = mp.get_context("spawn")
     rows = []
     for size, n_obs in CELLS:
-        for design, seed in (("simple", 42), ("difficult", 43)):
+        for design, seed in BASE_DESIGNS:
             for backend in ("rust-map", "within"):
                 queue = context.Queue()
                 process = context.Process(target=_worker, args=(queue, design, n_obs, seed, backend))

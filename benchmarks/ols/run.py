@@ -12,7 +12,7 @@ from statistics import median
 
 import pandas as pd
 
-from benchmarks.ols.pyfixest import measure
+from benchmarks.ols.pyfixest import fit_ols, measure
 
 ROOT = Path(__file__).absolute().parents[2]
 LATEST = ROOT / "results" / "runs" / "latest"
@@ -37,7 +37,7 @@ def benchmark_threads() -> int:
 
 def _native_rows(
     data_path: Path,
-    output: Path,
+    output: Path | None,
     design: str,
     fixed_effects: Sequence[str],
     backend: str,
@@ -97,8 +97,6 @@ def run_experiment(
                     warm_up = True
                     if repetitions is None:
                         started = time.perf_counter()
-                        from benchmarks.ols.pyfixest import fit_ols
-
                         fit_ols(frame, backend, fixed_effects)
                         planned = repetitions_for_runtime(time.perf_counter() - started)
                         warm_up = False
@@ -147,6 +145,7 @@ def run_experiment(
             rows.extend(measured)
             _print_cell(experiment, design, backend, measured)
     result = pd.DataFrame(rows)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(output, index=False)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        result.to_csv(output, index=False)
     return result

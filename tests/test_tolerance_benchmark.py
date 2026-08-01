@@ -3,12 +3,14 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 
 from benchmarks.tolerance.measure import TOLERANCES, coefficient_error_se, residual_error
-from scripts.benchmark_methods import METHODS, linestyle, style
+from scripts import make_figures, plot_tolerance
+from scripts.benchmark_methods import METHODS
 from scripts.make_figures import CROSS_PACKAGE_BACKENDS, CROSSOVER_FILES, MECHANISM_BACKENDS
 from scripts.plot_tolerance import METHOD_ORDER, aggregate_results, tolerance_figure
 
@@ -76,8 +78,32 @@ class TolerancePlotTests(unittest.TestCase):
         }
         for key in keys:
             self.assertIn(key, METHODS)
-            self.assertEqual(len(style(key)), 2)
-            self.assertTrue(linestyle(key))
+            self.assertEqual(len(METHODS[key]), 4)
+
+    def test_make_figures_includes_the_tolerance_plot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            results = root / "results"
+            figures = root / "figures"
+            results.mkdir()
+            pd.DataFrame({"placeholder": [1]}).to_csv(
+                results / "tolerance_frontier.csv", index=False
+            )
+            with (
+                patch.object(make_figures, "ROOT", root),
+                patch.object(make_figures, "RESULTS", results),
+                patch.object(make_figures, "FIGURES", figures),
+                patch.object(make_figures, "_load_points", return_value=[]),
+                patch.object(make_figures, "_load_crossover_results", return_value={}),
+                patch.object(make_figures, "headline_figure"),
+                patch.object(make_figures, "crossover_figure"),
+                patch.object(plot_tolerance, "tolerance_figure") as tolerance,
+            ):
+                make_figures.main()
+            tolerance.assert_called_once()
+            self.assertEqual(
+                tolerance.call_args.args[1], figures / "tolerance_frontier.svg"
+            )
 
 
 if __name__ == "__main__":

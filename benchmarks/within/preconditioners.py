@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from benchmarks.accuracy import accuracy_metrics, pair_edge_stats
-from benchmarks.data import make_base_data, solver_data
+from benchmarks.data import BASE_DESIGNS, make_base_data, solver_data
 from benchmarks.within.map import map_demean_with_sweeps
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
@@ -18,7 +18,8 @@ ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "within_preconditioners.csv"
 N_OBS = 100_000
 REPETITIONS = 3
-TOL = 1e-12
+MAP_TOLERANCE = 1e-10
+LSMR_TOLERANCE = 1e-12
 MAXITER = 10_000
 
 
@@ -30,7 +31,7 @@ def _lsmr(
     repetition: int,
 ) -> dict:
     preconditioner = getattr(PreconditionerConfig, name.capitalize())
-    options = LsmrOptions(tol=TOL, maxiter=MAXITER)
+    options = LsmrOptions(tol=LSMR_TOLERANCE, maxiter=MAXITER)
     started = time.perf_counter()
     solver = Solver(categories, preconditioner=preconditioner)
     setup = time.perf_counter() - started
@@ -59,7 +60,9 @@ def _map(
     repetition: int,
 ) -> dict:
     started = time.perf_counter()
-    result = map_demean_with_sweeps(rhs, categories, tol=1e-10, maxiter=MAXITER)
+    result = map_demean_with_sweeps(
+        rhs, categories, tol=MAP_TOLERANCE, maxiter=MAXITER
+    )
     solve = time.perf_counter() - started
     converged = all(result.converged)
     return {
@@ -77,7 +80,7 @@ def _map(
 
 def main() -> None:
     rows = []
-    for design, seed in (("simple", 42), ("difficult", 43)):
+    for design, seed in BASE_DESIGNS:
         categories, rhs = solver_data(make_base_data(N_OBS, design, seed))
         reference_fit = solve_batch(
             categories,
@@ -91,12 +94,14 @@ def main() -> None:
             "total_edges": sum(int(item["n_edges"]) for item in edges),
             "max_pair_density": max(float(item["density"]) for item in edges),
         }
-        map_demean_with_sweeps(rhs, categories, tol=1e-10, maxiter=1)
+        map_demean_with_sweeps(rhs, categories, tol=MAP_TOLERANCE, maxiter=1)
         for backend in ("rust-map", "within-off", "within-diagonal", "within-additive"):
             if backend != "rust-map":
                 name = backend.removeprefix("within-")
                 solve_batch(
-                    categories, rhs, LsmrOptions(tol=TOL, maxiter=MAXITER),
+                    categories,
+                    rhs,
+                    LsmrOptions(tol=LSMR_TOLERANCE, maxiter=MAXITER),
                     preconditioner=getattr(PreconditionerConfig, name.capitalize()),
                 )
             measured = []

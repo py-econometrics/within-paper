@@ -8,7 +8,6 @@ figure cannot drift from the table it replaces. Run after `analyze-gap-runtime`:
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 from pathlib import Path
@@ -22,8 +21,9 @@ matplotlib.use("Agg")
 matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
-from scripts.benchmark_methods import inline_label, linestyle, style
+from scripts.benchmark_methods import METHODS
 
 ROOT = Path(__file__).absolute().parents[1]
 
@@ -121,8 +121,7 @@ def _runtime_panel(
     """Draw one runtime-gap panel and fit slopes on the controlled AKM sweeps."""
 
     for raw_name in backends:
-        colour, marker = style(raw_name)
-        display = inline_label(raw_name)
+        display, colour, marker, line = METHODS[raw_name]
         usable = [
             row
             for row in points
@@ -198,7 +197,7 @@ def _runtime_panel(
                 np.exp(intercept + slope * grid),
                 color=colour,
                 linewidth=1.4,
-                linestyle=linestyle(raw_name),
+                linestyle=line,
                 alpha=0.55,
                 zorder=2,
             )
@@ -321,8 +320,8 @@ def crossover_figure(
     }
     for ax, model in zip(axes, ("OLS", "PPML"), strict=True):
         for backend, backend_results in results[model].items():
-            display = CROSSOVER_LABEL.get(backend) or inline_label(backend)
-            colour, marker = style(backend)
+            label, colour, marker, line = METHODS[backend]
+            display = CROSSOVER_LABEL.get(backend) or label
             x = x_base + offsets[backend]
             y = np.array(
                 [
@@ -340,7 +339,7 @@ def crossover_figure(
                 marker=marker,
                 markersize=5.2,
                 linewidth=1.35,
-                linestyle=linestyle(backend),
+                linestyle=line,
                 alpha=0.82,
                 markeredgecolor="white",
                 markeredgewidth=0.55,
@@ -398,12 +397,8 @@ def crossover_figure(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out-dir", type=Path, default=FIGURES)
-    args = parser.parse_args()
-
     points = _load_points()
-    headline_target = args.out_dir / "gap_runtime.svg"
+    headline_target = FIGURES / "gap_runtime.svg"
     headline_figure(points, headline_target)
     print(
         f"[figures] wrote {headline_target.relative_to(ROOT)} "
@@ -411,12 +406,23 @@ def main() -> None:
     )
 
     crossover_results = _load_crossover_results()
-    crossover_target = args.out_dir / "simple_difficult_runtime.svg"
+    crossover_target = FIGURES / "simple_difficult_runtime.svg"
     crossover_figure(crossover_results, crossover_target)
     print(
         f"[figures] wrote {crossover_target.relative_to(ROOT)} "
         "from recorded OLS and PPML trials"
     )
+
+    tolerance_source = RESULTS / "tolerance_frontier.csv"
+    if not tolerance_source.exists():
+        raise SystemExit(
+            f"{tolerance_source} is missing. Run `pixi run bench-tolerance`."
+        )
+    from scripts.plot_tolerance import tolerance_figure
+
+    tolerance_target = FIGURES / "tolerance_frontier.svg"
+    tolerance_figure(pd.read_csv(tolerance_source), tolerance_target)
+    print(f"[figures] wrote {tolerance_target.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

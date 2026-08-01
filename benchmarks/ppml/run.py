@@ -5,19 +5,17 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
-from functools import partial
 from pathlib import Path
 from statistics import median
 
 import pandas as pd
 
-from benchmarks.data import make_base_data
+from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.ppml.pyfixest import measure
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "ppml.csv"
 N_OBS = 1_000_000
-DESIGNS = (("simple", 42), ("difficult", 43))
 BACKENDS = ("rust-map", "within", "fixest", "GLFEM.jl")
 REPETITIONS = 3
 
@@ -42,8 +40,8 @@ def main() -> None:
     threads = int(os.environ["BENCH_THREADS"])
     os.environ["RAYON_NUM_THREADS"] = str(threads)
     rows = []
-    for design, seed in DESIGNS:
-        frame = partial(make_base_data, N_OBS, design, seed)()
+    for design, seed in BASE_DESIGNS:
+        frame = make_base_data(N_OBS, design, seed)
         with tempfile.TemporaryDirectory(prefix="within-ppml-") as directory:
             work = Path(directory)
             data_path = work / "sample.parquet"

@@ -32,7 +32,7 @@ def fit_ppml(frame: pd.DataFrame, backend: str):
     )
 
 
-def measure(frame: pd.DataFrame, backend: str, repetitions: int = 3) -> list[dict]:
+def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=r"\d+ singleton fixed effect\(s\) dropped")
         fit_ppml(frame, backend)

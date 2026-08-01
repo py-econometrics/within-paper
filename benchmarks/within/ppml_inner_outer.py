@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from benchmarks.data import make_base_data, solver_data
+from benchmarks.data import BASE_DESIGNS, make_base_data, solver_data
 from within import LsmrOptions, PreconditionerConfig, Solver
 
 ROOT = Path(__file__).absolute().parents[2]
@@ -103,7 +103,7 @@ def poisson_irls(
 
 def main() -> None:
     rows = []
-    for design, seed in (("simple", 42), ("difficult", 43)):
+    for design, seed in BASE_DESIGNS:
         frame = make_base_data(N_OBS, design, seed)
         categories, rhs = solver_data(frame, ("negbin_y", "x1"))
         for inner_tol, inner_maxiter in REGIMES:

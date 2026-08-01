@@ -40,10 +40,11 @@ def _measure(categories: np.ndarray, rhs: np.ndarray, name: str) -> dict:
 
 def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
     rng = np.random.default_rng(90_210)
+    n_obs = len(categories)
     extra = np.column_stack(
         [
-            rng.integers(0, max(2, N_OBS // 5_000), N_OBS),
-            rng.integers(0, max(2, N_OBS // 20_000), N_OBS),
+            rng.integers(0, max(2, n_obs // 5_000), n_obs),
+            rng.integers(0, max(2, n_obs // 20_000), n_obs),
         ]
     )
     full = np.asfortranarray(np.column_stack([categories, extra]).astype(np.uint32))
@@ -76,7 +77,7 @@ def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
 def amortization(categories: np.ndarray, base_rhs: np.ndarray) -> list[dict]:
     rng = np.random.default_rng(4_242)
     widest = np.asfortranarray(
-        np.column_stack([base_rhs, rng.standard_normal((N_OBS, 25))])
+        np.column_stack([base_rhs, rng.standard_normal((len(categories), 25))])
     )
     rows = []
     for k_rhs in (1, 2, 5, 10, 25):

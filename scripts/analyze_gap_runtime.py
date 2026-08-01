@@ -1,27 +1,12 @@
-"""Pooled spectral-gap versus runtime diagnostic (plan item 6).
-
-Pools existing hardness and runtime CSVs and reports:
-
-- log runtime against log gap, by backend, with a fitted slope per backend
-- named counter-examples (sorting non-monotonicity; akm_mobility_4 vs _5;
-  directors' small component share)
-
-Inputs live under ``results/runs/latest/``. No new solves are required.
-
-Run with:
-
-    pixi run analyze-gap-runtime
-"""
+"""Join spectral gaps to recorded runtimes for the paper figure."""
 
 from __future__ import annotations
 
-import argparse
 import json
-from dataclasses import asdict, dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
+
 ROOT = Path(__file__).absolute().parents[1]
 
 DEFAULT_HARDNESS = ROOT / "results" / "runs" / "latest" / "hardness.csv"
@@ -34,17 +19,6 @@ WORKER_FIRM_PAIRS = {
     ("indiv_id", "firm_id"),
     ("id1", "id2"),
 }
-
-
-@dataclass(frozen=True)
-class BackendSlope:
-    backend: str
-    view: str
-    n_points: int
-    slope: float | None
-    intercept: float | None
-    r_squared: float | None
-    note: str
 
 
 def _median_runtime(frame: pd.DataFrame) -> pd.DataFrame:
@@ -138,96 +112,6 @@ def _select_gap_rows(hardness: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(selected)
 
 
-def _fit_log_log_slope(
-    gaps: np.ndarray, times: np.ndarray
-) -> tuple[float | None, float | None, float | None, str]:
-    mask = np.isfinite(gaps) & np.isfinite(times) & (gaps > 0) & (times > 0)
-    x = np.log(gaps[mask])
-    y = np.log(times[mask])
-    if x.size < 3:
-        return None, None, None, "fewer than 3 positive finite points"
-    if float(np.std(x)) == 0.0:
-        return None, None, None, "zero variance in log gap"
-    slope, intercept = np.polyfit(x, y, 1)
-    fitted = slope * x + intercept
-    ss_res = float(np.sum((y - fitted) ** 2))
-    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
-    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else None
-    return float(slope), float(intercept), (float(r2) if r2 is not None else None), "ok"
-
-
-def _counter_examples(joined: pd.DataFrame) -> list[dict]:
-    examples = []
-    # Sorting non-monotonicity: median within time not monotone in gap.
-    sorting = joined[joined["family"].astype(str).str.startswith("akm_sorting")]
-    if len(sorting):
-        for backend, group in sorting.groupby("backend"):
-            ordered = group.sort_values("gap")
-            times = ordered["median_time"].to_numpy(dtype=float)
-            # Sorted by increasing gap, better connectivity should mean less
-            # work, so runtime is expected to fall. A rise is the counter-
-            # evidence; checking for a fall flagged the expected pattern.
-            if np.any(np.diff(times[np.isfinite(times)]) > 0):
-                examples.append(
-                    {
-                        "name": "sorting_non_monotonic",
-                        "backend": backend,
-                        "detail": (
-                            "AKM sorting median runtime is not monotone in the "
-                            "worker-firm gap"
-                        ),
-                        "designs": ordered["design"].tolist(),
-                        "gaps": ordered["gap"].astype(float).tolist(),
-                        "median_times": ordered["median_time"].astype(float).tolist(),
-                    }
-                )
-
-    # Mobility 4 vs 5: nearly identical gaps, nearly identical runtimes.
-    for (backend, view), group in joined.groupby(["backend", "view"]):
-        m4 = group[group["family"] == "akm_mobility_4"]
-        m5 = group[group["family"] == "akm_mobility_5"]
-        if len(m4) == 1 and len(m5) == 1:
-            g4 = float(m4.iloc[0]["gap"])
-            g5 = float(m5.iloc[0]["gap"])
-            t4 = m4.iloc[0]["median_time"]
-            t5 = m5.iloc[0]["median_time"]
-            examples.append(
-                {
-                    "name": "akm_mobility_4_vs_5",
-                    "backend": backend,
-                    "detail": (
-                        "Nearly identical worker-firm gaps and nearly identical "
-                        "runtimes; the gap does not separate these two cells"
-                    ),
-                    "gaps": [g4, g5],
-                    "median_times": [
-                        None if pd.isna(t4) else float(t4),
-                        None if pd.isna(t5) else float(t5),
-                    ],
-                }
-            )
-
-    # directors: gap looks hard but component share is small.
-    directors = joined[joined["family"].astype(str).str.contains("directors")]
-    for _, row in directors.iterrows():
-        examples.append(
-            {
-                "name": "directors_small_component_share",
-                "backend": row["backend"],
-                "detail": (
-                    "The pair attaining the gap covers only a fraction of "
-                    "observations, so the design is easier than its gap suggests"
-                ),
-                "gap": float(row["gap"]),
-                "worst_component_obs_share": float(row["worst_component_obs_share"]),
-                "median_time": (
-                    None if pd.isna(row["median_time"]) else float(row["median_time"])
-                ),
-            }
-        )
-    return examples
-
-
 def analyze(
     hardness_path: Path,
     results_dir: Path,
@@ -258,25 +142,6 @@ def analyze(
     ].rename(columns={"one_minus_rho": "gap"})
     joined = medians.merge(gap_cols, on="design", how="inner")
 
-    slopes: list[BackendSlope] = []
-    for backend, group in joined.groupby("backend"):
-        usable = group.dropna(subset=["median_time", "gap"])
-        slope, intercept, r2, note = _fit_log_log_slope(
-            usable["gap"].to_numpy(dtype=float),
-            usable["median_time"].to_numpy(dtype=float),
-        )
-        slopes.append(
-            BackendSlope(
-                backend=str(backend),
-                view=str(view),
-                n_points=int(len(usable)),
-                slope=slope,
-                intercept=intercept,
-                r_squared=r2,
-                note=note,
-            )
-        )
-
     points = []
     for _, row in joined.iterrows():
         points.append(
@@ -301,48 +166,14 @@ def analyze(
             }
         )
 
-    return {
-        "n_designs": int(joined["design"].nunique()),
-        "n_backends": int(joined["backend"].nunique()),
-        "n_points": len(points),
-        "slopes": [asdict(s) for s in sorted(slopes, key=lambda s: s.backend)],
-        "counter_examples": _counter_examples(joined),
-        "points": points,
-        "conclusion": (
-            "Pairwise spectral gaps describe difficult designs but give no "
-            "numerical cutoff for solver choice. Counter-examples include "
-            "non-monotonic sorting rows, near-tied mobility gaps, and designs "
-            "whose hardest component covers few observations."
-        ),
-    }
+    return {"points": points}
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--hardness", type=Path, default=DEFAULT_HARDNESS)
-    parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    args = parser.parse_args()
-
-    report = analyze(args.hardness, args.results_dir)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-
-    print(f"designs={report['n_designs']} backends={report['n_backends']} "
-          f"points={report['n_points']}")
-    print("\nlog-log slopes (log runtime ~ slope * log gap):")
-    for slope in report["slopes"]:
-        if slope["slope"] is None:
-            print(f"  {slope['backend']}: n={slope['n_points']} ({slope['note']})")
-        else:
-            print(
-                f"  {slope['backend']}: n={slope['n_points']} "
-                f"slope={slope['slope']:.3f} R^2={slope['r_squared']:.3f}"
-            )
-    print(f"\ncounter-examples: {len(report['counter_examples'])}")
-    for example in report["counter_examples"]:
-        print(f"  - {example['name']} [{example['backend']}]")
-    print(f"\nWrote {args.out}")
+    report = analyze(DEFAULT_HARDNESS, DEFAULT_RESULTS_DIR)
+    DEFAULT_OUT.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_OUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"analyze-gap-runtime / pooled / {len(report['points'])} points")
 
 
 if __name__ == "__main__":

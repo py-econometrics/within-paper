@@ -10,25 +10,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from pyfixest.core.detect_singletons import detect_singletons
 from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import svds
 
 from benchmarks.akm import SCENARIOS, make_akm_data
-from benchmarks.data import make_base_data
+from benchmarks.data import BASE_DESIGNS, CORREIA_NAMES, drop_singletons, make_base_data
 
 ROOT = Path(__file__).absolute().parents[1]
 CORREIA = ROOT / "benchmarks" / "data" / "correia_data"
 OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 DENSE_MAX_ENTRIES = 1_000_000
 PROPACK_MAX_MIN_DIM = 20_000
-CORREIA_NAMES = (
-    "credit2", "credit", "soccer", "synthetic-complete", "synthetic-uniform-easy",
-    "synthetic-uniform-hard", "synthetic-uniform-harder", "synthetic-assortative",
-    "synthetic-zigzag", "enron", "github", "patents", "workers", "schools", "directors",
-)
-
-
 @dataclass(frozen=True)
 class PairHardness:
     n_q_levels: int
@@ -100,20 +92,12 @@ def pair_hardness(q: np.ndarray, r: np.ndarray) -> PairHardness:
     return worst
 
 
-def _drop_singletons(frame: pd.DataFrame, fixed_effects: tuple[str, ...]) -> tuple[pd.DataFrame, int]:
-    categories = np.column_stack(
-        [pd.factorize(frame[column], sort=False)[0] for column in fixed_effects]
-    ).astype(np.int64)
-    mask = detect_singletons(categories)
-    return frame.loc[~mask].reset_index(drop=True), int(mask.sum())
-
-
 def _datasets():
     for name in CORREIA_NAMES:
         yield name, "correia", pd.read_csv(CORREIA / f"{name}.csv"), ("id1", "id2")
     for name in SCENARIOS:
         yield name, "akm", make_akm_data(name), ("indiv_id", "firm_id", "year")
-    for name, seed in (("simple", 42), ("difficult", 43)):
+    for name, seed in BASE_DESIGNS:
         yield name, "base", make_base_data(10_000_000, name, seed), ("indiv_id", "firm_id", "year")
         for label, n_obs in (("100k", 100_000), ("1m", 1_000_000)):
             yield f"memory_{name}_{label}", "memory", make_base_data(n_obs, name, seed), ("indiv_id", "firm_id", "year")
@@ -123,7 +107,7 @@ def main() -> None:
     rows = []
     for name, kind, raw, fixed_effects in _datasets():
         started = time.perf_counter()
-        frame, dropped = _drop_singletons(raw, fixed_effects)
+        frame, dropped = drop_singletons(raw, fixed_effects)
         for left, right in combinations(fixed_effects, 2):
             result = pair_hardness(frame[left].to_numpy(), frame[right].to_numpy())
             rows.append(

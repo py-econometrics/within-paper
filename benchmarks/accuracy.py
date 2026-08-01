@@ -79,15 +79,6 @@ def projection_errors(
     )
 
 
-def slope_se_difference(
-    beta: NDArray[np.floating],
-    reference_beta: NDArray[np.floating],
-    reference_se: NDArray[np.floating],
-) -> NDArray[np.float64]:
-    """Return coefficient error in reference standard-error units."""
-    return np.abs(np.asarray(beta) - np.asarray(reference_beta)) / np.asarray(reference_se)
-
-
 def accuracy_metrics(
     categories: NDArray,
     rhs: NDArray[np.floating],

@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
-matplotlib.rcParams["svg.hashsalt"] = "within-paper-tolerance"
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from scripts.benchmark_methods import legend_label, linestyle, style
-
-ROOT = Path(__file__).absolute().parents[1]
-
-DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
-DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
+from scripts.benchmark_methods import METHODS
 
 METHOD_ORDER = (
     "within-off",
@@ -137,7 +130,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         subset = failed[failed["backend"] == method]
         if subset.empty:
             continue
-        label = legend_label(method).replace("\n", " — ")
+        label = METHODS[method][0].replace("\n", " — ")
         count = len(subset)
         suffix = "setting" if count == 1 else "settings"
         entries.append(f"{label}: {count} {suffix}")
@@ -145,6 +138,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
 
 
 def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
+    matplotlib.rcParams["svg.hashsalt"] = "within-paper-tolerance"
     points = aggregate_results(raw)
     designs = sorted(
         points["design"].dropna().unique(),
@@ -193,13 +187,13 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     continue
                 method_points["plot_error"] = method_points[metric].clip(lower=floor)
                 method_points = method_points.sort_values("plot_error")
-                colour, marker = style(method)
+                _, colour, marker, line = METHODS[method]
                 ax.plot(
                     method_points["plot_error"],
                     method_points["median_time_s"],
                     color=colour,
                     linewidth=1.2,
-                    linestyle=linestyle(method),
+                    linestyle=line,
                     alpha=0.75,
                     zorder=2,
                 )
@@ -259,27 +253,18 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             for spine in ("top", "right"):
                 ax.spines[spine].set_visible(False)
 
-    labels = {
-        method: legend_label(method)
-        for method in METHOD_ORDER
-        if (points["backend"] == method).any()
-    }
-    handles = [
-        Line2D(
-            [0],
-            [0],
-            color=style(method)[0],
-            marker=style(method)[1],
-            linewidth=1.2,
-            linestyle=linestyle(method),
-            markersize=6,
-            markeredgecolor="white",
-            markeredgewidth=0.5,
-            label=labels[method],
+    handles = []
+    for method in METHOD_ORDER:
+        if not (points["backend"] == method).any():
+            continue
+        label, colour, marker, line = METHODS[method]
+        handles.append(
+            Line2D(
+                [0], [0], color=colour, marker=marker, linewidth=1.2,
+                linestyle=line, markersize=6, markeredgecolor="white",
+                markeredgewidth=0.5, label=label,
+            )
         )
-        for method in METHOD_ORDER
-        if method in labels
-    ]
     handles.append(
         Line2D(
             [0],
@@ -323,20 +308,3 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
     metadata = {"Date": None} if output.suffix.lower() == ".svg" else None
     fig.savefig(output, bbox_inches="tight", metadata=metadata)
     plt.close(fig)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    args = parser.parse_args()
-
-    if not args.input.exists():
-        raise SystemExit(f"{args.input} is missing. Run `pixi run bench-tolerance`.")
-    raw = pd.read_csv(args.input)
-    tolerance_figure(raw, args.output)
-    print(f"[figure] wrote {args.output}")
-
-
-if __name__ == "__main__":
-    main()

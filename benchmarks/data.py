@@ -6,6 +6,12 @@ import numpy as np
 import pandas as pd
 
 FE_COLUMNS = ("indiv_id", "firm_id", "year")
+BASE_DESIGNS = (("simple", 42), ("difficult", 43))
+CORREIA_NAMES = (
+    "credit2", "credit", "soccer", "synthetic-complete", "synthetic-uniform-easy",
+    "synthetic-uniform-hard", "synthetic-uniform-harder", "synthetic-assortative",
+    "synthetic-zigzag", "enron", "github", "patents", "workers", "schools", "directors",
+)
 
 
 def make_base_data(
@@ -61,3 +67,16 @@ def solver_data(
     ).astype(np.uint32)
     rhs = frame.loc[:, columns].to_numpy(dtype=float)
     return np.asfortranarray(categories), np.asfortranarray(rhs)
+
+
+def drop_singletons(
+    frame: pd.DataFrame, fixed_effects: tuple[str, ...]
+) -> tuple[pd.DataFrame, int]:
+    """Drop the recursive singleton set used by PyFixest."""
+    from pyfixest.core.detect_singletons import detect_singletons
+
+    categories = np.column_stack(
+        [pd.factorize(frame[name], sort=False)[0] for name in fixed_effects]
+    ).astype(np.int64)
+    dropped = detect_singletons(categories)
+    return frame.loc[~dropped].reset_index(drop=True), int(dropped.sum())
