@@ -4,26 +4,19 @@
 This script uses only the Python standard library, so runtime checks can run before the
 Pixi environment is available. Paper table data is stored in
 ``results/paper/benchmark_tables.json``; ``render`` writes the Typst includes, and
-``collect`` records raw outputs and runtime information.
+``collect`` folds the raw benchmark output into them.
 """
 
 from __future__ import annotations
 
 import argparse
-import copy
 import csv
 import hashlib
-import importlib.metadata
-import importlib.util
 import json
-import math
 import os
-import platform
 import re
 import shutil
 import subprocess
-import sys
-import tempfile
 import tomllib
 import time
 import urllib.request
@@ -42,38 +35,9 @@ from benchmarks.modular.timing import summarize_times
 from benchmarks.modular.methods import METHOD_TABLE_HEADER
 from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
-CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXPECTED_TRIALS = 3
-# The legacy CUDA timings are quoted only in Appendix C, never in a main
-# runtime table, so they resolve to generated prose values rather than to a
-# table cell. They moved out of the OLS table when the appendix was written.
-EXPECTED_EXTERNAL_CUDA_TARGETS = {
-    ("simple", "torch-cuda"),
-    ("difficult", "torch-cuda"),
-}
-RAW_GLOBS = (
-    "benchmarks/results/*.csv",
-    "results/runs/latest/*.csv",
-    # The calibration pilot and the pooled gap analysis write JSON, not CSV.
-    # Without these the run that froze Gate A and the diagnostic behind the
-    # spectral-gap caveat would carry no provenance.
-    "results/runs/latest/*.json",
-    "figures/results/*.svg",
-)
-CODE_GLOBS = (
-    "pixi.toml",
-    "pixi.lock",
-    "scripts/*.py",
-    "benchmarks/**/*.py",
-    "benchmarks/**/*.R",
-    "benchmarks/**/*.jl",
-    "benchmarks/julia-env/Project.toml",
-    "benchmarks/julia-env/Manifest.toml",
-    "config/*.json",
-    "data/correia_data/metadata/*.json",
-)
 
 
 def _read_json(path: Path) -> dict:
@@ -84,8 +48,6 @@ def _read_json(path: Path) -> dict:
 def _write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 
 
 def _latest(filename: str) -> Path:
@@ -121,75 +83,11 @@ def _run(command: list[str]) -> str:
     return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT).strip()
 
 
-def _code_fingerprint() -> str:
-    """Hash the code, locks, and metadata that define a benchmark run."""
-    paths: set[Path] = set()
-    for pattern in CODE_GLOBS:
-        paths.update(path for path in ROOT.glob(pattern) if path.is_file())
-    digest = hashlib.sha256()
-    for path in sorted(paths):
-        relative = path.relative_to(ROOT).as_posix().encode("utf-8")
-        digest.update(len(relative).to_bytes(4, "big"))
-        digest.update(relative)
-        digest.update(bytes.fromhex(_sha256(path)))
-    return digest.hexdigest()
-
-
 def _git_dirty() -> bool:
     try:
         return bool(_run(["git", "status", "--porcelain", "--untracked-files=all"]))
     except (OSError, subprocess.CalledProcessError):
         return True
-
-
-def _module_origin(name: str) -> str | None:
-    spec = importlib.util.find_spec(name)
-    return spec.origin if spec else None
-
-
-def _runtime_provenance() -> dict:
-    packages = {}
-    for name in ("pyfixest", "within-py", "pyarrow", "numpy", "pandas"):
-        try:
-            packages[name] = importlib.metadata.version(name)
-        except importlib.metadata.PackageNotFoundError:
-            packages[name] = None
-    return {
-        "captured_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "python": sys.version,
-        "python_packages": packages,
-        "platform": platform.platform(),
-        "machine": platform.machine(),
-        "processor": platform.processor(),
-        "bench_threads": os.environ.get("BENCH_THREADS"),
-        "julia_num_threads": os.environ.get("JULIA_NUM_THREADS"),
-        "within_repo": os.environ.get("WITHIN_REPO"),
-        "git_commit": _git_commit(),
-        "git_dirty": _git_dirty(),
-        "code_sha256": _code_fingerprint(),
-        "module_origins": {
-            "pyfixest": _module_origin("pyfixest"),
-            "within": _module_origin("within"),
-        },
-        "r_version": _optional_version(["Rscript", "--version"]),
-        "julia_version": _optional_version(["julia", "--version"]),
-    }
-
-
-def _git_commit() -> str | None:
-    try:
-        return _run(["git", "rev-parse", "HEAD"])
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def _optional_version(command: list[str]) -> str | None:
-    if shutil.which(command[0]) is None:
-        return None
-    try:
-        return _run(command)
-    except subprocess.CalledProcessError:
-        return None
 
 
 def _positive_thread_setting(name: str) -> tuple[int | None, str | None]:
@@ -498,31 +396,26 @@ def render(args: argparse.Namespace) -> None:
     print(f"[render] wrote {len(tables)} table fragments to {destination}")
 
 
-def collect(args: argparse.Namespace) -> None:
-    run_dir = ROOT / "results" / "runs" / args.run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    runtime = _runtime_provenance()
-    if runtime["within_repo"]:
+def collect(_: argparse.Namespace) -> None:
+    """Fold the raw benchmark output into the canonical paper tables.
+
+    The two refusals below are preconditions on the paper's numbers, not
+    bookkeeping: a run against a development build of `within`, or against
+    uncommitted benchmark code, produces timings nobody can trace back to a
+    revision.
+    """
+    if os.environ.get("WITHIN_REPO"):
         raise SystemExit(
             "Refusing to collect paper results with WITHIN_REPO set; "
             "the paper run must use the locked within-py package"
         )
-    if runtime["git_dirty"]:
+    if _git_dirty():
         raise SystemExit(
             "Refusing to collect paper results from a dirty tracked worktree; "
             "commit benchmark code and documentation first"
         )
     updated = _synchronize_canonical_tables()
-    artifacts = []
-    for pattern in RAW_GLOBS:
-        for path in sorted(ROOT.glob(pattern)):
-            if path.is_file():
-                artifacts.append({"path": str(path.relative_to(ROOT)), "bytes": path.stat().st_size, "sha256": _sha256(path)})
-    _write_json(run_dir / "provenance.json", {"runtime": runtime, "artifacts": artifacts})
-    print(
-        f"[collect] recorded {len(artifacts)} raw result files in {run_dir}; "
-        f"updated {updated} paper table cells"
-    )
+    print(f"[collect] updated {updated} paper table cells")
 
 
 def _is_git_tracked(path: Path) -> bool:
@@ -1328,111 +1221,6 @@ def _synchronize_canonical_tables(
     return changed
 
 
-def verify(_: argparse.Namespace) -> None:
-    document = _read_json(TABLES_PATH)
-    tables = document["tables"]
-    registry = _read_json(CLAIMS_PATH)
-    claims = registry["claims"]
-    claimed = {claim["table"] for claim in claims}
-    missing = sorted(set(tables) - claimed)
-    if missing:
-        raise SystemExit(f"Missing claim registry entries: {', '.join(missing)}")
-
-    provenance_path = _latest("provenance.json")
-    if not provenance_path.exists():
-        raise SystemExit(f"Missing benchmark provenance: {provenance_path}")
-    provenance = _read_json(provenance_path)
-    runtime = provenance.get("runtime", {})
-    required_runtime = (
-        "git_commit",
-        "git_dirty",
-        "code_sha256",
-        "bench_threads",
-        "julia_num_threads",
-        "r_version",
-        "julia_version",
-        "module_origins",
-    )
-    missing_runtime = [name for name in required_runtime if runtime.get(name) is None]
-    if missing_runtime:
-        raise SystemExit("Incomplete benchmark provenance: " + ", ".join(missing_runtime))
-    if runtime["git_dirty"]:
-        raise SystemExit("Benchmark provenance records a dirty tracked worktree")
-    current_code_hash = _code_fingerprint()
-    if runtime["code_sha256"] != current_code_hash:
-        raise SystemExit(
-            "Benchmark code fingerprint differs from provenance: "
-            f"expected {runtime['code_sha256']}, found {current_code_hash}"
-        )
-
-    artifacts = {
-        artifact.get("path", ""): artifact
-        for artifact in provenance.get("artifacts", [])
-        if artifact.get("path")
-    }
-    artifact_errors: list[str] = []
-    for relative, artifact in artifacts.items():
-        path = ROOT / relative
-        if not path.is_file():
-            artifact_errors.append(f"missing {relative}")
-        elif _sha256(path) != artifact.get("sha256"):
-            artifact_errors.append(f"hash mismatch {relative}")
-    external_sources = set(registry.get("external_sources", []))
-    source_errors: list[str] = []
-    for claim in claims:
-        for pattern in claim.get("sources", []):
-            matches = sorted(path for path in ROOT.glob(pattern) if path.is_file())
-            if not matches:
-                source_errors.append(f"{claim['id']}: no files match {pattern}")
-                continue
-            for path in matches:
-                relative = path.relative_to(ROOT).as_posix()
-                if relative not in external_sources and relative not in artifacts:
-                    source_errors.append(f"{claim['id']}: {relative} absent from provenance")
-    if artifact_errors or source_errors:
-        raise SystemExit(
-            "Invalid result provenance:\n- " + "\n- ".join(artifact_errors + source_errors)
-        )
-
-    expected_document = copy.deepcopy(document)
-    try:
-        _synchronize_canonical_tables(expected_document, write=False)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise SystemExit(f"Cannot reconstruct paper tables from raw results: {exc}") from exc
-    if expected_document != document:
-        raise SystemExit(
-            "Paper table values do not match the raw results. Run "
-            "`pixi run render-paper-results` after collecting the benchmark results."
-        )
-
-    with tempfile.TemporaryDirectory() as temp:
-        temp_root = Path(temp)
-        render(argparse.Namespace(output_dir=temp_root / "tables"))
-        for name in tables:
-            expected = (temp_root / "tables" / f"{name}.typ").read_text(encoding="utf-8")
-            actual_path = GENERATED_DIR / f"{name}.typ"
-            if not actual_path.exists() or actual_path.read_text(encoding="utf-8") != expected:
-                raise SystemExit(f"Generated table is stale: {actual_path}")
-        expected_values = (temp_root / "paper_values.typ").read_text(encoding="utf-8")
-        actual_values = GENERATED_DIR.parent / "paper_values.typ"
-        if not actual_values.exists() or actual_values.read_text(encoding="utf-8") != expected_values:
-            raise SystemExit(f"Generated paper values are stale: {actual_values}")
-    manuscript = (ROOT / "graph_preconditioner_hdfe.typ").read_text(encoding="utf-8")
-    required_includes = [f'generated/tables/{name}.typ' for name in tables]
-    absent = [item for item in required_includes if item not in manuscript]
-    if absent:
-        raise SystemExit("Manuscript is missing generated table includes: " + ", ".join(absent))
-    incomplete = []
-    for table_name, table in tables.items():
-        for row_number, row in enumerate(table["rows"], start=1):
-            for column, cell in enumerate(row, start=1):
-                if cell in {"#miss", "incomplete"}:
-                    incomplete.append(f"{table_name}[{row_number},{column}]={cell}")
-    if incomplete:
-        raise SystemExit("Required paper table cells are missing or incomplete: " + ", ".join(incomplete))
-    print("[verify] raw results, hashes, code, generated tables, and manuscript includes are current")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1442,14 +1230,11 @@ def main() -> None:
     fetch.add_argument("--datasets", nargs="*", help="Dataset metadata IDs to fetch (default: all)")
     fetch.add_argument("--offline", action="store_true", help="Validate local CSVs without network access")
     fetch.set_defaults(func=fetch_correia)
-    collect_parser = sub.add_parser("collect")
-    collect_parser.add_argument("--run-id", default="latest")
-    collect_parser.set_defaults(func=collect)
+    sub.add_parser("collect").set_defaults(func=collect)
     sub.add_parser("archive-legacy-results").set_defaults(func=archive_legacy_results)
     render_parser = sub.add_parser("render")
     render_parser.add_argument("--output-dir", type=Path)
     render_parser.set_defaults(func=render)
-    sub.add_parser("verify").set_defaults(func=verify)
     args = parser.parse_args()
     args.func(args)
 

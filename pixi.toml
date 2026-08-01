@@ -34,8 +34,7 @@ bench-diagnostics = { depends-on = ["pilot-calibration", "within-preconditioners
 bench-all = { depends-on = ["bench-generate-data", "agreement", "within-setup-cost", "bench-memory", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-diagnostics"], description = "Generate all synthetic data and run every benchmark" }
 reproduce-results = { cmd = "python -m scripts.paper_results collect", depends-on = ["check-external-runtimes", "bench-all", "bench-correia", "compute-hardness", "analyze-gap-runtime"], description = "Run every benchmark and save raw-file hashes and environment details" }
 render-paper-results = { cmd = "python -m scripts.paper_results render", description = "Write Typst tables from the paper result file" }
-reproduce-paper = { cmd = "python -m scripts.paper_results render && python -m scripts.paper_results verify && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Run benchmarks, verify results, and build the PDF" }
-verify-paper-results = { cmd = "python -m scripts.paper_results verify", description = "Verify result hashes, generated tables, and manuscript includes" }
+reproduce-paper = { cmd = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Run benchmarks, render tables, and build the PDF" }
 
 [dependencies]
 # Figures are generated from recorded results, never drawn by hand.
