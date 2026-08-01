@@ -23,95 +23,44 @@ matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
 
-from benchmarks.modular.methods import (
-    METHOD_INLINE_LABEL,
-    METHOD_LINESTYLE,
-    METHOD_STYLE,
-)
+from benchmarks.core.methods import canonical, inline_label, linestyle, style
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results" / "runs" / "latest"
 BENCHMARK_RESULTS = ROOT / "benchmarks" / "results"
 FIGURES = ROOT / "figures" / "results"
 
 # The left panel compares package defaults. The right panel holds package and
-# accuracy fixed, so it isolates the solver and preconditioner.
-CROSS_PACKAGE_BACKENDS = {
-    "pyfixest (rust-map)": "rust-map",
-    "fixest-map": "fixest",
-    "FEM.jl (lsmr)": "FEM.jl",
-    "pyfixest (within)": "within",
-}
+# accuracy fixed, so it isolates the solver and preconditioner. These are the
+# backend names as the result files spell them; every colour, marker, dash and
+# label is derived from the registry, so nothing is restated here.
+CROSS_PACKAGE_BACKENDS = ("rust-map", "fixest", "FEM.jl", "within")
 
-MECHANISM_BACKENDS = {
-    "pyfixest (rust-map, matched)": "MAP",
-    "pyfixest (within-off)": "LSMR, none",
-    "pyfixest (within-diagonal)": "LSMR, diagonal",
-    "pyfixest (within-additive)": "LSMR, factor-pair",
-}
-
-# Shared across every result figure in the paper.
-STYLE = {
-    "rust-map": METHOD_STYLE["map"],
-    "fixest": METHOD_STYLE["fixest"],
-    "FEM.jl": METHOD_STYLE["fem"],
-    "within": METHOD_STYLE["lsmr_factor_pair"],
-    "MAP": METHOD_STYLE["map"],
-    "LSMR, none": METHOD_STYLE["lsmr_none"],
-    "LSMR, diagonal": METHOD_STYLE["lsmr_diagonal"],
-    "LSMR, factor-pair": METHOD_STYLE["lsmr_factor_pair"],
-}
-
-LINESTYLE = {
-    "rust-map": METHOD_LINESTYLE["map"],
-    "fixest": METHOD_LINESTYLE["fixest"],
-    "FEM.jl": METHOD_LINESTYLE["fem"],
-    "within": METHOD_LINESTYLE["lsmr_factor_pair"],
-    "MAP": METHOD_LINESTYLE["map"],
-    "LSMR, none": METHOD_LINESTYLE["lsmr_none"],
-    "LSMR, diagonal": METHOD_LINESTYLE["lsmr_diagonal"],
-    "LSMR, factor-pair": METHOD_LINESTYLE["lsmr_factor_pair"],
-}
-
-DISPLAY_NAME = {
-    "pyfixest (rust-map)": METHOD_INLINE_LABEL["rust-map"],
-    "fixest-map": METHOD_INLINE_LABEL["fixest"],
-    "FEM.jl (lsmr)": METHOD_INLINE_LABEL["FEM.jl"],
-    "pyfixest (within)": METHOD_INLINE_LABEL["within"],
-    "pyfixest (rust-map, matched)": METHOD_INLINE_LABEL["rust-map-matched"],
-    "pyfixest (within-off)": METHOD_INLINE_LABEL["within-off"],
-    "pyfixest (within-diagonal)": METHOD_INLINE_LABEL["within-diagonal"],
-    "pyfixest (within-additive)": METHOD_INLINE_LABEL["within-additive"],
-}
+MECHANISM_BACKENDS = (
+    "rust-map-matched",
+    "within-off",
+    "within-diagonal",
+    "within-additive",
+)
 
 CROSSOVER_FILES = {
     "OLS": {
         "rust-map": "feols_bench__pyfixest_rust_map.csv",
         "fixest": "feols_bench__fixest_map.csv",
-        "Julia": "feols_bench__fem_jl_lsmr.csv",
+        "FEM.jl": "feols_bench__fem_jl_lsmr.csv",
         "within": "feols_bench__pyfixest_within.csv",
     },
     "PPML": {
         "rust-map": "fepois_bench__pyfixest_rust_map.csv",
         "fixest": "fepois_bench__fixest_fepois.csv",
-        "Julia": "fepois_bench__glfixedeffectmodels_jl.csv",
+        "FEM.jl": "fepois_bench__glfixedeffectmodels_jl.csv",
         "within": "fepois_bench__pyfixest_within.csv",
     },
 }
 
-CROSSOVER_STYLE = {
-    "rust-map": (METHOD_INLINE_LABEL["rust-map"], *METHOD_STYLE["map"]),
-    "fixest": (METHOD_INLINE_LABEL["fixest"], *METHOD_STYLE["fixest"]),
-    "Julia": ("FEM.jl / GLFEM.jl — LSMR (diagonal)", *METHOD_STYLE["fem"]),
-    "within": (METHOD_INLINE_LABEL["within"], *METHOD_STYLE["lsmr_factor_pair"]),
-}
-
-CROSSOVER_LINESTYLE = {
-    "rust-map": METHOD_LINESTYLE["map"],
-    "fixest": METHOD_LINESTYLE["fixest"],
-    "Julia": METHOD_LINESTYLE["fem"],
-    "within": METHOD_LINESTYLE["lsmr_factor_pair"],
-}
+# The crossover figure draws one series for both Julia packages, so its label
+# names both. Every other series takes the registry's inline label.
+CROSSOVER_LABEL = {"FEM.jl": "FEM.jl / GLFEM.jl — LSMR (diagonal)"}
 
 
 def _load_points() -> list[dict]:
@@ -167,7 +116,7 @@ def _load_crossover_results() -> dict[str, dict[str, dict[str, object]]]:
 def _runtime_panel(
     ax,
     points: list[dict],
-    backends: dict[str, str],
+    backends: tuple[str, ...],
     *,
     show_context: bool,
     title: str,
@@ -175,13 +124,16 @@ def _runtime_panel(
 ) -> None:
     """Draw one runtime-gap panel and fit slopes on the controlled AKM sweeps."""
 
-    for raw_name, label in backends.items():
-        colour, marker = STYLE[label]
-        display = DISPLAY_NAME[raw_name]
+    for raw_name in backends:
+        colour, marker = style(raw_name)
+        display = inline_label(raw_name)
         usable = [
             row
             for row in points
-            if row["backend"] == raw_name
+            # Resolved, not compared raw: result files recorded before the
+            # spellings were unified still say "pyfixest (rust-map)" where new
+            # ones say "rust-map", and both name the same series.
+            if canonical(row["backend"]) == canonical(raw_name)
             and row.get("gap")
             and row.get("median_time")
             and row["gap"] > 0
@@ -252,7 +204,7 @@ def _runtime_panel(
                 np.exp(intercept + slope * grid),
                 color=colour,
                 linewidth=1.4,
-                linestyle=LINESTYLE[label],
+                linestyle=linestyle(raw_name),
                 alpha=0.55,
                 zorder=2,
             )
@@ -349,7 +301,7 @@ def crossover_figure(
     offsets = {
         "rust-map": -0.075,
         "fixest": -0.025,
-        "Julia": 0.025,
+        "FEM.jl": 0.025,
         "within": 0.075,
     }
     designs = ("simple", "difficult")
@@ -373,7 +325,8 @@ def crossover_figure(
     }
     for ax, model in zip(axes, ("OLS", "PPML"), strict=True):
         for backend, backend_results in results[model].items():
-            display, colour, marker = CROSSOVER_STYLE[backend]
+            display = CROSSOVER_LABEL.get(backend) or inline_label(backend)
+            colour, marker = style(backend)
             x = x_base + offsets[backend]
             y = np.array(
                 [
@@ -391,7 +344,7 @@ def crossover_figure(
                 marker=marker,
                 markersize=5.2,
                 linewidth=1.35,
-                linestyle=CROSSOVER_LINESTYLE[backend],
+                linestyle=linestyle(backend),
                 alpha=0.82,
                 markeredgecolor="white",
                 markeredgewidth=0.55,

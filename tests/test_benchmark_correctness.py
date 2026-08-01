@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import csv
+import re
 import hashlib
 import json
 import sys
@@ -20,71 +21,67 @@ import scipy.sparse as sp
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from benchmarks.bench_within_setup_cost import _setup_share
-from benchmarks.modular.benchmark_correia import summarize_results
-from benchmarks.modular.benchmark_fepois import (
+from benchmarks.drivers.setup_cost import _setup_share
+from benchmarks.drivers.correia import summarize_results
+from benchmarks.drivers.ppml import (
     SIZES as FEPOIS_SIZES,
     SPECS as FEPOIS_SPECS,
 )
-from benchmarks.modular.benchmark_main import SIZES as OLS_SIZES
-from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
-from benchmarks.modular.dgp_functions import paper_base_dgp
-from benchmarks.modular.dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names
-from benchmarks.modular.accuracy import (
+from benchmarks.drivers.ols import SIZES as OLS_SIZES
+from benchmarks.dgp.akm import AKMConfig, simulate_akm_panel
+from benchmarks.dgp.base import paper_base_dgp
+from benchmarks.dgp.scenarios import BaseDGP, _seed_for, get_akm_sweep_scenario_names
+from benchmarks.core.accuracy import (
     GATE_A_ETA,
     accuracy_record,
     external_normal_residuals,
     pair_edge_stats,
     projection_errors,
 )
-from benchmarks.modular.benchmarker_sets import (
+from benchmarks.solvers.registry import (
     MATCHED_ACCURACY,
     PACKAGE_DEFAULTS,
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
 )
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     _as_bool,
     _external_eta,
+    _fit_converged,
 )
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
-    _demeaner_from_backend,
+    demeaner_for,
 )
-from benchmarks.modular.experiment import (
-    FE_COLS,
-    RunRecord,
-    SampleSpec,
-    clear_sample_cache,
-    load_sample,
-    matched_solver_specs,
-)
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
-from benchmarks.modular.subprocess_backend import _parse_subprocess_output
-from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
-from benchmarks.modular.results import write_rows
-from benchmarks.modular.timing import (
+from benchmarks.core.records import RunRecord
+from benchmarks.dgp.samples import FE_COLS, SampleSpec, clear_sample_cache, load_sample
+from benchmarks.solvers.specs import matched_solver_specs
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.core.methods import canonical
+from benchmarks.solvers.subprocess_driver import _parse_subprocess_output
+from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
+from benchmarks.core.results import write_rows
+from benchmarks.core.timing import (
     randomized_order,
     repetitions_for_runtime,
     summarize_times,
     timed,
 )
 from scripts.paper_results import (
-    _backend_name,
     _iteration_rows,
     _read_json,
     _component_share,
-    _largest_backend_metric,
+    _largest_metric,
     _numeric_cell,
     _render_trial_result,
     _table_fragment,
     _validate_ppml_results,
 )
-from benchmarks.modular.analyze_gap_runtime import _sized_key
-from benchmarks.modular.compute_hardness import _component_rho
+from scripts.analyze_gap_runtime import _sized_key
+from benchmarks.drivers.hardness import _component_rho
 
 
 def _frame_hash(frame: pd.DataFrame) -> str:
@@ -136,14 +133,14 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                 dataset = dgp.generate(n=2_300, n_iters=1, burn_in=0)[0]
 
                 with patch(
-                    "benchmarks.modular.dgps.paper_base_dgp", side_effect=AssertionError("cache miss")
+                    "benchmarks.dgp.scenarios.paper_base_dgp", side_effect=AssertionError("cache miss")
                 ):
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
 
                 frame = pd.read_parquet(dataset.data_path)
                 frame["unused"] = 0
                 frame.to_parquet(dataset.data_path, index=False)
-                with patch("benchmarks.modular.dgps.paper_base_dgp", wraps=paper_base_dgp) as generator:
+                with patch("benchmarks.dgp.scenarios.paper_base_dgp", wraps=paper_base_dgp) as generator:
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
             generator.assert_called_once()
 
@@ -259,19 +256,35 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(_render_trial_result(failed), "failed (0/3)")
         self.assertEqual(_render_trial_result(partial[:2]), "incomplete")
 
-    def test_timing_module_stays_standard_library_only(self) -> None:
-        # scripts/paper_results.py imports this module and must keep running
-        # before the Pixi environment exists, so a third-party import here
-        # would break the pre-environment runtime checks.
-        source = (ROOT / "benchmarks" / "modular" / "timing.py").read_text()
-        tree = ast.parse(source)
-        imported = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                imported.update(alias.name.split(".")[0] for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                imported.add(node.module.split(".")[0])
-        self.assertLessEqual(imported, set(sys.stdlib_module_names))
+    def test_pre_environment_modules_stay_standard_library_only(self) -> None:
+        # scripts/paper_results.py imports these and must keep running before
+        # the Pixi environment exists, so a third-party import in either would
+        # break the pre-environment runtime checks.
+        for relative in ("benchmarks/core/timing.py", "benchmarks/core/paths.py"):
+            with self.subTest(module=relative):
+                tree = ast.parse((ROOT / relative).read_text())
+                imported = set()
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        imported.update(a.name.split(".")[0] for a in node.names)
+                    elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                        imported.add(node.module.split(".")[0])
+                self.assertLessEqual(imported, set(sys.stdlib_module_names))
+
+    def test_shared_root_is_the_repository_root(self) -> None:
+        """paths.ROOT must agree with a root derived independently of it.
+
+        Every module now takes its paths from core.paths rather than counting
+        parent directories itself, so nothing else would notice if that one
+        definition drifted. This test derives the root the old way, from the
+        test file's own location, and is the only place that still does.
+        """
+        from benchmarks.core import paths
+
+        self.assertEqual(paths.ROOT, ROOT)
+        self.assertTrue((paths.ROOT / "pixi.toml").is_file())
+        self.assertEqual(paths.DATA_DIR, ROOT / "benchmarks" / "data")
+        self.assertEqual(paths.LATEST_RUN, ROOT / "results" / "runs" / "latest")
 
     def test_join_key_is_shared_between_harness_and_analysis(self) -> None:
         # Pairing a 1M runtime with a 10M gap moved a fitted slope once; the
@@ -332,7 +345,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             calls.append(kwargs["solver"])
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["arpack"])
 
@@ -346,7 +359,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             calls.append(kwargs["solver"])
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["propack"])
 
@@ -360,7 +373,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                 raise RuntimeError("PROPACK did not converge")
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["propack", "arpack"])
 
@@ -371,7 +384,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         ]
         self.assertEqual(_numeric_cell(rows[0][3]), 1.1e-14)
         self.assertEqual(
-            _largest_backend_metric(rows, "fixest", 3), "$1.9 times 10^(-7)$"
+            _largest_metric(rows, 3, backend="fixest"), "$1.9 times 10^(-7)$"
         )
 
     def test_component_share_ignores_scientific_exponent(self) -> None:
@@ -405,23 +418,23 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         )
 
     def test_demeaner_backend_labels_map_to_preconditioners(self) -> None:
-        rust = _demeaner_from_backend("rust")
+        rust = demeaner_for("rust")
         self.assertEqual(rust.kind, "map")
         self.assertEqual(rust.backend, "rust")
 
-        alias = _demeaner_from_backend("within")
+        alias = demeaner_for("within")
         self.assertEqual(alias.kind, "lsmr")
         self.assertEqual(alias.preconditioner, DEFAULT_WITHIN_PRECONDITIONER)
         self.assertEqual(alias.fixef_atol, alias.fixef_btol)
 
         for name in WITHIN_PRECONDITIONERS:
-            demeaner = _demeaner_from_backend(f"within-{name}")
+            demeaner = demeaner_for(f"within-{name}")
             self.assertEqual(demeaner.preconditioner, name)
             self.assertEqual(demeaner.fixef_atol, 1e-8)
             self.assertEqual(demeaner.fixef_btol, 1e-8)
 
         with self.assertRaisesRegex(ValueError, "Unknown within preconditioner"):
-            _demeaner_from_backend("within-bogus")
+            demeaner_for("within-bogus")
 
     def test_both_views_are_measured_in_one_pass(self) -> None:
         """One sweep produces the cross-package rows and the mechanism rows.
@@ -433,10 +446,10 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(
             [spec.label for spec in MATCHED_ACCURACY],
             [
-                "pyfixest (rust-map, matched)",
-                "pyfixest (within-off)",
-                "pyfixest (within-diagonal)",
-                "pyfixest (within-additive)",
+                "rust-map-matched",
+                "within-off",
+                "within-diagonal",
+                "within-additive",
             ],
         )
         default_labels = {spec.label for spec in PACKAGE_DEFAULTS}
@@ -470,7 +483,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             package_defaults=False, matched_accuracy=True, external=False
         )
         for benchmarker in matched.benchmarkers:
-            demeaner = _demeaner_from_backend(
+            demeaner = demeaner_for(
                 benchmarker._demeaner_backend,
                 tol=benchmarker._tol,
                 maxiter=benchmarker._maxiter,
@@ -479,7 +492,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(budgets, {MECHANISM_MAXITER})
 
         # The cross-package view keeps each package's documented default.
-        default_lsmr = _demeaner_from_backend("within")
+        default_lsmr = demeaner_for("within")
         self.assertEqual(default_lsmr.fixef_maxiter, 1_000)
 
     def test_external_residual_is_small_for_exact_demeaning(self) -> None:
@@ -603,9 +616,9 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
     def test_absorbed_factor_order_is_the_same_everywhere(self) -> None:
         # MAP cycles through factors in the given order, so a table that
         # absorbs in a different order is not comparing the same specification.
-        from benchmarks.modular.benchmark_akm_sweep import SPECS as AKM_SPECS
-        from benchmarks.modular.benchmark_fepois import SPECS as PPML_SPECS
-        from benchmarks.modular.benchmark_main import SPECS as MAIN_SPECS
+        from benchmarks.drivers.akm_sweep import SPECS as AKM_SPECS
+        from benchmarks.drivers.ppml import SPECS as PPML_SPECS
+        from benchmarks.drivers.ols import SPECS as MAIN_SPECS
 
         expected = ["indiv_id", "firm_id", "year"]
         for label, specs in (
@@ -619,24 +632,24 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
     def test_matched_arms_do_not_collapse_onto_default_cells(self) -> None:
         """Both views share a sweep, so the renderer must keep them apart.
 
-        _backend_name folds any label containing "within" onto "within" and any
-        containing "rust-map" onto "rust-map". With both views in one run that
+        canonical() must keep the matched-accuracy arms distinct from the
+        package-default arms they share a solver with. Folding them together
         put four within variants and two MAP variants into the same cell, whose
-        duplicate trial ids then render as "incomplete".
+        duplicate trial ids then rendered as "incomplete".
         """
-        self.assertEqual(_backend_name("pyfixest (within)"), "within")
-        self.assertEqual(_backend_name("pyfixest (rust-map)"), "rust-map")
+        self.assertEqual(canonical("pyfixest (within)"), "within")
+        self.assertEqual(canonical("pyfixest (rust-map)"), "rust-map")
         for preconditioner in ("off", "diagonal", "additive"):
             self.assertEqual(
-                _backend_name(f"pyfixest (within-{preconditioner})"),
+                canonical(f"pyfixest (within-{preconditioner})"),
                 f"within-{preconditioner}",
             )
         self.assertEqual(
-            _backend_name("pyfixest (rust-map, matched)"), "rust-map-matched"
+            canonical("pyfixest (rust-map, matched)"), "rust-map-matched"
         )
 
-        names = {_backend_name(spec.label) for spec in PACKAGE_DEFAULTS}
-        matched = {_backend_name(spec.label) for spec in MATCHED_ACCURACY}
+        names = {canonical(spec.label) for spec in PACKAGE_DEFAULTS}
+        matched = {canonical(spec.label) for spec in MATCHED_ACCURACY}
         self.assertEqual(names & matched, set())
 
     def test_unmeasured_gate_a_components_do_not_pass(self) -> None:
@@ -670,7 +683,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         1.7e-7 at 10M, so a join on the family name alone pairs a 1M runtime
         with a 10M gap.
         """
-        from benchmarks.modular.analyze_gap_runtime import _design_key_from_hardness, _sized_key
+        from scripts.analyze_gap_runtime import _design_key_from_hardness, _sized_key
 
         self.assertEqual(_design_key_from_hardness("difficult_10000000_k1_iter_1"), "difficult")
         self.assertNotEqual(
@@ -688,7 +701,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         """
         import pandas as pd
 
-        from benchmarks.modular.analyze_gap_runtime import _counter_examples
+        from scripts.analyze_gap_runtime import _counter_examples
 
         def frame(times):
             return pd.DataFrame(
@@ -807,7 +820,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
 
         import pyfixest as pf
 
-        frame = pd.read_parquet(ROOT / "data" / "difficult_100k.parquet")
+        frame = pd.read_parquet(ROOT / "benchmarks" / "data" / "difficult_100k.parquet")
         formula = "y ~ x1 | indiv_id + firm_id + year"
 
         def eta_at(backend: str, tol: float | None) -> float:
@@ -817,7 +830,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                     formula,
                     data=frame,
                     vcov="iid",
-                    demeaner=_demeaner_from_backend(backend, tol=tol),
+                    demeaner=demeaner_for(backend, tol=tol),
                 )
             value = _external_eta(fit, frame, "y", ["x1"])
             self.assertIsNotNone(value)
@@ -838,6 +851,41 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             pass
 
         self.assertIsNone(_external_eta(NotAModel(), pd.DataFrame({"y": [1.0]}), "y", []))
+
+
+class TypedDemeanerTests(unittest.TestCase):
+    """Every fit goes through a typed demeaner, not the deprecated strings."""
+
+    def test_no_source_file_passes_the_deprecated_arguments(self) -> None:
+        # PyFixest 0.60 deprecated demeaner_backend/fixef_tol/fixef_maxiter on
+        # feols and fepois. They remain valid as typed-constructor keywords, so
+        # only the call-site form is banned.
+        offenders = []
+        for path in sorted((ROOT / "benchmarks").rglob("*.py")):
+            for number, line in enumerate(path.read_text().splitlines(), start=1):
+                # Prose that names the deprecated argument is fine; a call
+                # that passes it is not.
+                if "`demeaner_backend=`" in line or line.lstrip().startswith("#"):
+                    continue
+                if "demeaner_backend=" in line:
+                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(offenders, [], "pass a typed demeaner= instead")
+
+    def test_rust_cg_resolves_to_the_within_lsmr_backend(self) -> None:
+        # Pre-0.60 alias. It was not conjugate gradient by then: PyFixest
+        # mapped it onto the within backend with preconditioner "auto", and the
+        # agreement check depends on that being what it compares against.
+        demeaner = demeaner_for("rust-cg")
+        self.assertEqual(demeaner.backend, "within")
+        self.assertEqual(demeaner.preconditioner, "auto")
+        self.assertEqual(demeaner.precision, "float64")
+
+    def test_named_configurations_build_the_expected_demeaner(self) -> None:
+        self.assertEqual(demeaner_for("rust").backend, "rust")
+        self.assertEqual(demeaner_for("within").preconditioner, "additive")
+        for name in ("off", "diagonal", "additive"):
+            self.assertEqual(demeaner_for(f"within-{name}").preconditioner, name)
+        self.assertEqual(demeaner_for("torch_mps").precision, "float32")
 
 
 class SubprocessOutputTests(unittest.TestCase):
@@ -927,6 +975,231 @@ class SharedPrimitiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
                 write_rows(Path(tmp) / "rows.csv", [])
+
+
+class PackageLayeringTests(unittest.TestCase):
+    """The dependency direction is a build failure, not a review comment.
+
+    core <- dgp <- solvers <- drivers, and scripts/ reaches only core. The
+    layering was already correct before it was named; writing it down here is
+    what keeps it correct once the directories stop being self-evident.
+    """
+
+    # package -> the packages it is allowed to import from
+    ALLOWED = {
+        "core": set(),
+        "dgp": {"core"},
+        "solvers": {"core", "dgp"},
+        "drivers": {"core", "dgp", "solvers", "drivers"},
+    }
+
+    def _imports(self, path: Path) -> set[str]:
+        found = set()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            module = None
+            if isinstance(node, ast.ImportFrom) and node.level == 0:
+                module = node.module
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("benchmarks."):
+                        found.add(alias.name.split(".")[1])
+                continue
+            if module and module.startswith("benchmarks."):
+                found.add(module.split(".")[1])
+        return found
+
+    def test_no_package_imports_from_a_layer_above_it(self) -> None:
+        violations = []
+        for package, allowed in self.ALLOWED.items():
+            for path in (ROOT / "benchmarks" / package).glob("*.py"):
+                for imported in self._imports(path) - allowed - {package}:
+                    violations.append(
+                        f"{path.relative_to(ROOT)} imports benchmarks.{imported}"
+                    )
+        self.assertEqual(violations, [], f"layering violations: {violations}")
+
+    def test_scripts_reach_only_the_core_primitives(self) -> None:
+        violations = []
+        for path in (ROOT / "scripts").glob("*.py"):
+            for imported in self._imports(path) - {"core"}:
+                violations.append(f"{path.relative_to(ROOT)} imports benchmarks.{imported}")
+        self.assertEqual(violations, [], f"scripts reached past core: {violations}")
+
+    def test_nothing_outside_drivers_imports_a_driver(self) -> None:
+        """A driver is run, never imported. Only tests may reach into one."""
+        violations = []
+        for package in ("core", "dgp", "solvers"):
+            for path in (ROOT / "benchmarks" / package).glob("*.py"):
+                if "drivers" in self._imports(path):
+                    violations.append(str(path.relative_to(ROOT)))
+        for path in (ROOT / "scripts").glob("*.py"):
+            if "drivers" in self._imports(path):
+                violations.append(str(path.relative_to(ROOT)))
+        self.assertEqual(violations, [], f"library code imports a driver: {violations}")
+
+
+class BackendRegistryTests(unittest.TestCase):
+    """The two registries a new backend has to appear in must agree.
+
+    Adding a backend means declaring how to run it (solvers/registry.py) and
+    how to name and colour it (core/methods.py). Nothing links the two, so a
+    backend added to one and not the other used to fail as a missing figure
+    series or a table cell rendering "incomplete" rather than as an error.
+    """
+
+    def test_every_runnable_backend_has_a_presentation_record(self) -> None:
+        from benchmarks.solvers.registry import MATCHED_ACCURACY, PACKAGE_DEFAULTS
+
+        for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY):
+            with self.subTest(label=spec.label):
+                self.assertIsNotNone(
+                    canonical(spec.label),
+                    f"{spec.label!r} runs but core.methods cannot name it",
+                )
+
+    def test_no_driver_invents_a_spelling(self) -> None:
+        """Every name a driver records must already be canonical.
+
+        The alias table exists only to read result files written before the
+        names were unified. If a new arm needs an alias to be understood, the
+        arm is spelled wrong, not the table incomplete: that is how "rust-map"
+        came to have five spellings, one per driver that wrote it.
+        """
+        from benchmarks.core.methods import METHODS
+        from benchmarks.drivers.tolerance import METHOD_BY_KEY
+        from benchmarks.solvers.registry import (
+            EXTERNAL_FEOLS,
+            MATCHED_ACCURACY,
+            PACKAGE_DEFAULTS,
+        )
+
+        recorded = (
+            [spec.label for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY)]
+            + [label for label, _ in EXTERNAL_FEOLS]
+            + list(METHOD_BY_KEY)
+        )
+        aliased = sorted(name for name in recorded if name not in METHODS)
+        self.assertEqual(
+            aliased, [], f"these are recorded but are not canonical keys: {aliased}"
+        )
+
+    def test_every_recorded_backend_is_registered(self) -> None:
+        """Whatever the drivers actually wrote must still resolve.
+
+        This is the check that catches a backend renamed in one place. It reads
+        the raw result files, so it only asserts on what is present locally.
+        """
+        spellings = set()
+        for pattern in ("benchmarks/results/*.csv", "results/runs/latest/*.csv"):
+            for path in ROOT.glob(pattern):
+                with path.open(newline="", encoding="utf-8") as handle:
+                    for row in csv.DictReader(handle):
+                        for column in ("backend", "algo"):
+                            if row.get(column):
+                                spellings.add(row[column])
+        if not spellings:
+            self.skipTest("no raw benchmark results present")
+        unmapped = sorted(s for s in spellings if canonical(s) is None)
+        self.assertEqual(unmapped, [], f"unregistered backends in results: {unmapped}")
+
+
+class DriverEntryPointTests(unittest.TestCase):
+    """Importing a driver must never run it.
+
+    bench_memory_py once had no __main__ guard, so importing the module ran
+    all eight benchmarks and overwrote results/runs/latest/memory.csv with
+    whatever the import happened to produce. Anything that imports broadly
+    (a test collector, a dead-code sweep, an IDE) could destroy a recorded
+    result that way, and results/runs is not tracked, so there is no undo.
+    """
+
+    DRIVERS = sorted(
+        path
+        for path in (ROOT / "benchmarks").rglob("*.py")
+        if path.name != "__init__.py"
+    ) + sorted((ROOT / "scripts").glob("*.py"))
+
+    # matplotlib.use() and the rcParams assignment have to run before pyplot is
+    # imported, so they are legitimately module level. Nothing else here is.
+    IMPORT_TIME_SETUP = ("matplotlib.use", "matplotlib.rcParams")
+
+    def test_no_driver_executes_work_at_module_level(self) -> None:
+        offenders = []
+        for path in self.DRIVERS:
+            source = path.read_text(encoding="utf-8")
+            for node in ast.parse(source).body:
+                # Loops and bare calls at module level run on import.
+                # Assignments, imports, defs and classes are declarations.
+                if not isinstance(node, (ast.Expr, ast.For, ast.While, ast.With)):
+                    continue
+                # A module docstring is an Expr but does nothing.
+                if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                    continue
+                text = ast.get_source_segment(source, node) or ""
+                if text.startswith(self.IMPORT_TIME_SETUP):
+                    continue
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+        self.assertEqual(offenders, [], f"module-level work on import: {offenders}")
+
+    def test_every_driver_guards_its_entry_point(self) -> None:
+        """A driver with argparse must reach it only through __main__."""
+        offenders = []
+        for path in self.DRIVERS:
+            source = path.read_text(encoding="utf-8")
+            if "argparse.ArgumentParser(" not in source:
+                continue
+            if 'if __name__ == "__main__":' not in source:
+                offenders.append(str(path.relative_to(ROOT)))
+        self.assertEqual(offenders, [], f"argparse without a guard: {offenders}")
+
+    def test_every_driver_still_imports(self) -> None:
+        """Import each driver for real, not just parse it.
+
+        Guards make importing a driver harmless, which makes this affordable,
+        and it is the only check that catches a name used at module level but
+        never imported. One driver interpolated DATA_DIR into a subprocess
+        template while the import for it had been placed inside that template,
+        so the module raised NameError and nothing noticed: no test imports the
+        drivers, and the AST checks above parse without executing.
+        """
+        import importlib
+
+        for path in sorted((ROOT / "benchmarks" / "drivers").glob("*.py")):
+            if path.name == "__init__.py":
+                continue
+            name = f"benchmarks.drivers.{path.stem}"
+            with self.subTest(driver=name):
+                importlib.import_module(name)
+
+
+class ConvergenceCheckTests(unittest.TestCase):
+    """Convergence must be read through the helper, not off a raw attribute.
+
+    PyFixest defines `.convergence` on Feglm (PPML) but not on Feols, so
+    `fit.convergence` on a linear fit raises AttributeError rather than
+    reporting non-convergence. Two standalone drivers did exactly that, which
+    made every one of their runs fail at the check.
+    """
+
+    def test_no_driver_reads_convergence_off_a_fit_directly(self) -> None:
+        offenders = []
+        for path in DriverEntryPointTests.DRIVERS:
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if re.search(r"\bfit\w*\.convergence\b", line):
+                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(offenders, [], f"use _fit_converged instead: {offenders}")
+
+    def test_helper_tolerates_a_model_with_no_flag(self) -> None:
+        class LinearFit:  # Feols exposes no convergence attribute at all
+            pass
+
+        class PoissonFit:  # Feglm does
+            convergence = False
+
+        self.assertTrue(_fit_converged(LinearFit()))
+        self.assertFalse(_fit_converged(PoissonFit()))
 
 
 if __name__ == "__main__":

@@ -14,45 +14,20 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from benchmarks.modular.methods import (
-    METHOD_LINESTYLE,
-    METHOD_STYLE,
-    legend_label,
-    resolve,
-)
+from benchmarks.core.methods import canonical, legend_label, linestyle, style
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
 
 METHOD_ORDER = (
-    "lsmr_off",
-    "lsmr_diagonal",
-    "lsmr_additive",
-    "pyfixest_map",
-    "r_fixest",
-    "julia_fem",
+    "within-off",
+    "within-diagonal",
+    "within-additive",
+    "rust-map",
+    "fixest",
+    "FEM.jl",
 )
-
-STYLE = {
-    "lsmr_off": METHOD_STYLE["lsmr_none"],
-    "lsmr_diagonal": METHOD_STYLE["lsmr_diagonal"],
-    "lsmr_additive": METHOD_STYLE["lsmr_factor_pair"],
-    "pyfixest_map": METHOD_STYLE["map"],
-    "r_fixest": METHOD_STYLE["fixest"],
-    "julia_fem": METHOD_STYLE["fem"],
-}
-
-LINESTYLE = {
-    "lsmr_off": METHOD_LINESTYLE["lsmr_none"],
-    "lsmr_diagonal": METHOD_LINESTYLE["lsmr_diagonal"],
-    "lsmr_additive": METHOD_LINESTYLE["lsmr_factor_pair"],
-    "pyfixest_map": METHOD_LINESTYLE["map"],
-    "r_fixest": METHOD_LINESTYLE["fixest"],
-    "julia_fem": METHOD_LINESTYLE["fem"],
-}
-
-METHOD_LABEL_BY_KEY = {key: legend_label(resolve(key)) for key in METHOD_ORDER}
 
 METRICS = (
     ("coefficient_error_se", "Slope error (reference SE)"),
@@ -60,7 +35,7 @@ METRICS = (
 )
 
 
-def _as_bool(values: pd.Series) -> pd.Series:
+def _coerce_bool_series(values: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(values):
         return values.fillna(False)
     return values.astype(str).str.lower().eq("true")
@@ -84,7 +59,11 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tolerance results are missing columns: {missing}")
 
     data = raw.copy()
-    data["success"] = _as_bool(data["success"])
+    # Result files recorded before the spellings were unified say "lsmr_off"
+    # where new ones say "within-off". Resolve on the way in so one figure can
+    # read both, and so METHOD_ORDER holds canonical names only.
+    data["method"] = data["method"].map(lambda value: canonical(value) or value)
+    data["success"] = _coerce_bool_series(data["success"])
     numeric = [
         "tolerance",
         "default_tolerance",
@@ -162,7 +141,7 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         subset = failed[failed["method"] == method]
         if subset.empty:
             continue
-        label = METHOD_LABEL_BY_KEY[method].replace("\n", " — ")
+        label = legend_label(method).replace("\n", " — ")
         count = len(subset)
         suffix = "setting" if count == 1 else "settings"
         entries.append(f"{label}: {count} {suffix}")
@@ -218,13 +197,13 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     continue
                 method_points["plot_error"] = method_points[metric].clip(lower=floor)
                 method_points = method_points.sort_values("plot_error")
-                colour, marker = STYLE[method]
+                colour, marker = style(method)
                 ax.plot(
                     method_points["plot_error"],
                     method_points["median_time_s"],
                     color=colour,
                     linewidth=1.2,
-                    linestyle=LINESTYLE[method],
+                    linestyle=linestyle(method),
                     alpha=0.75,
                     zorder=2,
                 )
@@ -285,7 +264,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                 ax.spines[spine].set_visible(False)
 
     labels = {
-        method: METHOD_LABEL_BY_KEY[method]
+        method: legend_label(method)
         for method in METHOD_ORDER
         if (points["method"] == method).any()
     }
@@ -293,10 +272,10 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
         Line2D(
             [0],
             [0],
-            color=STYLE[method][0],
-            marker=STYLE[method][1],
+            color=style(method)[0],
+            marker=style(method)[1],
             linewidth=1.2,
-            linestyle=LINESTYLE[method],
+            linestyle=linestyle(method),
             markersize=6,
             markeredgecolor="white",
             markeredgewidth=0.5,

@@ -9,18 +9,18 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from benchmarks.modular.benchmark_tolerance import (
+from benchmarks.drivers.tolerance import (
     METHOD_BY_KEY,
     coefficient_error_se,
     residual_error,
 )
-from benchmarks.modular.methods import METHOD_STYLE
-from scripts.make_figures import CROSSOVER_STYLE, STYLE as PAPER_FIGURE_STYLE
-from scripts.plot_tolerance import (
-    STYLE as TOLERANCE_STYLE,
-    aggregate_results,
-    tolerance_figure,
+from benchmarks.core.methods import METHODS, linestyle, resolve, style
+from scripts.make_figures import (
+    CROSS_PACKAGE_BACKENDS,
+    CROSSOVER_FILES,
+    MECHANISM_BACKENDS,
 )
+from scripts.plot_tolerance import METHOD_ORDER, aggregate_results, tolerance_figure
 
 
 class ToleranceMetricTests(unittest.TestCase):
@@ -40,12 +40,12 @@ class ToleranceMetricTests(unittest.TestCase):
         self.assertEqual(
             set(METHOD_BY_KEY),
             {
-                "lsmr_off",
-                "lsmr_diagonal",
-                "lsmr_additive",
-                "pyfixest_map",
-                "r_fixest",
-                "julia_fem",
+                "within-off",
+                "within-diagonal",
+                "within-additive",
+                "rust-map",
+                "fixest",
+                "FEM.jl",
             },
         )
         for method in METHOD_BY_KEY.values():
@@ -93,19 +93,32 @@ class TolerancePlotTests(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertIn("<svg", output.read_text(encoding="utf-8")[:500])
 
-    def test_method_styles_are_shared_across_paper_figures(self) -> None:
-        self.assertEqual(PAPER_FIGURE_STYLE["rust-map"], METHOD_STYLE["map"])
-        self.assertEqual(PAPER_FIGURE_STYLE["fixest"], METHOD_STYLE["fixest"])
-        self.assertEqual(PAPER_FIGURE_STYLE["FEM.jl"], METHOD_STYLE["fem"])
-        self.assertEqual(
-            PAPER_FIGURE_STYLE["within"], METHOD_STYLE["lsmr_factor_pair"]
-        )
-        self.assertEqual(TOLERANCE_STYLE["pyfixest_map"], METHOD_STYLE["map"])
-        self.assertEqual(TOLERANCE_STYLE["r_fixest"], METHOD_STYLE["fixest"])
-        self.assertEqual(TOLERANCE_STYLE["julia_fem"], METHOD_STYLE["fem"])
-        self.assertEqual(
-            CROSSOVER_STYLE["Julia"][1:], METHOD_STYLE["fem"]
-        )
+    def test_every_figure_key_resolves_to_the_registry(self) -> None:
+        """No figure may name a configuration the registry does not carry.
+
+        The styles used to be restated per figure, which meant an unregistered
+        key produced a KeyError only when that panel was drawn. Now every key
+        goes through resolve(), so checking them here covers all of them.
+        """
+        keys = {
+            *CROSS_PACKAGE_BACKENDS,
+            *MECHANISM_BACKENDS,
+            *METHOD_ORDER,
+            *CROSSOVER_FILES["OLS"],
+            *CROSSOVER_FILES["PPML"],
+        }
+        for key in sorted(keys):
+            with self.subTest(key=key):
+                self.assertIn(resolve(key), METHODS)
+                self.assertEqual(len(style(key)), 2)
+                self.assertTrue(linestyle(key))
+
+    def test_the_same_configuration_styles_alike_across_figures(self) -> None:
+        """The tolerance and runtime figures spell these differently."""
+        self.assertEqual(style("lsmr_additive"), style("pyfixest (within)"))
+        self.assertEqual(style("pyfixest_map"), style("pyfixest (rust-map)"))
+        self.assertEqual(style("r_fixest"), style("fixest-map"))
+        self.assertEqual(style("julia_fem"), style("Julia"))
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-DRIVERS = ROOT / "benchmarks" / "modular"
+DRIVERS = ROOT / "benchmarks" / "external"
 
 HAS_R = shutil.which("Rscript") is not None
 HAS_JULIA = shutil.which("julia") is not None
