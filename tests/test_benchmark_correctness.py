@@ -21,13 +21,13 @@ import scipy.sparse as sp
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from benchmarks.bench_within_setup_cost import _setup_share
-from benchmarks.modular.benchmark_correia import summarize_results
-from benchmarks.modular.benchmark_fepois import (
+from benchmarks.drivers.setup_cost import _setup_share
+from benchmarks.drivers.correia import summarize_results
+from benchmarks.drivers.ppml import (
     SIZES as FEPOIS_SIZES,
     SPECS as FEPOIS_SPECS,
 )
-from benchmarks.modular.benchmark_main import SIZES as OLS_SIZES
+from benchmarks.drivers.ols import SIZES as OLS_SIZES
 from benchmarks.dgp.akm import AKMConfig, simulate_akm_panel
 from benchmarks.dgp.base import paper_base_dgp
 from benchmarks.dgp.scenarios import BaseDGP, _seed_for, get_akm_sweep_scenario_names
@@ -81,7 +81,7 @@ from scripts.paper_results import (
     _validate_ppml_results,
 )
 from benchmarks.modular.analyze_gap_runtime import _sized_key
-from benchmarks.modular.compute_hardness import _component_rho
+from benchmarks.drivers.hardness import _component_rho
 
 
 def _frame_hash(frame: pd.DataFrame) -> str:
@@ -345,7 +345,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             calls.append(kwargs["solver"])
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["arpack"])
 
@@ -359,7 +359,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
             calls.append(kwargs["solver"])
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["propack"])
 
@@ -373,7 +373,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                 raise RuntimeError("PROPACK did not converge")
             return np.array([0.5, 1.0])
 
-        with patch("benchmarks.modular.compute_hardness.svds", side_effect=fake_svds):
+        with patch("benchmarks.drivers.hardness.svds", side_effect=fake_svds):
             self.assertEqual(_component_rho(matrix), 0.25)
         self.assertEqual(calls, ["propack", "arpack"])
 
@@ -616,9 +616,9 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
     def test_absorbed_factor_order_is_the_same_everywhere(self) -> None:
         # MAP cycles through factors in the given order, so a table that
         # absorbs in a different order is not comparing the same specification.
-        from benchmarks.modular.benchmark_akm_sweep import SPECS as AKM_SPECS
-        from benchmarks.modular.benchmark_fepois import SPECS as PPML_SPECS
-        from benchmarks.modular.benchmark_main import SPECS as MAIN_SPECS
+        from benchmarks.drivers.akm_sweep import SPECS as AKM_SPECS
+        from benchmarks.drivers.ppml import SPECS as PPML_SPECS
+        from benchmarks.drivers.ols import SPECS as MAIN_SPECS
 
         expected = ["indiv_id", "firm_id", "year"]
         for label, specs in (

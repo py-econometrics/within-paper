@@ -13,22 +13,24 @@ _julia-setup = { depends-on = ["setup-julia-env"], description = "Compatibility 
 fetch-correia = { cmd = "python -m scripts.paper_results fetch-correia", description = "Download the Correia HDFE CSVs and verify their checksums" }
 check-correia-data = { cmd = "python -m scripts.paper_results fetch-correia --offline", description = "Verify the local Correia CSV collection without downloading" }
 archive-legacy-results = { cmd = "python -m scripts.paper_results archive-legacy-results", description = "Move untracked result files and figures to a dated archive" }
-agreement = { cmd = "python -m benchmarks.bench_agreement_py", depends-on = ["_julia-setup", "bench-generate-data"], description = "Run numerical agreement checks against PyFixest, R fixest, and FixedEffectModels.jl" }
-within-setup-cost = { cmd = "python -m benchmarks.bench_within_setup_cost", description = "Measure setup and solve time for the standalone within Python API" }
+agreement = { cmd = "python -m benchmarks.drivers.agreement", depends-on = ["_julia-setup", "bench-generate-data"], description = "Run numerical agreement checks against PyFixest, R fixest, and FixedEffectModels.jl" }
+within-setup-cost = { cmd = "python -m benchmarks.drivers.setup_cost", description = "Measure setup and solve time for the standalone within Python API" }
 test = { cmd = "python -m unittest discover -s tests -t . -v", description = "Run benchmark regression tests" }
-bench-generate-data = { cmd = "python -m benchmarks.bench_generate_data", description = "Generate the 100K and 1M one-covariate DGP files used by the agreement and memory checks" }
-bench-memory = { cmd = "python -m benchmarks.bench_memory_py", depends-on = ["bench-generate-data"], description = "Measure peak RSS and runtime for the PyFixest MAP and within backends (100K, 1M)" }
-bench-main = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.modular.benchmark_main", depends-on = ["_julia-setup"], description = "Run the 10M-observation OLS benchmark" }
-bench-fepois = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.modular.benchmark_fepois", depends-on = ["_julia-setup"], description = "Run the worker-firm-year PPML benchmark against fixest, GLFixedEffectModels.jl, and PyFixest fepois" }
-bench-akm-sweep = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.modular.benchmark_akm_sweep", depends-on = ["_julia-setup"], description = "Run the AKM mobility and sorting benchmarks" }
-within-preconditioners = { cmd = "python -m benchmarks.bench_within_preconditioners", description = "Standalone within setup/solve/iteration/residual diagnostics for off/diagonal/additive" }
+bench-generate-data = { cmd = "python -m benchmarks.drivers.generate_data", description = "Generate the 100K and 1M one-covariate DGP files used by the agreement and memory checks" }
+bench-memory = { cmd = "python -m benchmarks.drivers.memory", depends-on = ["bench-generate-data"], description = "Measure peak RSS and runtime for the PyFixest MAP and within backends (100K, 1M)" }
+bench-main = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.drivers.ols", depends-on = ["_julia-setup"], description = "Run the 10M-observation OLS benchmark" }
+bench-fepois = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.drivers.ppml", depends-on = ["_julia-setup"], description = "Run the worker-firm-year PPML benchmark against fixest, GLFixedEffectModels.jl, and PyFixest fepois" }
+bench-akm-sweep = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.drivers.akm_sweep", depends-on = ["_julia-setup"], description = "Run the AKM mobility and sorting benchmarks" }
+within-preconditioners = { cmd = "python -m benchmarks.drivers.preconditioners", description = "Standalone within setup/solve/iteration/residual diagnostics for off/diagonal/additive" }
 analyze-gap-runtime = { cmd = "python -m benchmarks.modular.analyze_gap_runtime", description = "Pool existing hardness and runtime CSVs into the gap-versus-runtime diagnostic" }
 make-figures = { cmd = "python -m scripts.make_figures", description = "Generate paper figures from recorded benchmark results" }
-pilot-calibration = { cmd = "python -m benchmarks.modular.pilot_calibration", depends-on = ["bench-generate-data"], description = "Validate the accuracy metrics and freeze tolerances before production runs" }
-bench-accuracy-frontier = { cmd = "python -m benchmarks.modular.benchmark_accuracy_frontier", description = "Sweep package tolerances for the time-versus-accuracy frontier" }
-ppml-inner-outer = { cmd = "python -m benchmarks.bench_ppml_inner_outer", description = "PPML inner LSMR versus outer IRLS diagnostics via standalone within" }
-bench-correia = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.modular.benchmark_correia", depends-on = ["_julia-setup", "check-correia-data"], description = "Run the local Correia benchmarks after checksum verification" }
-compute-hardness = { cmd = "python -m benchmarks.modular.compute_hardness", depends-on = ["bench-generate-data", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-correia"], description = "Compute pairwise spectral gaps after singleton pruning" }
+pilot-calibration = { cmd = "python -m benchmarks.drivers.pilot_calibration", depends-on = ["bench-generate-data"], description = "Validate the accuracy metrics and freeze tolerances before production runs" }
+bench-accuracy-frontier = { cmd = "python -m benchmarks.drivers.accuracy_frontier", description = "Sweep package tolerances for the time-versus-accuracy frontier" }
+ppml-inner-outer = { cmd = "python -m benchmarks.drivers.ppml_inner_outer", description = "PPML inner LSMR versus outer IRLS diagnostics via standalone within" }
+bench-scaling = { cmd = "python -m benchmarks.drivers.scaling", description = "Scaling in the number of absorbed factors, and amortization over right-hand sides" }
+bench-tolerance = { cmd = "python -m benchmarks.drivers.tolerance", depends-on = ["_julia-setup"], description = "Runtime against achieved precision over each solver's own tolerance grid" }
+bench-correia = { cmd = "JULIA_PROJECT=benchmarks/julia-env python -m benchmarks.drivers.correia", depends-on = ["_julia-setup", "check-correia-data"], description = "Run the local Correia benchmarks after checksum verification" }
+compute-hardness = { cmd = "python -m benchmarks.drivers.hardness", depends-on = ["bench-generate-data", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-correia"], description = "Compute pairwise spectral gaps after singleton pruning" }
 bench-modular-all = { depends-on = ["bench-main", "bench-fepois", "bench-akm-sweep"], description = "Run the OLS, PPML, and AKM benchmarks" }
 bench-diagnostics = { depends-on = ["pilot-calibration", "within-preconditioners", "bench-accuracy-frontier", "ppml-inner-outer"], description = "Run the mechanism and accuracy diagnostics" }
 bench-all = { depends-on = ["bench-generate-data", "agreement", "within-setup-cost", "bench-memory", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-diagnostics"], description = "Generate all synthetic data and run every benchmark" }

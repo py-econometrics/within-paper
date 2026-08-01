@@ -9,7 +9,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from benchmarks.modular.benchmark_tolerance import (
+from benchmarks.drivers.tolerance import (
     METHOD_BY_KEY,
     coefficient_error_se,
     residual_error,
