@@ -16,7 +16,7 @@ FML = "y ~ x1 | indiv_id + firm_id + year"
 SCRIPT = f"""\
 import resource, sys, time, warnings, gc
 from pathlib import Path
-from benchmarks.modular.feols_benchmarkers import _fit_converged
+from benchmarks.solvers.pyfixest_feols import _fit_converged
 from benchmarks.solvers.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf

@@ -4,13 +4,13 @@ import argparse
 from pathlib import Path
 
 from benchmarks.core.cli import add_output_args
-from benchmarks.modular.benchmarker_sets import (
+from benchmarks.solvers.registry import (
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
 )
 from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
-from benchmarks.modular.runner import run_benchmarks
+from benchmarks.solvers.runner import run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT
 
 

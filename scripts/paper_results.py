@@ -32,7 +32,7 @@ from pathlib import Path
 # this script keep running before the Pixi environment exists; a test pins
 # that property.
 from benchmarks.core.timing import summarize_times
-from benchmarks.core.methods import METHOD_TABLE_HEADER
+from benchmarks.core.methods import METHOD_TABLE_HEADER, canonical
 from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
@@ -484,33 +484,6 @@ def _rows_from_csvs() -> list[dict[str, str]]:
     return rows
 
 
-def _backend_name(value: str) -> str | None:
-    text = value.lower()
-    # Matched-accuracy arms are their own series and must never be folded into
-    # the package-default cell they share a solver with. Both views are
-    # measured in one sweep (PROTOCOL.md section 6), so without this the four
-    # within variants would collapse onto "within", the two MAP variants onto
-    # "rust-map", and every affected cell would render as "incomplete" from
-    # duplicate trial ids.
-    for preconditioner in ("off", "diagonal", "additive"):
-        if f"within-{preconditioner}" in text:
-            return f"within-{preconditioner}"
-    if "matched" in text:
-        return "rust-map-matched"
-    if "within" in text or "rust-cg" in text or "rust_cg" in text:
-        return "within"
-    if "rust-map" in text or "rust_map" in text or text in {"rust", "pyfixest-map", "pyfixest_map"}:
-        return "rust-map"
-    if "torch-cuda" in text:
-        return "torch-cuda"
-    if "glfixed" in text or "glfem" in text:
-        return "GLFEM.jl"
-    if "fixedeffectmodels" in text or "fem.jl" in text:
-        return "FEM.jl"
-    if "fixest" in text:
-        return "fixest"
-    return None
-
 
 def _format_seconds(value: float) -> str:
     if value < 1:
@@ -675,7 +648,7 @@ def _matches_runtime_target(
         return False
     if _runtime_dataset(row) != dataset:
         return False
-    if _backend_name(row.get("backend") or row.get("algo") or "") != backend:
+    if canonical(row.get("backend") or row.get("algo") or "") != backend:
         return False
     return all(_integer_field(row, field) == value for field, value in requirements.items())
 
@@ -813,9 +786,9 @@ def _synchronize_agreement(document: dict) -> int:
     if observations is None:
         return 0
     by_key = {
-        (row["dgp"], _backend_name(row["backend"])): row
+        (row["dgp"], canonical(row["backend"])): row
         for row in observations
-        if _backend_name(row["backend"]) and _integer_field(row, "model_k") == 1
+        if canonical(row["backend"]) and _integer_field(row, "model_k") == 1
     }
     changed = 0
     dgp = ""
@@ -1101,7 +1074,7 @@ def _synchronize_zigzag(document: dict) -> int:
         ]
     times: dict[str, float] = {}
     for row in rows:
-        backend = _backend_name(row.get("algo") or "")
+        backend = canonical(row.get("algo") or "")
         if backend in {"within", "FEM.jl"} and str(row.get("success", "")).lower() == "true":
             try:
                 times[backend] = float(row["time"])

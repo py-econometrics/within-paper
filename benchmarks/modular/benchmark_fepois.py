@@ -4,10 +4,10 @@ import argparse
 from pathlib import Path
 
 from benchmarks.core.cli import add_output_args
-from benchmarks.modular.benchmarker_sets import build_fepois_benchmarkers
+from benchmarks.solvers.registry import build_fepois_benchmarkers
 from benchmarks.dgp.scenarios import BaseDGP
 from benchmarks.core.interfaces import FeolsSpec
-from benchmarks.modular.runner import generate_datasets, run_benchmarks
+from benchmarks.solvers.runner import generate_datasets, run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT
 
 # ---------------------------------------------------------------------------

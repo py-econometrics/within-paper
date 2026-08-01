@@ -38,13 +38,13 @@ from benchmarks.core.accuracy import (
     pair_edge_stats,
     projection_errors,
 )
-from benchmarks.modular.benchmarker_sets import (
+from benchmarks.solvers.registry import (
     MATCHED_ACCURACY,
     PACKAGE_DEFAULTS,
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
 )
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     _as_bool,
     _external_eta,
     _fit_converged,
@@ -60,8 +60,9 @@ from benchmarks.core.records import RunRecord
 from benchmarks.dgp.samples import FE_COLS, SampleSpec, clear_sample_cache, load_sample
 from benchmarks.solvers.specs import matched_solver_specs
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
-from benchmarks.modular.subprocess_backend import _parse_subprocess_output
-from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.core.methods import canonical
+from benchmarks.solvers.subprocess_driver import _parse_subprocess_output
+from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
 from benchmarks.core.results import write_rows
 from benchmarks.core.timing import (
     randomized_order,
@@ -70,7 +71,6 @@ from benchmarks.core.timing import (
     timed,
 )
 from scripts.paper_results import (
-    _backend_name,
     _iteration_rows,
     _read_json,
     _component_share,
@@ -632,24 +632,24 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
     def test_matched_arms_do_not_collapse_onto_default_cells(self) -> None:
         """Both views share a sweep, so the renderer must keep them apart.
 
-        _backend_name folds any label containing "within" onto "within" and any
-        containing "rust-map" onto "rust-map". With both views in one run that
+        canonical() must keep the matched-accuracy arms distinct from the
+        package-default arms they share a solver with. Folding them together
         put four within variants and two MAP variants into the same cell, whose
-        duplicate trial ids then render as "incomplete".
+        duplicate trial ids then rendered as "incomplete".
         """
-        self.assertEqual(_backend_name("pyfixest (within)"), "within")
-        self.assertEqual(_backend_name("pyfixest (rust-map)"), "rust-map")
+        self.assertEqual(canonical("pyfixest (within)"), "within")
+        self.assertEqual(canonical("pyfixest (rust-map)"), "rust-map")
         for preconditioner in ("off", "diagonal", "additive"):
             self.assertEqual(
-                _backend_name(f"pyfixest (within-{preconditioner})"),
+                canonical(f"pyfixest (within-{preconditioner})"),
                 f"within-{preconditioner}",
             )
         self.assertEqual(
-            _backend_name("pyfixest (rust-map, matched)"), "rust-map-matched"
+            canonical("pyfixest (rust-map, matched)"), "rust-map-matched"
         )
 
-        names = {_backend_name(spec.label) for spec in PACKAGE_DEFAULTS}
-        matched = {_backend_name(spec.label) for spec in MATCHED_ACCURACY}
+        names = {canonical(spec.label) for spec in PACKAGE_DEFAULTS}
+        matched = {canonical(spec.label) for spec in MATCHED_ACCURACY}
         self.assertEqual(names & matched, set())
 
     def test_unmeasured_gate_a_components_do_not_pass(self) -> None:
@@ -975,6 +975,45 @@ class SharedPrimitiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
                 write_rows(Path(tmp) / "rows.csv", [])
+
+
+class BackendRegistryTests(unittest.TestCase):
+    """The two registries a new backend has to appear in must agree.
+
+    Adding a backend means declaring how to run it (solvers/registry.py) and
+    how to name and colour it (core/methods.py). Nothing links the two, so a
+    backend added to one and not the other used to fail as a missing figure
+    series or a table cell rendering "incomplete" rather than as an error.
+    """
+
+    def test_every_runnable_backend_has_a_presentation_record(self) -> None:
+        from benchmarks.solvers.registry import MATCHED_ACCURACY, PACKAGE_DEFAULTS
+
+        for spec in (*PACKAGE_DEFAULTS, *MATCHED_ACCURACY):
+            with self.subTest(label=spec.label):
+                self.assertIsNotNone(
+                    canonical(spec.label),
+                    f"{spec.label!r} runs but core.methods cannot name it",
+                )
+
+    def test_every_recorded_backend_is_registered(self) -> None:
+        """Whatever the drivers actually wrote must still resolve.
+
+        This is the check that catches a backend renamed in one place. It reads
+        the raw result files, so it only asserts on what is present locally.
+        """
+        spellings = set()
+        for pattern in ("benchmarks/results/*.csv", "results/runs/latest/*.csv"):
+            for path in ROOT.glob(pattern):
+                with path.open(newline="", encoding="utf-8") as handle:
+                    for row in csv.DictReader(handle):
+                        for column in ("backend", "algo"):
+                            if row.get(column):
+                                spellings.add(row[column])
+        if not spellings:
+            self.skipTest("no raw benchmark results present")
+        unmapped = sorted(s for s in spellings if canonical(s) is None)
+        self.assertEqual(unmapped, [], f"unregistered backends in results: {unmapped}")
 
 
 class DriverEntryPointTests(unittest.TestCase):

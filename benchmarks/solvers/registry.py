@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     PyFeolsBenchmarkerFullApi,
     detect_torch_runtime_availability,
 )
-from benchmarks.modular.subprocess_backend import (
+from benchmarks.solvers.subprocess_driver import (
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
 )
@@ -17,7 +17,7 @@ from benchmarks.solvers.settings import (
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
 )
-from benchmarks.modular.fepois_benchmarkers import (
+from benchmarks.solvers.pyfixest_fepois import (
     FixestFepoisBenchmarker,
     GLFixedEffectModelsBenchmarker,
     PyFepoisBenchmarkerFullApi,

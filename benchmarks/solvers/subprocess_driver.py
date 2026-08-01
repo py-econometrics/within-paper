@@ -22,7 +22,7 @@ from pathlib import Path
 
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     _as_bool,
     _normalize_vcov,
     _result_from_dataset,

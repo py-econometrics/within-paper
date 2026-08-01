@@ -37,7 +37,7 @@ from benchmarks.core.accuracy import (
     external_normal_residuals,
     projection_errors,
 )
-from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
 from benchmarks.solvers.settings import demeaner_for
 from benchmarks.core.paths import ROOT
 

@@ -56,11 +56,33 @@ ALIASES = {
     "pyfixest (within-diagonal)": "within-diagonal",
     "pyfixest (within-additive)": "within-additive",
     "fixest-map": "fixest",
+    "fixest-fepois": "fixest",
     "FEM.jl (lsmr)": "FEM.jl",
+    "FixedEffectModels": "FEM.jl",
+    "glfixedeffectmodels.jl": "GLFEM.jl",
+    "pyfixest-map": "rust-map",
+    "pyfixest-within": "within",
+    "rust": "rust-map",
     # The crossover figure draws one series for both Julia packages, which
     # share a style. Its own label is set at the call site.
     "Julia": "FEM.jl",
 }
+
+
+def canonical(key: str) -> str | None:
+    """The canonical key for a recorded backend name, or None if unknown.
+
+    Matching is exact. paper_results used to do this by substring, which is how
+    "PyFixest MAP" mapped to R fixest: "pyfi(xest)" contains "fixest". Nothing
+    in the tracked results hits that case today, but the class of bug is only
+    avoidable by matching whole names.
+
+    Returning None rather than raising keeps a result file that mentions an
+    unregistered backend from aborting a render; the row is skipped, and a test
+    asserts every backend in the tracked results is registered.
+    """
+    resolved = ALIASES.get(key, key)
+    return resolved if resolved in METHODS else None
 
 
 def resolve(key: str) -> str:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import warnings
 
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     _TablePrinter,
     _beta_x1,
     demeaner_for,
@@ -16,7 +16,7 @@ from benchmarks.modular.feols_benchmarkers import (
     _retained_rows,
     _trim_process_memory,
 )
-from benchmarks.modular.subprocess_backend import (
+from benchmarks.solvers.subprocess_driver import (
     JuliaFeolsBenchmarker,
     SubprocessFeolsBenchmarker,
 )

@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.modular.feols_benchmarkers import (
+from benchmarks.solvers.pyfixest_feols import (
     PyFeolsBenchmarkerFullApi,
     _fmt_time,
 )
-from benchmarks.modular.subprocess_backend import (
+from benchmarks.solvers.subprocess_driver import (
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
 )
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
-from benchmarks.modular.runner import run_benchmarks
+from benchmarks.solvers.runner import run_benchmarks
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
 # ---------------------------------------------------------------------------

@@ -41,7 +41,7 @@ from benchmarks.solvers.settings import (
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,
 )
-from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
+from benchmarks.solvers.map_diagnostics import map_demean_with_sweeps
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 from benchmarks.core.paths import ROOT
 

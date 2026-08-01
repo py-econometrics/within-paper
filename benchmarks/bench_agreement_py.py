@@ -28,7 +28,7 @@ from pathlib import Path
 
 from benchmarks.core.results import write_rows
 from benchmarks.dgp.samples import FE_COLS
-from benchmarks.modular.feols_benchmarkers import _fit_converged
+from benchmarks.solvers.pyfixest_feols import _fit_converged
 from benchmarks.solvers.settings import demeaner_for
 import numpy as np
 import pandas as pd
