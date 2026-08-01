@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-from benchmarks.modular.results import write_rows
+from benchmarks.core.results import write_rows
 from benchmarks.modular.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,

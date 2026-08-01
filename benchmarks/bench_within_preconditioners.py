@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 
 
-from benchmarks.modular.cli import add_runs_arg
+from benchmarks.core.cli import add_runs_arg
 from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     RunRecord,
@@ -42,8 +42,8 @@ from benchmarks.modular.experiment import (
 
 
 import within
-from benchmarks.modular.accuracy import accuracy_record, pair_edge_stats
-from benchmarks.modular.timing import timed
+from benchmarks.core.accuracy import accuracy_record, pair_edge_stats
+from benchmarks.core.timing import timed
 from benchmarks.modular.settings import (
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,

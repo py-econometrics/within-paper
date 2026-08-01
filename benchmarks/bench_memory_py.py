@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from benchmarks.modular.results import write_rows
+from benchmarks.core.results import write_rows
 
 
 FML = "y ~ x1 | indiv_id + firm_id + year"

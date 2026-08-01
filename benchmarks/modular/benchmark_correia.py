@@ -13,7 +13,7 @@ from benchmarks.modular.subprocess_backend import (
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
 )
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 

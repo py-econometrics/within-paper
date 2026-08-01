@@ -20,7 +20,7 @@ from benchmarks.modular.subprocess_backend import (
     JuliaFeolsBenchmarker,
     SubprocessFeolsBenchmarker,
 )
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 from benchmarks.core.paths import EXTERNAL_DIR
 class PyFepoisBenchmarkerFullApi:
     """Benchmark one pf.fepois() call with the selected demeaning backend."""

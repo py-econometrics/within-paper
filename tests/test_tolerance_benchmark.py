@@ -14,7 +14,7 @@ from benchmarks.modular.benchmark_tolerance import (
     coefficient_error_se,
     residual_error,
 )
-from benchmarks.modular.methods import METHODS, linestyle, resolve, style
+from benchmarks.core.methods import METHODS, linestyle, resolve, style
 from scripts.make_figures import (
     CROSS_PACKAGE_BACKENDS,
     CROSSOVER_FILES,

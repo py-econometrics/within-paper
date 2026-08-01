@@ -38,8 +38,8 @@ import pandas as pd
 from pyfixest.core.detect_singletons import detect_singletons
 
 
-from benchmarks.modular.methods import inline_label, resolve
-from benchmarks.modular.accuracy import external_normal_residuals
+from benchmarks.core.methods import inline_label, resolve
+from benchmarks.core.accuracy import external_normal_residuals
 from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for

@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 
 from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
 from benchmarks.modular.dgp_functions import PAPER_BASE_MAX_K, paper_base_dgp
-from benchmarks.modular.interfaces import BenchmarkDataset
+from benchmarks.core.interfaces import BenchmarkDataset
 def _seed_for(dgp_name: str, n: int, iteration: int) -> int:
     """Build deterministic seeds so benchmark runs are reproducible."""
     stable_offset = int.from_bytes(

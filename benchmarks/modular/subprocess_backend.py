@@ -20,7 +20,7 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
 
 from benchmarks.modular.feols_benchmarkers import (
     _as_bool,

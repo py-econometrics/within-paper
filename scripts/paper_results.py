@@ -31,8 +31,8 @@ from pathlib import Path
 # one per consumer. The module is standard-library only, which is what lets
 # this script keep running before the Pixi environment exists; a test pins
 # that property.
-from benchmarks.modular.timing import summarize_times
-from benchmarks.modular.methods import METHOD_TABLE_HEADER
+from benchmarks.core.timing import summarize_times
+from benchmarks.core.methods import METHOD_TABLE_HEADER
 from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"

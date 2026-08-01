@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 
 
-from benchmarks.modular.cli import add_dgps_arg
+from benchmarks.core.cli import add_dgps_arg
 from benchmarks.modular.experiment import (
     PRECONDITIONERS,
     SampleSpec,

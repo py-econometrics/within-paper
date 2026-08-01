@@ -23,8 +23,8 @@ from benchmarks.modular.settings import (
     WITHIN_PRECONDITIONERS,
     demeaner_for,
 )
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
-from benchmarks.modular.timing import repetitions_for_runtime
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsResult, FeolsSpec
+from benchmarks.core.timing import repetitions_for_runtime
 _MIN_DGP_WIDTH = 16
 
 
@@ -250,7 +250,7 @@ def _external_eta(fit: Any, frame: "pd.DataFrame", depvar: str, covariates: list
         import numpy as np
         import pandas as pd
 
-        from benchmarks.modular.accuracy import external_normal_residuals
+        from benchmarks.core.accuracy import external_normal_residuals
 
         fe_frame = getattr(fit, "_fe", None)
         demeaned_y = getattr(fit, "_Y", None)

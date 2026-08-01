@@ -26,7 +26,7 @@ import warnings
 from collections.abc import Iterable
 from pathlib import Path
 
-from benchmarks.modular.results import write_rows
+from benchmarks.core.results import write_rows
 from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for

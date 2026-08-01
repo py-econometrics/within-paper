@@ -30,8 +30,8 @@ from pathlib import Path
 import numpy as np
 
 
-from benchmarks.modular.cli import add_runs_arg
-from benchmarks.modular.timing import timed
+from benchmarks.core.cli import add_runs_arg
+from benchmarks.core.timing import timed
 from benchmarks.modular.experiment import (
     RunRecord,
     SampleSpec,
@@ -43,7 +43,7 @@ from benchmarks.modular.experiment import (
 
 
 import within
-from benchmarks.modular.accuracy import accuracy_record
+from benchmarks.core.accuracy import accuracy_record
 from benchmarks.modular.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,

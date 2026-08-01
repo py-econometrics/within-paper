@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from benchmarks.modular.methods import legend_label, linestyle, style
+from benchmarks.core.methods import legend_label, linestyle, style
 from benchmarks.core.paths import ROOT
 
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"

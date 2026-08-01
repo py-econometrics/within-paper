@@ -23,7 +23,7 @@ matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
 import numpy as np
 
-from benchmarks.modular.methods import inline_label, linestyle, style
+from benchmarks.core.methods import inline_label, linestyle, style
 from benchmarks.core.paths import ROOT
 
 RESULTS = ROOT / "results" / "runs" / "latest"

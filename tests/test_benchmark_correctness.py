@@ -31,7 +31,7 @@ from benchmarks.modular.benchmark_main import SIZES as OLS_SIZES
 from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
 from benchmarks.modular.dgp_functions import paper_base_dgp
 from benchmarks.modular.dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names
-from benchmarks.modular.accuracy import (
+from benchmarks.core.accuracy import (
     GATE_A_ETA,
     accuracy_record,
     external_normal_residuals,
@@ -64,11 +64,11 @@ from benchmarks.modular.experiment import (
     load_sample,
     matched_solver_specs,
 )
-from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
+from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.subprocess_backend import _parse_subprocess_output
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
-from benchmarks.modular.results import write_rows
-from benchmarks.modular.timing import (
+from benchmarks.core.results import write_rows
+from benchmarks.core.timing import (
     randomized_order,
     repetitions_for_runtime,
     summarize_times,
@@ -265,7 +265,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         # scripts/paper_results.py imports these and must keep running before
         # the Pixi environment exists, so a third-party import in either would
         # break the pre-environment runtime checks.
-        for relative in ("benchmarks/modular/timing.py", "benchmarks/core/paths.py"):
+        for relative in ("benchmarks/core/timing.py", "benchmarks/core/paths.py"):
             with self.subTest(module=relative):
                 tree = ast.parse((ROOT / relative).read_text())
                 imported = set()

@@ -21,8 +21,8 @@ from pathlib import Path
 import numpy as np
 
 
-from benchmarks.modular.cli import add_dgps_arg, add_runs_arg
-from benchmarks.modular.timing import timed
+from benchmarks.core.cli import add_dgps_arg, add_runs_arg
+from benchmarks.core.timing import timed
 from benchmarks.modular.experiment import (
     SampleSpec,
     clear_sample_cache,

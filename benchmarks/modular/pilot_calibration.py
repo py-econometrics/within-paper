@@ -29,9 +29,9 @@ import numpy as np
 import pandas as pd
 
 
-from benchmarks.modular.cli import add_dgps_arg
+from benchmarks.core.cli import add_dgps_arg
 from benchmarks.modular.experiment import FE_COLS
-from benchmarks.modular.accuracy import (
+from benchmarks.core.accuracy import (
     GATE_A_DELTA,
     GATE_A_ETA,
     external_normal_residuals,

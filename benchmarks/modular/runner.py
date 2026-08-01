@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.modular.interfaces import (
+from benchmarks.core.interfaces import (
     BenchmarkDataset,
     DataGeneratorProtocol,
     FeolsBenchmarkerProtocol,
     FeolsResult,
     FeolsSpec,
 )
-from benchmarks.modular.timing import randomized_order
+from benchmarks.core.timing import randomized_order
 def _serialize_result(result: FeolsResult) -> dict:
     return asdict(result)
 
