@@ -9,7 +9,7 @@ from statistics import median
 import numpy as np
 import pandas as pd
 
-from benchmarks.accuracy import accuracy_metrics, pair_edge_stats
+from benchmarks.accuracy import accuracy_metrics
 from benchmarks.data import BASE_DESIGNS, make_base_data, solver_data
 from benchmarks.within.map import map_demean_with_sweeps
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
@@ -89,11 +89,6 @@ def main() -> None:
             preconditioner=PreconditionerConfig.Additive,
         )
         reference = np.asarray(reference_fit.demeaned)
-        edges = pair_edge_stats(categories)
-        edge_summary = {
-            "total_edges": sum(int(item["n_edges"]) for item in edges),
-            "max_pair_density": max(float(item["density"]) for item in edges),
-        }
         map_demean_with_sweeps(rhs, categories, tol=MAP_TOLERANCE, maxiter=1)
         for backend in ("rust-map", "within-off", "within-diagonal", "within-additive"):
             if backend != "rust-map":
@@ -111,7 +106,7 @@ def main() -> None:
                     if backend == "rust-map"
                     else _lsmr(categories, rhs, reference, name, repetition)
                 )
-                row.update(design=design, n_obs=len(categories), **edge_summary)
+                row.update(design=design, n_obs=len(categories))
                 rows.append(row)
                 measured.append(row["total_s"])
             print(

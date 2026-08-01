@@ -10,9 +10,9 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP #linebreak() none], th[fixest (R) #linebreak() MAP #linebreak() accelerated], th[FEM.jl #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [0.857 (1.00)], [2.98s], [2.82s], [2.53s], [12.0s],
-  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [416.2s], [73.0s], [31.7s], [4.37s],
+  [simple (well-connected)], [#miss], [#miss], [#miss], [#miss], [#miss],
+  [difficult (near-nested)], [#miss], [#miss], [#miss], [#miss], [#miss],
   table.hline(stroke: 0.8pt + table-rule),
 )

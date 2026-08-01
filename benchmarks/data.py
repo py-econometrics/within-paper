@@ -14,9 +14,7 @@ CORREIA_NAMES = (
 )
 
 
-def make_base_data(
-    n_obs: int, design: str, seed: int, *, n_covariates: int = 1
-) -> pd.DataFrame:
+def make_base_data(n_obs: int, design: str, seed: int) -> pd.DataFrame:
     """Generate the simple or difficult panel used in the paper."""
     rng = np.random.default_rng(seed)
     n_years = 10
@@ -33,10 +31,9 @@ def make_base_data(
     else:
         raise ValueError(f"unknown base design {design!r}")
 
-    x = rng.standard_normal((actual_n, max(10, n_covariates)))
-    beta = 1.0 / np.arange(1, n_covariates + 1, dtype=float)
+    x = rng.standard_normal((actual_n, 10))
     mean = (
-        x[:, :n_covariates] @ beta
+        x[:, 0]
         + rng.standard_normal(n_firms)[firm - 1]
         + rng.standard_normal(n_individuals)[individual - 1]
         + rng.standard_normal(n_years)[year - 1]
@@ -50,9 +47,8 @@ def make_base_data(
         "year": year,
         "y": y,
         "negbin_y": rng.negative_binomial(theta, probability),
+        "x1": x[:, 0],
     }
-    for index in range(n_covariates):
-        values[f"x{index + 1}"] = x[:, index]
     return pd.DataFrame(values)
 
 

@@ -48,7 +48,6 @@ def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
                         "runtime_s": time.perf_counter() - started,
                         "n_retained": int(fit._N),
                         "beta_x1": float(fit.coef().loc["x1"]),
-                        "deviance": float(fit.deviance),
                         "converged": True,
                         "error": "",
                     }
@@ -61,7 +60,6 @@ def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
                         "runtime_s": time.perf_counter() - started,
                         "n_retained": None,
                         "beta_x1": None,
-                        "deviance": None,
                         "converged": False,
                         "error": str(error),
                     }

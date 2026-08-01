@@ -45,18 +45,11 @@ SCENARIOS = {
 }
 
 
-def scenario_config(name: str, *, n_obs: int = 1_000_000) -> AKMConfig:
-    base = AKMConfig(n_workers=round(n_obs / 10))
-    return replace(base, **SCENARIOS[name])
-
-
-def scenario_seed(name: str, n_obs: int = 1_000_000) -> int:
+def make_akm_data(name: str) -> pd.DataFrame:
     offset = int.from_bytes(hashlib.sha256(name.encode()).digest()[:2], "big") % 97
-    return n_obs * 100 + 17 + offset + 42
-
-
-def make_akm_data(name: str, *, n_obs: int = 1_000_000) -> pd.DataFrame:
-    return simulate_akm_panel(scenario_config(name, n_obs=n_obs), seed=scenario_seed(name, n_obs))
+    return simulate_akm_panel(
+        replace(AKMConfig(), **SCENARIOS[name]), seed=100_000_059 + offset
+    )
 
 
 def _balanced_groups(n_items: int, n_groups: int, rng: np.random.Generator) -> np.ndarray:

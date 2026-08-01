@@ -169,12 +169,17 @@ class PythonFitTests(unittest.TestCase):
 
 class PaperResultTests(unittest.TestCase):
     @staticmethod
-    def _rows(experiment: str, design: str, backend: str, n_obs: int, n_fe: int, view: str):
+    def _rows(design: str, backend: str, n_obs: int, n_fe: int, view: str):
         return [
             {
-                "experiment": experiment, "design": design, "backend": backend,
-                "repetition": repetition, "n_planned": 3, "runtime_s": repetition + 1,
-                "converged": True, "n_obs": n_obs, "n_fe": n_fe, "model_k": 1,
+                "design": design,
+                "backend": backend,
+                "repetition": repetition,
+                "n_planned": 3,
+                "runtime_s": repetition + 1,
+                "converged": True,
+                "n_obs": n_obs,
+                "n_fe": n_fe,
                 "view": view,
             }
             for repetition in range(3)
@@ -202,14 +207,14 @@ class PaperResultTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             latest = Path(directory)
             fixtures = {
-                "ols.csv": self._rows("ols", "simple", "rust-map", 10_000_000, 3, "default"),
-                "ppml.csv": self._rows("ppml", "simple", "rust-map", 1_000_000, 3, "default"),
+                "ols.csv": self._rows("simple", "rust-map", 10_000_000, 3, "default"),
+                "ppml.csv": self._rows("simple", "rust-map", 1_000_000, 3, "default"),
                 "akm.csv": [
-                    *self._rows("akm", "akm_mobility_1", "rust-map", 1_000_000, 3, "default"),
-                    *self._rows("akm", "akm_mobility_1", "rust-map", 1_000_000, 3, "matched"),
+                    *self._rows("akm_mobility_1", "rust-map", 1_000_000, 3, "default"),
+                    *self._rows("akm_mobility_1", "rust-map", 1_000_000, 3, "matched"),
                 ],
                 "correia.csv": self._rows(
-                    "correia", "synthetic-complete", "rust-map", 1_000, 2, "default"
+                    "synthetic-complete", "rust-map", 1_000, 2, "default"
                 ),
             }
             for filename, rows in fixtures.items():
@@ -222,6 +227,46 @@ class PaperResultTests(unittest.TestCase):
             self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["mechanism_mobility"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["correia_synthetic"]["rows"][0][2], "2.00s")
+
+    def test_ppml_inner_outer_table_distinguishes_inner_regimes(self) -> None:
+        document = {
+            "tables": {
+                "ppml_inner_outer": {
+                    "rows": [],
+                }
+            }
+        }
+        rows = [
+            {
+                "design": "simple",
+                "preconditioner": "additive",
+                "rebuild_each_step": "true",
+                "inner_tol": "1e-12",
+                "inner_maxiter": "10000",
+                "outer_converged": "true",
+                "outer_iterations": "32",
+                "inner_iterations_sum": "1905",
+                "total_s": "2.17",
+            },
+            {
+                "design": "simple",
+                "preconditioner": "off",
+                "rebuild_each_step": "false",
+                "inner_tol": "1e-8",
+                "inner_maxiter": "1000",
+                "outer_converged": "false",
+                "outer_iterations": "100",
+                "inner_iterations_sum": "1234",
+                "total_s": "4.5",
+            },
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_ppml_inner_outer(document)
+
+        rendered = document["tables"]["ppml_inner_outer"]["rows"]
+        self.assertEqual(len(rendered[0]), 8)
+        self.assertEqual(rendered[0][3:5], ["$1.0 times 10^(-8)$", "1#h(0.18em)000"])
+        self.assertEqual(rendered[1][3:5], ["$1.0 times 10^(-12)$", "10#h(0.18em)000"])
 
 
 if __name__ == "__main__":

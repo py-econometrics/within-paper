@@ -7,7 +7,7 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 data_path <- args[[1]]
 output_path <- args[[2]]
-repetitions <- as.integer(args[[4]])
+repetitions <- as.integer(args[[3]])
 threads <- as.integer(Sys.getenv("BENCH_THREADS"))
 setFixest_nthreads(threads)
 if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")
@@ -32,12 +32,12 @@ for (index in seq_len(repetitions)) {
       backend = "fixest", repetition = index - 1L,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = nobs(fit), beta_x1 = unname(coef(fit)[["x1"]]),
-      deviance = as.numeric(deviance(fit)), converged = TRUE, error = ""
+      converged = TRUE, error = ""
     )
   }, error = function(error) data.frame(
     backend = "fixest", repetition = index - 1L,
     runtime_s = proc.time()[["elapsed"]] - started,
-    n_retained = NA_integer_, beta_x1 = NA_real_, deviance = NA_real_,
+    n_retained = NA_integer_, beta_x1 = NA_real_,
     converged = FALSE, error = conditionMessage(error)
   ))
 }

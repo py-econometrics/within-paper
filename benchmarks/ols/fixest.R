@@ -8,9 +8,8 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 data_path <- args[[1]]
 output_path <- args[[2]]
-design <- args[[3]]
-fixed_effects <- strsplit(args[[4]], ",", fixed = TRUE)[[1]]
-requested <- args[[5]]
+fixed_effects <- strsplit(args[[3]], ",", fixed = TRUE)[[1]]
+requested <- args[[4]]
 threads <- as.integer(Sys.getenv("BENCH_THREADS"))
 setFixest_nthreads(threads)
 if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")

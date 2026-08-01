@@ -91,24 +91,3 @@ def accuracy_metrics(
         "max_eta": float(np.max(eta)),
         "max_delta": float(np.max(delta)) if delta is not None else None,
     }
-
-
-def pair_edge_stats(categories: NDArray) -> list[dict[str, float | int]]:
-    """Count unique edges and densities for each pair of factors."""
-    cats = np.asarray(categories, dtype=np.int64)
-    rows = []
-    for left in range(cats.shape[1]):
-        for right in range(left + 1, cats.shape[1]):
-            n_left = int(cats[:, left].max()) + 1
-            n_right = int(cats[:, right].max()) + 1
-            packed = cats[:, left] * n_right + cats[:, right]
-            n_edges = int(np.unique(packed).size)
-            rows.append(
-                {
-                    "factor_q": left,
-                    "factor_r": right,
-                    "n_edges": n_edges,
-                    "density": n_edges / (n_left * n_right),
-                }
-            )
-    return rows

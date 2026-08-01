@@ -57,13 +57,20 @@ def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
         )
         for repetition in range(REPETITIONS):
             measured = _measure(current, rhs, "additive")
-            metrics = accuracy_metrics(current, rhs, measured.pop("demeaned"), np.asarray(reference.demeaned))
+            metrics = accuracy_metrics(
+                current,
+                rhs,
+                measured.pop("demeaned"),
+                np.asarray(reference.demeaned),
+            )
             rows.append(
                 {
-                    "design": "difficult", "repetition": repetition,
-                    "n_factors": n_factors, "n_pairs": n_factors * (n_factors - 1) // 2,
+                    "design": "difficult",
+                    "repetition": repetition,
+                    "n_factors": n_factors,
                     "setup_share": measured["setup_s"] / measured["total_s"],
-                    **measured, **metrics,
+                    **measured,
+                    **metrics,
                 }
             )
         print(
@@ -89,8 +96,7 @@ def amortization(categories: np.ndarray, base_rhs: np.ndarray) -> list[dict]:
                 rows.append(
                     {
                         "design": "difficult", "repetition": repetition,
-                        "backend": f"within-{name}", "preconditioner": name,
-                        "k_rhs": k_rhs, "time_per_rhs_s": measured["total_s"] / k_rhs,
+                        "preconditioner": name, "k_rhs": k_rhs,
                         **measured,
                     }
                 )

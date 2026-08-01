@@ -6,7 +6,7 @@ using FixedEffectModels
 using Parquet2
 using StatsModels
 
-data_path, output_path, design, fixed_text, requested = ARGS
+data_path, output_path, fixed_text, requested = ARGS
 threads = parse(Int, ENV["BENCH_THREADS"])
 Threads.nthreads() == threads || error("Julia thread count does not match BENCH_THREADS")
 frame = DataFrame(Parquet2.Dataset(data_path))

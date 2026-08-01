@@ -114,7 +114,6 @@ def _runtime_panel(
     backends: tuple[str, ...],
     *,
     view: str,
-    show_context: bool,
     title: str,
     note: str,
 ) -> None:
@@ -131,41 +130,22 @@ def _runtime_panel(
             and row.get("median_time")
             and row["gap"] > 0
             and row["median_time"] > 0
+            and row["kind"] == "akm"
         ]
         if not usable:
             continue
 
-        # Only the AKM sweeps are a controlled comparison: one sample size, one
-        # DGP, connectivity the single thing that moves. The Correia collection
-        # and the 10M designs vary size and structure as well, so they are shown
-        # for context but excluded from the fit. Fitting across them would
-        # report a slope that mixes connectivity with scale.
-        rows = [row for row in usable if row["kind"] == "akm"]
-        context = [row for row in usable if row["kind"] != "akm"]
-        if show_context and context:
-            ax.scatter(
-                [row["gap"] for row in context],
-                [row["median_time"] for row in context],
-                s=20,
-                c=colour,
-                marker=marker,
-                alpha=0.22,
-                linewidths=0,
-                zorder=1,
-            )
-        if not rows:
-            continue
-        gaps = np.array([row["gap"] for row in rows])
-        times = np.array([row["median_time"] for row in rows])
+        gaps = np.array([row["gap"] for row in usable])
+        times = np.array([row["median_time"] for row in usable])
         # A cell that did not converge in every trial is drawn hollow, so a
         # censored point is visible rather than silently averaged in.
         complete = np.array(
-            [row.get("n_success", 0) == row.get("n_trials", 0) for row in rows]
+            [row.get("n_success", 0) == row.get("n_trials", 0) for row in usable]
         )
 
-        slope = None
+        fit = None
         if gaps.size >= 3:
-            slope = float(np.polyfit(np.log(gaps), np.log(times), 1)[0])
+            fit = np.polyfit(np.log(gaps), np.log(times), 1)
         ax.scatter(
             gaps[complete],
             times[complete],
@@ -189,8 +169,8 @@ def _runtime_panel(
                 zorder=3,
             )
 
-        if slope is not None:
-            intercept = float(np.polyfit(np.log(gaps), np.log(times), 1)[1])
+        if fit is not None:
+            slope, intercept = fit
             grid = np.linspace(np.log(gaps.min()), np.log(gaps.max()), 64)
             ax.plot(
                 np.exp(grid),
@@ -246,7 +226,6 @@ def headline_figure(points: list[dict], out: Path) -> None:
         points,
         CROSS_PACKAGE_BACKENDS,
         view="default",
-        show_context=False,
         title="(a) Cross-package defaults",
         note=(
             "solid: log-log fit to AKM medians\n"
@@ -258,7 +237,6 @@ def headline_figure(points: list[dict], out: Path) -> None:
         points,
         MECHANISM_BACKENDS,
         view="matched",
-        show_context=False,
         title="(b) Same code path, matched accuracy",
         note=(
             "same AKM samples at 1M; log-log fits\n"

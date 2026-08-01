@@ -44,19 +44,18 @@ come from the same retained sample as its comparators is not a comparison.
 
 - **Retained sample.** Backends receive the same input file. Singleton dropping is left
   at each package's default, and the retained row count is recorded per backend per trial
-  so that a cell whose retained count differs from its comparators can be flagged rather
-  than compared. *Currently recorded for the PyFixest backends only; see the open items.*
+  so that a cell whose retained count differs from its comparators is rejected rather
+  than compared.
 - **Weights.** Unweighted (`W = I`) in every benchmark. Weighted solves appear only
   inside PPML, where IRLS sets them.
 - **Covariates.** One slope covariate `x1`, except in the multi-RHS amortization
   experiment, which is the only place K > 1.
 - **Factor order.** Worker, firm, year, in that order, for every experiment. MAP is
-  sensitive to the cycling order, so it must not vary across tables. Reconciled
-  2026-07-26; the OLS and PPML tables predate it and must be regenerated.
+  sensitive to the cycling order, so it must not vary across tables.
 - **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
   launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
   `check-external-runtimes` verifies the R and Julia settings before a production run.
-- **Data.** A fixed stored dataset per design, generated once and reused for every
+- **Data.** One deterministic dataset per design, generated once and reused for every
   repetition. Regenerating the sample per repetition confounds solver variance with DGP
   variance; DGP replication is a separate robustness exercise with its own rows.
 
@@ -282,35 +281,24 @@ Resolved before the production runs, and struck from this list when done:
 - [x] Reconcile the factor order between the OLS/PPML specs and the AKM sweep spec. Done
       2026-07-26: all three now absorb `indiv_id, firm_id, year`. **The existing OLS and
       PPML tables were produced under the old order and must be regenerated.**
-- [~] Randomized backend ordering. The runner shuffles the backend list once per
-      invocation with a seed and prints it, but it then runs every design for one backend
-      before moving to the next. That is randomization across the run, not within each
-      design, so thermal drift can still align with a backend. The rule in section 4 is
-      not yet met.
-- [~] Retained sample size. `n_retained` is recorded for the PyFixest backends only. The
-      R and Julia subprocess protocol returns the input row count and the parser never
-      populates the field, so a singleton-handling difference between PyFixest and
-      `fixest` or `FEM.jl` still cannot be detected. Cross-backend retained-size checking
-      is not yet in place.
-- [x] One shared experiment layer. `benchmarks/dgp/samples.py, benchmarks/solvers/specs.py and benchmarks/core/records.py` holds sample
-      identity, the seed rule, the solver settings, and the `RunRecord` schema. The seed
-      no longer depends on the repetition index, an in-process cache hands every
-      repetition the identical arrays, the standalone diagnostics run at the same matched
-      settings as the end-to-end ablation, and `write_records` refuses to write a record
-      that fails `validate()`.
-- [x] Run the standalone diagnostics on the AKM designs. `load_sample` reaches both the
-      `simple`/`difficult` generator and the AKM sweep Parquet cache, so the mechanism
-      metrics are recorded on the mechanism samples.
+- [ ] Randomized backend ordering. The compact runners currently use a fixed backend
+      order within each design, so the rule in section 4 is not yet met.
+- [x] Retained sample size. Every final Python, R, and Julia row records `n_retained`.
+      The OLS and PPML runners reject a comparison if successful backends retained
+      different row counts.
+- [x] One shared experiment layer. Each runner creates one frame per design, reuses it
+      for every in-process backend, and writes the same frame to a temporary Parquet file
+      for R and Julia. Seeds belong to designs rather than repetitions, and each result
+      file is written once after the complete run.
+- [ ] Run the standalone diagnostics on the AKM designs. The current standalone
+      preconditioner diagnostic still uses the simple and difficult base designs.
 - [x] Wire the R1/R2/R3 repetition counts into the harness. Done. The PyFixest
       benchmarkers time one fit, choose the count from its runtime, and repeat on the
-      same in-memory frame. `FeolsResult` separates `repetition` from `iter_num`, records
-      the planned count, and the renderer checks a cell against the plan rather than
-      against a hardcoded three. Rows without the fields are treated as pre-rule results
-      expecting three trials, so existing tables still render.
-- [ ] Reduce the DGP replicate count for timing. Repetitions and replicates now multiply:
-      three stored replicates times twenty repetitions is sixty trials on a subsecond
-      cell. Timing should run on one replicate, with DGP replication kept as its own
-      exercise, which is a change to the drivers rather than the harness.
+      same in-memory frame. Final rows keep `repetition` and `n_planned`, and the renderer
+      checks a cell against that recorded plan rather than assuming three trials.
+- [x] Reduce the DGP replicate count for timing. Each timing runner now generates one
+      sample per design and repeats the fit on that sample. DGP replication remains a
+      separate robustness exercise.
 - [x] Settle PPML preconditioner reuse. Done 2026-07-28. The outer criterion was the
       problem: `max |delta eta|` never fired, absolutely or relatively, so every
       configuration read as non-converged. It now stops on relative deviance and relative
@@ -323,6 +311,6 @@ Resolved before the production runs, and struck from this list when done:
       only one is measured. `pixi run ppml-inner-outer` now sweeps both; it needs an
       otherwise idle machine, since the timings are the point.
 - [x] Report iterations in solver-specific units. Done 2026-07-28.
-      `bench_within_preconditioners.py --with-map` runs counting MAP beside the three
-      LSMR configurations on one sample, each row carries an `iteration_unit`, and the
-      renderer keeps sweeps and iterations in separate columns.
+      `pixi run within-preconditioners` runs counting MAP beside the three LSMR
+      configurations on one sample. The renderer keeps MAP sweeps and LSMR iterations
+      in separate columns and marks capped cells.

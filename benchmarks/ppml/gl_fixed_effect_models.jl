@@ -7,7 +7,7 @@ using GLM
 using Parquet2
 using StatsModels
 
-data_path, output_path, design, requested = ARGS
+data_path, output_path, requested = ARGS
 threads = parse(Int, ENV["BENCH_THREADS"])
 Threads.nthreads() == threads || error("Julia thread count does not match BENCH_THREADS")
 frame = DataFrame(Parquet2.Dataset(data_path))
@@ -26,14 +26,14 @@ for repetition in 0:(parse(Int, requested) - 1)
         push!(rows, (
             backend="GLFEM.jl", repetition=repetition,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=nobs(fit),
-            beta_x1=Float64(coef(fit)[1]), deviance=missing,
+            beta_x1=Float64(coef(fit)[1]),
             converged=true, error="",
         ))
     catch error_value
         push!(rows, (
             backend="GLFEM.jl", repetition=repetition,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=missing,
-            beta_x1=missing, deviance=missing, converged=false,
+            beta_x1=missing, converged=false,
             error=sprint(showerror, error_value),
         ))
     end

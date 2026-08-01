@@ -60,13 +60,15 @@ def main() -> None:
         for design, seed in BASE_DESIGNS:
             for backend in ("rust-map", "within"):
                 queue = context.Queue()
-                process = context.Process(target=_worker, args=(queue, design, n_obs, seed, backend))
+                process = context.Process(
+                    target=_worker, args=(queue, design, n_obs, seed, backend)
+                )
                 process.start()
                 process.join()
                 if process.exitcode:
                     raise RuntimeError(f"memory worker exited with status {process.exitcode}")
                 row = queue.get()
-                row.update(size=size, design=design, backend=backend, n_obs=n_obs, model_k=1)
+                row.update(size=size, design=design, backend=backend, n_obs=n_obs)
                 rows.append(row)
                 print(
                     f"bench-memory / OLS / {design}-{size} / {backend}: "

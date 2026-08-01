@@ -13,8 +13,8 @@ from within import LsmrOptions, PreconditionerConfig, Solver
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
-N_OBS = 100_000
-OUTER_MAXITER = 25
+N_OBS = 1_000_000
+OUTER_MAXITER = 100
 OUTER_TOL = 1e-8
 REGIMES = ((1e-8, 1_000), (1e-12, 10_000))
 

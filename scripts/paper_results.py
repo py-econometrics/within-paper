@@ -203,12 +203,9 @@ def fetch_correia(args: argparse.Namespace) -> None:
     metadata_dir = CORREIA_DIR / "metadata"
     if not metadata_dir.exists():
         raise SystemExit(f"Metadata directory not found: {metadata_dir}")
-    selected = set(args.datasets or [])
     for metadata_path in sorted(metadata_dir.glob("*.json")):
         metadata = _read_json(metadata_path)
         slug = metadata["slug"]
-        if selected and slug not in selected:
-            continue
         destination = CORREIA_DIR / f"{slug}.csv"
         if destination.exists() and _sha256(destination) == metadata["checksum_csv"]:
             print(f"[ok] {slug}: existing CSV checksum verified")
@@ -304,7 +301,7 @@ def _table_fragment(name: str, table: dict) -> str:
     return "\n".join(lines)
 
 
-def render(args: argparse.Namespace) -> None:
+def render(_: argparse.Namespace) -> None:
     # Synchronize before rendering so that a table fragment can never be built
     # from a result file that is older than the raw benchmark output beside it.
     # Rendering used to read the stored document as-is, which made every table
@@ -313,7 +310,7 @@ def render(args: argparse.Namespace) -> None:
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
     prose = document.get("prose", {})
-    destination = Path(args.output_dir) if args.output_dir else GENERATED_DIR
+    destination = GENERATED_DIR
     destination.mkdir(parents=True, exist_ok=True)
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
@@ -497,10 +494,6 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
     return rendered
 
 
-def _runtime_dataset(row: dict[str, str]) -> str | None:
-    return row.get("design") or row.get("dgp") or row.get("source_dataset_id") or row.get("dataset")
-
-
 def _integer_field(row: dict[str, str], name: str) -> int | None:
     try:
         return int(float(row.get(name, "")))
@@ -513,7 +506,7 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
         {
             str(row.get("n_fe") or "missing")
             for row in rows
-            if row.get("experiment") == "ppml"
+            if row.get("_source_file") == "ppml.csv"
             and _integer_field(row, "n_fe") != 3
         }
     )
@@ -538,12 +531,12 @@ def _paper_runtime_target(
         "mechanism_sorting",
     }:
         view = "matched" if table_name.startswith("mechanism_") else "default"
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": 3}, f"akm.csv:{view}"
+        return dataset, {"n_obs": 1_000_000, "n_fe": 3}, f"akm.csv:{view}"
     if table_name == "ols":
-        return dataset, {"n_obs": 10_000_000, "model_k": 1, "n_fe": 3}, "ols.csv:default"
+        return dataset, {"n_obs": 10_000_000, "n_fe": 3}, "ols.csv:default"
     if table_name == "ppml":
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": int(row[1])}, "ppml.csv:default"
-    return dataset, {"model_k": 1, "n_fe": 2}, "correia.csv:default"
+        return dataset, {"n_obs": 1_000_000, "n_fe": int(row[1])}, "ppml.csv:default"
+    return dataset, {"n_fe": 2}, "correia.csv:default"
 
 
 def _matches_runtime_target(
@@ -556,7 +549,7 @@ def _matches_runtime_target(
     filename, view = source_marker.split(":", 1)
     if row.get("_source_file") != filename or row.get("view") != view:
         return False
-    if _runtime_dataset(row) != dataset:
+    if row.get("design") != dataset:
         return False
     raw_backend = row.get("backend", "")
     if raw_backend != backend:
@@ -806,16 +799,32 @@ def _synchronize_ppml_inner_outer(document: dict) -> int:
         return 0
 
     rendered: list[list[str]] = []
+    preconditioner_order = {"off": 0, "diagonal": 1, "additive": 2}
     for design in ("simple", "difficult"):
         first = True
-        for row in [r for r in rows if r.get("design") == design]:
+        design_rows = sorted(
+            (r for r in rows if r.get("design") == design),
+            key=lambda row: (
+                -float(row["inner_tol"]),
+                preconditioner_order[row["preconditioner"]],
+                str(row.get("rebuild_each_step", "")).lower() in {"true", "1"},
+            ),
+        )
+        for row in design_rows:
             converged = str(row.get("outer_converged", "")).lower() in {"true", "1"}
             steps = row.get("outer_iterations", "")
             rendered.append(
                 [
                     design if first else "",
                     f"`{row['preconditioner']}`",
-                    "yes" if str(row.get("rebuild_each_step", "")).lower() in {"true", "1"} else "no",
+                    (
+                        "yes"
+                        if str(row.get("rebuild_each_step", "")).lower()
+                        in {"true", "1"}
+                        else "no"
+                    ),
+                    _format_typst_scientific(float(row["inner_tol"])),
+                    f"{int(float(row['inner_maxiter'])):,}".replace(",", "#h(0.18em)"),
                     steps if converged else f"{steps} (capped)",
                     f"{int(float(row['inner_iterations_sum'])):,}".replace(",", "#h(0.18em)"),
                     _format_seconds(float(row["total_s"])),
@@ -1065,7 +1074,6 @@ def _synchronize_canonical_tables(
                     if item["design"] == dgp
                     and item["size"] == size
                     and item["backend"] == backend
-                    and _integer_field(item, "model_k") == 1
                 ]
                 match = next(
                     (
@@ -1104,13 +1112,14 @@ def main() -> None:
     sub.add_parser("check-external-runtimes").set_defaults(func=check_external_runtimes)
     sub.add_parser("setup-julia-env").set_defaults(func=setup_julia_env)
     fetch = sub.add_parser("fetch-correia")
-    fetch.add_argument("--datasets", nargs="*", help="Dataset metadata IDs to fetch (default: all)")
-    fetch.add_argument("--offline", action="store_true", help="Validate local CSVs without network access")
+    fetch.add_argument(
+        "--offline",
+        action="store_true",
+        help="Validate local CSVs without network access",
+    )
     fetch.set_defaults(func=fetch_correia)
     sub.add_parser("collect").set_defaults(func=collect)
-    render_parser = sub.add_parser("render")
-    render_parser.add_argument("--output-dir", type=Path)
-    render_parser.set_defaults(func=render)
+    sub.add_parser("render").set_defaults(func=render)
     args = parser.parse_args()
     args.func(args)
 

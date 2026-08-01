@@ -41,11 +41,6 @@ def _median_runtime(frame: pd.DataFrame) -> pd.DataFrame:
         record["median_time"] = (
             float(converged_times.median()) if len(converged_times) else None
         )
-        record["iqr_time"] = (
-            float(converged_times.quantile(0.75) - converged_times.quantile(0.25))
-            if len(converged_times) >= 2
-            else None
-        )
         rows.append(record)
     return pd.DataFrame(rows)
 
@@ -134,9 +129,6 @@ def analyze(
         [
             "design",
             "one_minus_rho",
-            "worst_component_obs_share",
-            "rho_qr",
-            "dataset_id",
             "kind",
         ]
     ].rename(columns={"one_minus_rho": "gap"})
@@ -150,19 +142,12 @@ def analyze(
                 "backend": row["backend"],
                 "view": row["view"],
                 "gap": float(row["gap"]) if pd.notna(row["gap"]) else None,
-                "worst_component_obs_share": (
-                    float(row["worst_component_obs_share"])
-                    if pd.notna(row["worst_component_obs_share"])
-                    else None
-                ),
                 "median_time": (
                     None if pd.isna(row["median_time"]) else float(row["median_time"])
                 ),
-                "iqr_time": None if pd.isna(row.get("iqr_time")) else float(row["iqr_time"]),
                 "n_trials": int(row["n_trials"]),
                 "n_success": int(row["n_success"]),
                 "kind": row.get("kind"),
-                "source_dataset_id": row.get("dataset_id"),
             }
         )
 

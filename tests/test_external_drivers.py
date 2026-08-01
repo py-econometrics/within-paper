@@ -27,12 +27,12 @@ def _run(language: str, model: str) -> pd.DataFrame:
             script = ROOT / "benchmarks" / "ols" / (
                 "fixest.R" if language == "r" else "fixed_effect_models.jl"
             )
-            args = [str(data), str(output), "simple", "indiv_id,firm_id,year", "1"]
+            args = [str(data), str(output), "indiv_id,firm_id,year", "1"]
         else:
             script = ROOT / "benchmarks" / "ppml" / (
                 "fixest.R" if language == "r" else "gl_fixed_effect_models.jl"
             )
-            args = [str(data), str(output), "simple", "1"]
+            args = [str(data), str(output), "1"]
         if language == "r":
             command = ["Rscript", str(script), *args]
         else:

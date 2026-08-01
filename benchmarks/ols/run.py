@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
 import time
 from collections.abc import Callable, Sequence
@@ -13,6 +12,7 @@ from statistics import median
 import pandas as pd
 
 from benchmarks.ols.pyfixest import fit_ols, measure
+from benchmarks.runtime import assert_same_retained, run_native
 
 ROOT = Path(__file__).absolute().parents[2]
 LATEST = ROOT / "results" / "runs" / "latest"
@@ -37,28 +37,15 @@ def benchmark_threads() -> int:
 
 def _native_rows(
     data_path: Path,
-    output: Path | None,
-    design: str,
+    output: Path,
     fixed_effects: Sequence[str],
     backend: str,
     repetitions: int | None,
 ) -> list[dict]:
     script = "fixest.R" if backend == "fixest" else "fixed_effect_models.jl"
     count = "adaptive" if repetitions is None else str(repetitions)
-    arguments = [str(data_path), str(output), design, ",".join(fixed_effects), count]
-    if backend == "fixest":
-        command = ["Rscript", str(Path(__file__).with_name(script)), *arguments]
-    else:
-        command = [
-            "julia",
-            f"--project={ROOT / 'benchmarks' / 'julia-env'}",
-            str(Path(__file__).with_name(script)),
-            *arguments,
-        ]
-    environment = dict(os.environ)
-    environment["JULIA_NUM_THREADS"] = environment["BENCH_THREADS"]
-    subprocess.run(command, check=True, env=environment)
-    return pd.read_csv(output).to_dict("records")
+    arguments = [str(data_path), str(output), ",".join(fixed_effects), count]
+    return run_native(Path(__file__).with_name(script), arguments, output)
 
 
 def _print_cell(experiment: str, design: str, backend: str, rows: list[dict]) -> None:
@@ -105,16 +92,14 @@ def run_experiment(
                     measured = measure(frame, backend, fixed_effects, planned, warm_up=warm_up)
                 else:
                     measured = _native_rows(
-                        data_path, work / f"{backend}.csv", design,
+                        data_path, work / f"{backend}.csv",
                         fixed_effects, backend, repetitions,
                     )
                 for row in measured:
                     row.update(
-                        experiment=experiment,
                         design=design,
                         n_obs=len(frame),
                         n_fe=len(fixed_effects),
-                        model_k=1,
                         threads=threads,
                         view="default",
                         n_planned=len(measured),
@@ -122,15 +107,7 @@ def run_experiment(
                 rows.extend(measured)
                 design_rows.extend(measured)
                 _print_cell(experiment, design, backend, measured)
-            retained = {
-                int(float(row["n_retained"]))
-                for row in design_rows
-                if str(row["converged"]).lower() in {"true", "1"}
-            }
-            if len(retained) > 1:
-                raise RuntimeError(
-                    f"OLS backends retained different row counts for {design}: {sorted(retained)}"
-                )
+            assert_same_retained(design_rows, "OLS", design)
         for backend, view, tolerance, maxiter in extra_python_cells:
             measured = measure(
                 frame, backend, fixed_effects, repetitions or 3,
@@ -138,8 +115,8 @@ def run_experiment(
             )
             for row in measured:
                 row.update(
-                    experiment=experiment, design=design, n_obs=len(frame),
-                    n_fe=len(fixed_effects), model_k=1, threads=threads,
+                    design=design, n_obs=len(frame),
+                    n_fe=len(fixed_effects), threads=threads,
                     view=view, n_planned=len(measured),
                 )
             rows.extend(measured)

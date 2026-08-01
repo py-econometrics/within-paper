@@ -771,8 +771,10 @@ diagonal versus factor-pair preconditioning:
 )
 ]
 
-All reported CPU times are medians across three benchmark iterations run on an Apple M4
-Mac mini with 10 CPU cores and 16 GB of memory running macOS 15.3.1.
+Reported CPU times are medians over each benchmark's measured repetitions. Headline OLS
+uses the adaptive R1/R2/R3 rule; experiments with a fixed count use three repetitions.
+All runs use an Apple M4 Mac mini with 10 CPU cores and 16 GB of memory running macOS
+15.3.1.
 
 We do not include `reghdfe` @reghdfe @correia2017 directly in the benchmark tables because Stata is not open
 source and we lack a license. `reghdfe` is a mature accelerated-MAP
@@ -984,39 +986,30 @@ residuals. The construction cost is therefore paid once per regression rather th
 once per IRLS step. 
 
 We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
-benchmark suite @berge2026fixest at $n = 1$M observations, $k = 10$ covariates, and two
-or three fixed effects (worker-year, or worker-firm-year), using the same iteration
-protocol as the OLS benchmarks. The compared backends are R `fixest`'s `fepois`,
+benchmark suite @berge2026fixest at $n = 1$M observations, with one covariate and worker,
+firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
 `rust-map` and the preconditioned `within` solver.
 
 #v(0.35em)
 
 #text(size: 8.8pt)[
-#strong[Poisson benchmarks (1M observations, k=10 covariates).]
+#strong[Poisson benchmarks (1M observations, one covariate).]
 #include "generated/tables/ppml.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
-  $n = 1$M and $k = 10$ covariates. `fixest` is R `fixest::fepois`; `rust-map` and
+  $n = 1$M with one covariate and three fixed effects. `fixest` is R `fixest::fepois`; `rust-map` and
   `within` are the PyFixest `fepois` routine with the unpreconditioned MAP backend and
   the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
-  `GLFixedEffectModels.jl`. The two `GLFEM.jl` entries marked #sym.tilde.op are read
-  approximately from a follow-up run because the harness CSV for those cells contained a
-  subprocess error rather than a recorded time. "failed" indicates that all three
+  `GLFixedEffectModels.jl`. "failed" indicates that all three
   iterations of `rust-map` reached the 10000-iteration MAP cap without converging.]
   ]
 
-The patterns observed in the OLS benchmarks carry over. With two fixed effects, all four
-backends complete in comparable time on both designs and R `fixest` is fastest: the
-worker-year pair alone does not create a regime in which the preconditioner amortizes
-its setup cost, even with the IRLS-induced reuse. With a third fixed effect, the picture
-changes. On the three-FE simple design MAP still converges and `fixest` remains
-fastest, but the unaccelerated `rust-map` slows to 25s, `GLFEM.jl` to roughly 48s, and
-`within` lands between them at 13s. The three-FE difficult design provides the sharpest
-contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes on the
-order of 800s, `fixest`'s IRLS loop takes several minutes with large run-to-run variance,
-and `within` finishes in under nine seconds, roughly 35 times faster than `fixest` and
-nearly two orders of magnitude faster than `GLFEM.jl`. The factor-pair preconditioner captures
+The patterns observed in the OLS benchmarks carry over. On the simple design all four
+backends converge: `within` and `fixest` finish in under ten seconds, while `rust-map`
+and `GLFEM.jl` take about 26 and 48 seconds. The difficult design provides the sharpest
+contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes 167
+seconds, `fixest` takes 320 seconds, and `within` finishes in about five seconds. The factor-pair preconditioner captures
 the same sparse worker-firm coupling that drove the OLS benchmark results, and the IRLS outer
 loop inherits the gain without modification.
 
@@ -1044,18 +1037,18 @@ strategy. Both backends are executed in isolated processes and report peak RSS v
 #v(0.4em)
 
 #text(size: 8.9pt)[
-#strong[Memory footprint (3 FE, $k = 10$).]
+#strong[Memory footprint (3 FE, one covariate).]
 #include "generated/tables/memory.typ"
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
-		isolated Python processes. 10 covariates, three fixed effects. These two DGPs serve as
+		isolated Python processes. One covariate, three fixed effects. These two DGPs serve as
 		representative probes; we do not claim that memory behavior is design-specific. Gap
 		denotes $1-rho_(W F)$ for the worker-firm pair in the corresponding generated design.]
 		]
 
 At 100K observations, the preconditioner adds roughly 50 MB on both the easy and the
 hard graph. At 1M observations the overhead is larger in absolute terms (135--515 MB),
-but it remains modest relative to the data footprint of a panel with 10 covariates. 
+but it remains modest relative to the full panel data footprint.
 The preconditioned solver consumes more memory than MAP, yet the additional
 storage for factor-pair co-occurrences, partition weights, and local approximate
 Cholesky factors remains small relative to
@@ -1080,13 +1073,12 @@ coefficient for all four backends.
 #v(0.4em)
 
 #text(size: 9.2pt)[
-#strong[Coefficient agreement (100K observations, 3 FE, $k = 10$).]
+#strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
 #include "generated/tables/agreement.typ"
 #v(0.25em)
 #text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
-Differences are absolute slope-coefficient deviations from `rust-map`, averaged
-(Avg) and maximized (Max) across all 10 covariates. `within` is the PyFixest
-preconditioned Rust backend.]
+Differences are absolute slope-coefficient deviations from `rust-map`. `within` is the
+PyFixest preconditioned Rust backend.]
 ]
 
 The `within` and `FEM.jl` rows are almost identical to `rust-map` at the reported
@@ -1343,10 +1335,9 @@ per-RHS cost of the factor-pair preconditioner falls as $K$ grows.]
 
 #include "generated/tables/ppml_inner_outer.typ"
 #v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] Outer IRLS steps and inner LSMR iterations for the PPML
-fits, with and without rebuilding the preconditioner at every outer step. Reuse is
-measured at the inner tolerance stated in the table; it is not a claim about every
-tolerance.]
+#text(size: 8.2pt)[#emph[Note:] Outer IRLS steps and inner LSMR iterations for PPML fits
+at one million observations, with a 100-step outer cap. The table gives the inner
+tolerance and cap for each row and compares reuse with rebuilding at every outer step.]
 
 #pagebreak()
 

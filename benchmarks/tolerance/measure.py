@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -13,8 +12,8 @@ import pandas as pd
 from benchmarks.accuracy import external_normal_residuals
 from benchmarks.data import FE_COLUMNS, drop_singletons
 from benchmarks.ols.pyfixest import fit_ols
+from benchmarks.runtime import run_native
 
-ROOT = Path(__file__).absolute().parents[2]
 BASE_GRID = (1e-4, 1e-6, 1e-8, 1e-10)
 EXTENDED_GRID = (*BASE_GRID, 1e-12)
 TOLERANCES = {
@@ -150,17 +149,7 @@ def _native_rows(
         ",".join(str(value) for value in tolerances), str(default),
         str(repetitions), str(maxiter), str(reference["beta"]), str(reference["se"]),
     ]
-    if backend == "fixest":
-        command = ["Rscript", str(Path(__file__).with_name(script)), *arguments]
-    else:
-        command = [
-            "julia", f"--project={ROOT / 'benchmarks' / 'julia-env'}",
-            str(Path(__file__).with_name(script)), *arguments,
-        ]
-    environment = dict(os.environ)
-    environment["JULIA_NUM_THREADS"] = environment["BENCH_THREADS"]
-    subprocess.run(command, check=True, env=environment)
-    return pd.read_csv(output).to_dict("records")
+    return run_native(Path(__file__).with_name(script), arguments, output)
 
 
 def measure(
@@ -197,8 +186,6 @@ def measure(
             for row in measured:
                 row.update(
                     n_obs=len(prepared), n_singletons_dropped=dropped, threads=threads,
-                    reference_beta_x1=reference["beta"], reference_se_x1=reference["se"],
-                    reference_fe_eta=reference["eta"], reference_x_score=reference["x_score"],
                 )
             rows.extend(measured)
             successful = [
