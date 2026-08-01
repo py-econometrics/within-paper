@@ -80,7 +80,7 @@ from scripts.paper_results import (
     _table_fragment,
     _validate_ppml_results,
 )
-from benchmarks.modular.analyze_gap_runtime import _sized_key
+from scripts.analyze_gap_runtime import _sized_key
 from benchmarks.drivers.hardness import _component_rho
 
 
@@ -683,7 +683,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         1.7e-7 at 10M, so a join on the family name alone pairs a 1M runtime
         with a 10M gap.
         """
-        from benchmarks.modular.analyze_gap_runtime import _design_key_from_hardness, _sized_key
+        from scripts.analyze_gap_runtime import _design_key_from_hardness, _sized_key
 
         self.assertEqual(_design_key_from_hardness("difficult_10000000_k1_iter_1"), "difficult")
         self.assertNotEqual(
@@ -701,7 +701,7 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         """
         import pandas as pd
 
-        from benchmarks.modular.analyze_gap_runtime import _counter_examples
+        from scripts.analyze_gap_runtime import _counter_examples
 
         def frame(times):
             return pd.DataFrame(
@@ -977,6 +977,67 @@ class SharedPrimitiveTests(unittest.TestCase):
                 write_rows(Path(tmp) / "rows.csv", [])
 
 
+class PackageLayeringTests(unittest.TestCase):
+    """The dependency direction is a build failure, not a review comment.
+
+    core <- dgp <- solvers <- drivers, and scripts/ reaches only core. The
+    layering was already correct before it was named; writing it down here is
+    what keeps it correct once the directories stop being self-evident.
+    """
+
+    # package -> the packages it is allowed to import from
+    ALLOWED = {
+        "core": set(),
+        "dgp": {"core"},
+        "solvers": {"core", "dgp"},
+        "drivers": {"core", "dgp", "solvers", "drivers"},
+    }
+
+    def _imports(self, path: Path) -> set[str]:
+        found = set()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            module = None
+            if isinstance(node, ast.ImportFrom) and node.level == 0:
+                module = node.module
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("benchmarks."):
+                        found.add(alias.name.split(".")[1])
+                continue
+            if module and module.startswith("benchmarks."):
+                found.add(module.split(".")[1])
+        return found
+
+    def test_no_package_imports_from_a_layer_above_it(self) -> None:
+        violations = []
+        for package, allowed in self.ALLOWED.items():
+            for path in (ROOT / "benchmarks" / package).glob("*.py"):
+                for imported in self._imports(path) - allowed - {package}:
+                    violations.append(
+                        f"{path.relative_to(ROOT)} imports benchmarks.{imported}"
+                    )
+        self.assertEqual(violations, [], f"layering violations: {violations}")
+
+    def test_scripts_reach_only_the_core_primitives(self) -> None:
+        violations = []
+        for path in (ROOT / "scripts").glob("*.py"):
+            for imported in self._imports(path) - {"core"}:
+                violations.append(f"{path.relative_to(ROOT)} imports benchmarks.{imported}")
+        self.assertEqual(violations, [], f"scripts reached past core: {violations}")
+
+    def test_nothing_outside_drivers_imports_a_driver(self) -> None:
+        """A driver is run, never imported. Only tests may reach into one."""
+        violations = []
+        for package in ("core", "dgp", "solvers"):
+            for path in (ROOT / "benchmarks" / package).glob("*.py"):
+                if "drivers" in self._imports(path):
+                    violations.append(str(path.relative_to(ROOT)))
+        for path in (ROOT / "scripts").glob("*.py"):
+            if "drivers" in self._imports(path):
+                violations.append(str(path.relative_to(ROOT)))
+        self.assertEqual(violations, [], f"library code imports a driver: {violations}")
+
+
 class BackendRegistryTests(unittest.TestCase):
     """The two registries a new backend has to appear in must agree.
 
@@ -1064,6 +1125,25 @@ class DriverEntryPointTests(unittest.TestCase):
             if 'if __name__ == "__main__":' not in source:
                 offenders.append(str(path.relative_to(ROOT)))
         self.assertEqual(offenders, [], f"argparse without a guard: {offenders}")
+
+    def test_every_driver_still_imports(self) -> None:
+        """Import each driver for real, not just parse it.
+
+        Guards make importing a driver harmless, which makes this affordable,
+        and it is the only check that catches a name used at module level but
+        never imported. One driver interpolated DATA_DIR into a subprocess
+        template while the import for it had been placed inside that template,
+        so the module raised NameError and nothing noticed: no test imports the
+        drivers, and the AST checks above parse without executing.
+        """
+        import importlib
+
+        for path in sorted((ROOT / "benchmarks" / "drivers").glob("*.py")):
+            if path.name == "__init__.py":
+                continue
+            name = f"benchmarks.drivers.{path.stem}"
+            with self.subTest(driver=name):
+                importlib.import_module(name)
 
 
 class ConvergenceCheckTests(unittest.TestCase):

@@ -294,7 +294,7 @@ Resolved before the production runs, and struck from this list when done:
       populates the field, so a singleton-handling difference between PyFixest and
       `fixest` or `FEM.jl` still cannot be detected. Cross-backend retained-size checking
       is not yet in place.
-- [x] One shared experiment layer. `benchmarks/modular/experiment.py` holds sample
+- [x] One shared experiment layer. `benchmarks/dgp/samples.py, benchmarks/solvers/specs.py and benchmarks/core/records.py` holds sample
       identity, the seed rule, the solver settings, and the `RunRecord` schema. The seed
       no longer depends on the repetition index, an in-process cache hands every
       repetition the identical arrays, the standalone diagnostics run at the same matched

@@ -23,7 +23,6 @@ benchmarks/data/correia_data/.downloads/
 results/runs/
 results/legacy/
 benchmarks/results/
-benchmarks/modular/*.csv
 figures/benchmarks/
 
 # local Codex skill marker

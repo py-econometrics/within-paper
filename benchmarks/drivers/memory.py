@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from benchmarks.core.paths import DATA_DIR, ROOT
 from benchmarks.core.results import write_rows
 
 
@@ -20,7 +21,6 @@ from benchmarks.solvers.pyfixest_feols import _fit_converged
 from benchmarks.solvers.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf
-from benchmarks.core.paths import DATA_DIR, ROOT
 
 size, dgp_type, backend = sys.argv[1], sys.argv[2], sys.argv[3]
 df = pd.read_parquet(Path("{DATA_DIR}") / f"{{dgp_type}}_{{size}}.parquet")
