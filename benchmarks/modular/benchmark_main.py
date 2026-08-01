@@ -5,7 +5,7 @@ from pathlib import Path
 
 from benchmarks.core.cli import add_output_args
 from benchmarks.modular.benchmarker_sets import build_feols_benchmarkers
-from benchmarks.modular.dgps import BaseDGP
+from benchmarks.dgp.scenarios import BaseDGP
 from benchmarks.core.interfaces import FeolsSpec
 from benchmarks.modular.runner import generate_datasets, run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT

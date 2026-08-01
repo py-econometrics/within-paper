@@ -23,7 +23,7 @@ from scipy.sparse.linalg import svds
 
 
 from pyfixest.core.detect_singletons import detect_singletons
-from benchmarks.modular.dgps import get_akm_sweep_scenario_names
+from benchmarks.dgp.scenarios import get_akm_sweep_scenario_names
 from benchmarks.core.paths import CORREIA_DIR, DATA_DIR, ROOT
 
 MEMORY_DATA_DIR = ROOT / "benchmarks" / "data"

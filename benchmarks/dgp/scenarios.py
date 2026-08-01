@@ -10,8 +10,8 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
-from benchmarks.modular.dgp_functions import PAPER_BASE_MAX_K, paper_base_dgp
+from benchmarks.dgp.akm import AKMConfig, simulate_akm_panel
+from benchmarks.dgp.base import PAPER_BASE_MAX_K, paper_base_dgp
 from benchmarks.core.interfaces import BenchmarkDataset
 def _seed_for(dgp_name: str, n: int, iteration: int) -> int:
     """Build deterministic seeds so benchmark runs are reproducible."""
@@ -52,8 +52,10 @@ def _generator_source_hash(source: str) -> str:
     return hashlib.sha256(source_path.read_bytes()).hexdigest()[:16]
 
 
-_BASE_GENERATOR_SOURCE_HASH = _generator_source_hash("dgp_functions.py")
-_AKM_GENERATOR_SOURCE_HASH = _generator_source_hash("akm_dgp.py")
+# Hashed by content, not by name, so renaming these files does not invalidate
+# the Parquet caches keyed on them.
+_BASE_GENERATOR_SOURCE_HASH = _generator_source_hash("base.py")
+_AKM_GENERATOR_SOURCE_HASH = _generator_source_hash("akm.py")
 
 
 def _param_hash(params: dict, generator_source_hash: str) -> str:

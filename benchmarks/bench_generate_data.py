@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-from benchmarks.modular.dgp_functions import base_dgp
+from benchmarks.dgp.base import base_dgp
 from benchmarks.core.paths import ROOT
 
 SIZES = {"100k": 100_000, "1m": 1_000_000}

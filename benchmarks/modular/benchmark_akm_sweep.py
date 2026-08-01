@@ -8,7 +8,7 @@ from benchmarks.modular.benchmarker_sets import (
     build_feols_benchmarkers,
     require_multiple_absorbed_factors,
 )
-from benchmarks.modular.dgps import get_akm_sweep_scenarios
+from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
 from benchmarks.core.paths import DATA_DIR, ROOT

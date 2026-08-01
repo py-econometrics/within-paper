@@ -43,7 +43,7 @@ from benchmarks.core.accuracy import external_normal_residuals
 from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for
-from benchmarks.modular.dgps import get_akm_sweep_scenarios
+from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"

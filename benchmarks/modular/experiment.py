@@ -119,7 +119,7 @@ def _akm_frame(spec: SampleSpec) -> "pd.DataFrame":
     """Read one AKM sweep design from its generated Parquet cache."""
     import pandas as pd
 
-    from benchmarks.modular.dgps import get_akm_sweep_scenarios
+    from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 
     data_dir = ROOT / "benchmarks" / "data"
     scenarios = {dgp.dgp_name: dgp for dgp in get_akm_sweep_scenarios(data_dir)}
@@ -145,7 +145,7 @@ def load_sample(
     the AKM mobility and sorting designs the mechanism section is about, not
     only on simple and difficult.
     """
-    from benchmarks.modular.dgp_functions import base_dgp
+    from benchmarks.dgp.base import base_dgp
 
     columns = tuple(rhs_columns or ("y", *[f"x{i}" for i in range(1, spec.k + 1)]))
     cache_key = (spec.design, spec.n_obs, spec.k, columns)

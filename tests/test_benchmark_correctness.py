@@ -28,9 +28,9 @@ from benchmarks.modular.benchmark_fepois import (
     SPECS as FEPOIS_SPECS,
 )
 from benchmarks.modular.benchmark_main import SIZES as OLS_SIZES
-from benchmarks.modular.akm_dgp import AKMConfig, simulate_akm_panel
-from benchmarks.modular.dgp_functions import paper_base_dgp
-from benchmarks.modular.dgps import BaseDGP, _seed_for, get_akm_sweep_scenario_names
+from benchmarks.dgp.akm import AKMConfig, simulate_akm_panel
+from benchmarks.dgp.base import paper_base_dgp
+from benchmarks.dgp.scenarios import BaseDGP, _seed_for, get_akm_sweep_scenario_names
 from benchmarks.core.accuracy import (
     GATE_A_ETA,
     accuracy_record,
@@ -138,14 +138,14 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
                 dataset = dgp.generate(n=2_300, n_iters=1, burn_in=0)[0]
 
                 with patch(
-                    "benchmarks.modular.dgps.paper_base_dgp", side_effect=AssertionError("cache miss")
+                    "benchmarks.dgp.scenarios.paper_base_dgp", side_effect=AssertionError("cache miss")
                 ):
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
 
                 frame = pd.read_parquet(dataset.data_path)
                 frame["unused"] = 0
                 frame.to_parquet(dataset.data_path, index=False)
-                with patch("benchmarks.modular.dgps.paper_base_dgp", wraps=paper_base_dgp) as generator:
+                with patch("benchmarks.dgp.scenarios.paper_base_dgp", wraps=paper_base_dgp) as generator:
                     dgp.generate(n=2_300, n_iters=1, burn_in=0)
             generator.assert_called_once()
 
