@@ -49,21 +49,16 @@ from benchmarks.modular.feols_benchmarkers import (
     _external_eta,
     _fit_converged,
 )
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
     WITHIN_PRECONDITIONERS,
     demeaner_for,
 )
-from benchmarks.modular.experiment import (
-    FE_COLS,
-    RunRecord,
-    SampleSpec,
-    clear_sample_cache,
-    load_sample,
-    matched_solver_specs,
-)
+from benchmarks.core.records import RunRecord
+from benchmarks.dgp.samples import FE_COLS, SampleSpec, clear_sample_cache, load_sample
+from benchmarks.solvers.specs import matched_solver_specs
 from benchmarks.core.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.subprocess_backend import _parse_subprocess_output
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps

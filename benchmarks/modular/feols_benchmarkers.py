@@ -13,7 +13,7 @@ from typing import Any, Callable, TypeVar
 
 import pandas as pd
 
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     LSMR_SETTINGS,
     MAP_SETTINGS,

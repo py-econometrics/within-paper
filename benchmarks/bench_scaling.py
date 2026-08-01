@@ -32,19 +32,14 @@ import numpy as np
 
 from benchmarks.core.cli import add_runs_arg
 from benchmarks.core.timing import timed
-from benchmarks.modular.experiment import (
-    RunRecord,
-    SampleSpec,
-    load_sample,
-    preconditioner_config,
-    sample_hash,
-    write_records,
-)
+from benchmarks.core.records import RunRecord, write_records
+from benchmarks.dgp.samples import SampleSpec, load_sample, sample_hash
+from benchmarks.solvers.specs import preconditioner_config
 
 
 import within
 from benchmarks.core.accuracy import accuracy_record
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAXITER,
 )

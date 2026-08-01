@@ -11,7 +11,7 @@ from benchmarks.modular.subprocess_backend import (
     FixestFeolsBenchmarker,
     JuliaFeolsBenchmarker,
 )
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     MECHANISM_LSMR_TOL,
     MECHANISM_MAP_TOL,
     MECHANISM_MAXITER,

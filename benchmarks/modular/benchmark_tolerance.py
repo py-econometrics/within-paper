@@ -40,9 +40,9 @@ from pyfixest.core.detect_singletons import detect_singletons
 
 from benchmarks.core.methods import inline_label, resolve
 from benchmarks.core.accuracy import external_normal_residuals
-from benchmarks.modular.experiment import FE_COLS
+from benchmarks.dgp.samples import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
-from benchmarks.modular.settings import demeaner_for
+from benchmarks.solvers.settings import demeaner_for
 from benchmarks.dgp.scenarios import get_akm_sweep_scenarios
 from benchmarks.core.paths import EXTERNAL_DIR, ROOT
 

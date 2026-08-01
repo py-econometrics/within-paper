@@ -30,7 +30,7 @@ import pandas as pd
 
 
 from benchmarks.core.cli import add_dgps_arg
-from benchmarks.modular.experiment import FE_COLS
+from benchmarks.dgp.samples import FE_COLS
 from benchmarks.core.accuracy import (
     GATE_A_DELTA,
     GATE_A_ETA,
@@ -38,7 +38,7 @@ from benchmarks.core.accuracy import (
     projection_errors,
 )
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
-from benchmarks.modular.settings import demeaner_for
+from benchmarks.solvers.settings import demeaner_for
 from benchmarks.core.paths import ROOT
 
 RHS_COLS = ["y", "x1"]

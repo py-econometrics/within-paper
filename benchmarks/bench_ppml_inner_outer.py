@@ -28,13 +28,9 @@ import numpy as np
 
 
 from benchmarks.core.cli import add_dgps_arg
-from benchmarks.modular.experiment import (
-    PRECONDITIONERS,
-    SampleSpec,
-    load_sample,
-    preconditioner_config,
-    write_rows,
-)
+from benchmarks.dgp.samples import SampleSpec, load_sample
+from benchmarks.core.results import write_rows
+from benchmarks.solvers.specs import PRECONDITIONERS, preconditioner_config
 
 
 import within

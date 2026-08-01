@@ -28,12 +28,12 @@ import pandas as pd
 
 
 from benchmarks.core.cli import add_dgps_arg
-from benchmarks.modular.experiment import FE_COLS
+from benchmarks.dgp.samples import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.core.results import write_rows
 from benchmarks.core.accuracy import accuracy_record
 from benchmarks.dgp.base import paper_base_dgp
-from benchmarks.modular.settings import (
+from benchmarks.solvers.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
     LSMR_SETTINGS,
     MAP_SETTINGS,

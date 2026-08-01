@@ -17,7 +17,7 @@ SCRIPT = f"""\
 import resource, sys, time, warnings, gc
 from pathlib import Path
 from benchmarks.modular.feols_benchmarkers import _fit_converged
-from benchmarks.modular.settings import demeaner_for
+from benchmarks.solvers.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf
 from benchmarks.core.paths import DATA_DIR, ROOT

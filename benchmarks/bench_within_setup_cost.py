@@ -23,12 +23,8 @@ import numpy as np
 
 from benchmarks.core.cli import add_dgps_arg, add_runs_arg
 from benchmarks.core.timing import timed
-from benchmarks.modular.experiment import (
-    SampleSpec,
-    clear_sample_cache,
-    load_sample,
-    write_rows,
-)
+from benchmarks.dgp.samples import SampleSpec, clear_sample_cache, load_sample
+from benchmarks.core.results import write_rows
 
 
 import within
