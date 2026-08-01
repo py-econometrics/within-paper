@@ -24,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_HARDNESS = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 DEFAULT_RESULTS_DIR = ROOT / "benchmarks" / "results"
 DEFAULT_OUT = ROOT / "results" / "runs" / "latest" / "gap_runtime_analysis.json"

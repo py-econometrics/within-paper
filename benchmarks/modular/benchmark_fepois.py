@@ -8,8 +8,8 @@ from benchmarks.modular.benchmarker_sets import build_fepois_benchmarkers
 from benchmarks.modular.dgps import BaseDGP
 from benchmarks.modular.interfaces import FeolsSpec
 from benchmarks.modular.runner import generate_datasets, run_benchmarks
+from benchmarks.core.paths import DATA_DIR, ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -17,7 +17,6 @@ SIZES = [1_000_000]
 K_VALUES = [1]
 N_ITERS = 3
 BURN_IN = 1
-DATA_DIR = ROOT / "benchmarks" / "data"
 OUTPUT_CSV = ROOT / "benchmarks" / "results" / "fepois_bench.csv"
 
 DGPS = [

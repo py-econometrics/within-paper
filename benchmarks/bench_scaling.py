@@ -29,7 +29,6 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
 
 from benchmarks.modular.cli import add_runs_arg
 from benchmarks.modular.timing import timed
@@ -50,6 +49,7 @@ from benchmarks.modular.settings import (
     MECHANISM_MAXITER,
 )
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
+from benchmarks.core.paths import ROOT
 
 MAX_FACTORS = 5
 

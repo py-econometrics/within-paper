@@ -32,8 +32,8 @@ from benchmarks.modular.settings import (
 )
 
 import numpy as np
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 
 # Absorbed in this order everywhere. MAP cycles through the factors as given,
 # so a driver that varies the order is not measuring the same specification.

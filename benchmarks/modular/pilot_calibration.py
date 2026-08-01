@@ -28,7 +28,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.experiment import FE_COLS
@@ -40,6 +39,7 @@ from benchmarks.modular.accuracy import (
 )
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 from benchmarks.modular.settings import demeaner_for
+from benchmarks.core.paths import ROOT
 
 RHS_COLS = ["y", "x1"]
 TOLERANCE_GRID = (1e-8, 1e-10, 1e-12, 1e-14)

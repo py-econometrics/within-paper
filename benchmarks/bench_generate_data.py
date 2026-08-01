@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 MODULAR_DIR = ROOT / "benchmarks" / "modular"
 
 from benchmarks.modular.dgp_functions import base_dgp
+from benchmarks.core.paths import ROOT
 
 SIZES = {"100k": 100_000, "1m": 1_000_000}
 K = 1

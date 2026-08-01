@@ -21,13 +21,11 @@ import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import svds
 
-ROOT = Path(__file__).resolve().parents[2]
 
 from pyfixest.core.detect_singletons import detect_singletons
 from benchmarks.modular.dgps import get_akm_sweep_scenario_names
+from benchmarks.core.paths import CORREIA_DIR, DATA_DIR, ROOT
 
-CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
-DATA_DIR = ROOT / "benchmarks" / "data"
 MEMORY_DATA_DIR = ROOT / "benchmarks" / "data"
 DEFAULT_OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 PROPACK_MAX_MIN_DIM = 20_000

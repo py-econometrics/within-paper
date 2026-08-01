@@ -15,8 +15,8 @@ import pandas as pd
 from matplotlib.lines import Line2D
 
 from benchmarks.modular.methods import legend_label, linestyle, style
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
 DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
 

@@ -32,7 +32,6 @@ from statistics import median
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
 # The timing rules live with the benchmark harness that produces the numbers,
 # not beside the renderer that formats them, so that "median over converged
 # trials, failures kept in the denominator" has one implementation rather than
@@ -41,11 +40,11 @@ ROOT = Path(__file__).resolve().parents[1]
 # that property.
 from benchmarks.modular.timing import summarize_times
 from benchmarks.modular.methods import METHOD_TABLE_HEADER
+from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 CLAIMS_PATH = ROOT / "results" / "paper" / "claim_registry.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
-CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 EXPECTED_TRIALS = 3
 # The legacy CUDA timings are quoted only in Appendix C, never in a main
 # runtime table, so they resolve to generated prose values rather than to a
@@ -87,7 +86,6 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-LATEST_RUN = ROOT / "results" / "runs" / "latest"
 
 
 def _latest(filename: str) -> Path:

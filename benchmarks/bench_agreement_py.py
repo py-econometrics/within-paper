@@ -33,9 +33,8 @@ from benchmarks.modular.settings import demeaner_for
 import numpy as np
 import pandas as pd
 import pyfixest as pf
+from benchmarks.core.paths import JULIA_ENV, ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
-JULIA_ENV = ROOT / "benchmarks" / "julia-env"
 FML = "y ~ x1 | indiv_id + firm_id + year"
 DEPVAR = "y"
 COVARIATES = ["x1"]

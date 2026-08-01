@@ -20,7 +20,6 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
 
 from benchmarks.modular.cli import add_dgps_arg, add_runs_arg
 from benchmarks.modular.timing import timed
@@ -34,6 +33,7 @@ from benchmarks.modular.experiment import (
 
 import within
 from within import LsmrOptions, Solver, solve_batch
+from benchmarks.core.paths import ROOT
 
 
 def _setup_share(setup_wall: float, solve_wall: float) -> float:

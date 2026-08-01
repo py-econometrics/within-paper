@@ -27,7 +27,6 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
 
 from benchmarks.modular.cli import add_runs_arg
 from benchmarks.modular.experiment import (
@@ -51,6 +50,7 @@ from benchmarks.modular.settings import (
 )
 from benchmarks.modular.map_diagnostics import map_demean_with_sweeps
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
+from benchmarks.core.paths import ROOT
 
 
 def _edge_summary(categories: np.ndarray) -> dict[str, float | int]:

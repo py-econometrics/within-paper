@@ -26,7 +26,6 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
 
 from benchmarks.modular.cli import add_dgps_arg
 from benchmarks.modular.experiment import (
@@ -40,6 +39,7 @@ from benchmarks.modular.experiment import (
 
 import within
 from within import LsmrOptions, Solver
+from benchmarks.core.paths import ROOT
 
 
 def _ppml_sample(design: str, n_obs: int) -> tuple["Sample", "np.ndarray", "np.ndarray"]:

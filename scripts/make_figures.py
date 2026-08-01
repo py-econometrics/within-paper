@@ -24,8 +24,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from benchmarks.modular.methods import inline_label, linestyle, style
+from benchmarks.core.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results" / "runs" / "latest"
 BENCHMARK_RESULTS = ROOT / "benchmarks" / "results"
 FIGURES = ROOT / "figures" / "results"

@@ -261,19 +261,35 @@ class BenchmarkCorrectnessTests(unittest.TestCase):
         self.assertEqual(_render_trial_result(failed), "failed (0/3)")
         self.assertEqual(_render_trial_result(partial[:2]), "incomplete")
 
-    def test_timing_module_stays_standard_library_only(self) -> None:
-        # scripts/paper_results.py imports this module and must keep running
-        # before the Pixi environment exists, so a third-party import here
-        # would break the pre-environment runtime checks.
-        source = (ROOT / "benchmarks" / "modular" / "timing.py").read_text()
-        tree = ast.parse(source)
-        imported = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                imported.update(alias.name.split(".")[0] for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                imported.add(node.module.split(".")[0])
-        self.assertLessEqual(imported, set(sys.stdlib_module_names))
+    def test_pre_environment_modules_stay_standard_library_only(self) -> None:
+        # scripts/paper_results.py imports these and must keep running before
+        # the Pixi environment exists, so a third-party import in either would
+        # break the pre-environment runtime checks.
+        for relative in ("benchmarks/modular/timing.py", "benchmarks/core/paths.py"):
+            with self.subTest(module=relative):
+                tree = ast.parse((ROOT / relative).read_text())
+                imported = set()
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        imported.update(a.name.split(".")[0] for a in node.names)
+                    elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                        imported.add(node.module.split(".")[0])
+                self.assertLessEqual(imported, set(sys.stdlib_module_names))
+
+    def test_shared_root_is_the_repository_root(self) -> None:
+        """paths.ROOT must agree with a root derived independently of it.
+
+        Every module now takes its paths from core.paths rather than counting
+        parent directories itself, so nothing else would notice if that one
+        definition drifted. This test derives the root the old way, from the
+        test file's own location, and is the only place that still does.
+        """
+        from benchmarks.core import paths
+
+        self.assertEqual(paths.ROOT, ROOT)
+        self.assertTrue((paths.ROOT / "pixi.toml").is_file())
+        self.assertEqual(paths.DATA_DIR, ROOT / "benchmarks" / "data")
+        self.assertEqual(paths.LATEST_RUN, ROOT / "results" / "runs" / "latest")
 
     def test_join_key_is_shared_between_harness_and_analysis(self) -> None:
         # Pairing a 1M runtime with a 10M gap moved a fitted slope once; the

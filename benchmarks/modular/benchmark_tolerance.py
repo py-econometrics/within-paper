@@ -37,7 +37,6 @@ import numpy as np
 import pandas as pd
 from pyfixest.core.detect_singletons import detect_singletons
 
-ROOT = Path(__file__).resolve().parents[2]
 
 from benchmarks.modular.methods import inline_label, resolve
 from benchmarks.modular.accuracy import external_normal_residuals
@@ -45,6 +44,7 @@ from benchmarks.modular.experiment import FE_COLS
 from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for
 from benchmarks.modular.dgps import get_akm_sweep_scenarios
+from benchmarks.core.paths import ROOT
 
 FORMULA = "y ~ x1 | indiv_id + firm_id + year"
 MODEL_COLUMNS = [*FE_COLS, "x1", "y"]

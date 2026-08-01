@@ -15,7 +15,7 @@ from benchmarks.modular.subprocess_backend import (
 )
 from benchmarks.modular.interfaces import BenchmarkDataset, FeolsSpec
 from benchmarks.modular.runner import run_benchmarks
-ROOT = Path(__file__).resolve().parents[2]
+from benchmarks.core.paths import ROOT
 
 # ---------------------------------------------------------------------------
 # Configuration

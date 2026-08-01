@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from benchmarks.core.paths import RESULTS_DIR, ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 
 # Where the package-comparison drivers write their raw per-trial CSVs.
-RESULTS_DIR = ROOT / "benchmarks" / "results"
 
 # The standard pair of fixest designs. Several experiments sweep exactly these.
 DEFAULT_DGPS = ("simple", "difficult")
