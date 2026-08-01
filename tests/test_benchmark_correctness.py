@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import csv
+import re
 import hashlib
 import json
 import sys
@@ -46,6 +47,7 @@ from benchmarks.modular.benchmarker_sets import (
 from benchmarks.modular.feols_benchmarkers import (
     _as_bool,
     _external_eta,
+    _fit_converged,
 )
 from benchmarks.modular.settings import (
     DEFAULT_WITHIN_PRECONDITIONER,
@@ -962,6 +964,86 @@ class SharedPrimitiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
                 write_rows(Path(tmp) / "rows.csv", [])
+
+
+class DriverEntryPointTests(unittest.TestCase):
+    """Importing a driver must never run it.
+
+    bench_memory_py once had no __main__ guard, so importing the module ran
+    all eight benchmarks and overwrote results/runs/latest/memory.csv with
+    whatever the import happened to produce. Anything that imports broadly
+    (a test collector, a dead-code sweep, an IDE) could destroy a recorded
+    result that way, and results/runs is not tracked, so there is no undo.
+    """
+
+    DRIVERS = sorted(
+        path
+        for path in (ROOT / "benchmarks").rglob("*.py")
+        if path.name != "__init__.py"
+    ) + sorted((ROOT / "scripts").glob("*.py"))
+
+    # matplotlib.use() and the rcParams assignment have to run before pyplot is
+    # imported, so they are legitimately module level. Nothing else here is.
+    IMPORT_TIME_SETUP = ("matplotlib.use", "matplotlib.rcParams")
+
+    def test_no_driver_executes_work_at_module_level(self) -> None:
+        offenders = []
+        for path in self.DRIVERS:
+            source = path.read_text(encoding="utf-8")
+            for node in ast.parse(source).body:
+                # Loops and bare calls at module level run on import.
+                # Assignments, imports, defs and classes are declarations.
+                if not isinstance(node, (ast.Expr, ast.For, ast.While, ast.With)):
+                    continue
+                # A module docstring is an Expr but does nothing.
+                if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                    continue
+                text = ast.get_source_segment(source, node) or ""
+                if text.startswith(self.IMPORT_TIME_SETUP):
+                    continue
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+        self.assertEqual(offenders, [], f"module-level work on import: {offenders}")
+
+    def test_every_driver_guards_its_entry_point(self) -> None:
+        """A driver with argparse must reach it only through __main__."""
+        offenders = []
+        for path in self.DRIVERS:
+            source = path.read_text(encoding="utf-8")
+            if "argparse.ArgumentParser(" not in source:
+                continue
+            if 'if __name__ == "__main__":' not in source:
+                offenders.append(str(path.relative_to(ROOT)))
+        self.assertEqual(offenders, [], f"argparse without a guard: {offenders}")
+
+
+class ConvergenceCheckTests(unittest.TestCase):
+    """Convergence must be read through the helper, not off a raw attribute.
+
+    PyFixest defines `.convergence` on Feglm (PPML) but not on Feols, so
+    `fit.convergence` on a linear fit raises AttributeError rather than
+    reporting non-convergence. Two standalone drivers did exactly that, which
+    made every one of their runs fail at the check.
+    """
+
+    def test_no_driver_reads_convergence_off_a_fit_directly(self) -> None:
+        offenders = []
+        for path in DriverEntryPointTests.DRIVERS:
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if re.search(r"\bfit\w*\.convergence\b", line):
+                    offenders.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(offenders, [], f"use _fit_converged instead: {offenders}")
+
+    def test_helper_tolerates_a_model_with_no_flag(self) -> None:
+        class LinearFit:  # Feols exposes no convergence attribute at all
+            pass
+
+        class PoissonFit:  # Feglm does
+            convergence = False
+
+        self.assertTrue(_fit_converged(LinearFit()))
+        self.assertFalse(_fit_converged(PoissonFit()))
 
 
 if __name__ == "__main__":

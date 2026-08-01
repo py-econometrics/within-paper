@@ -13,10 +13,15 @@ SEED = 42
 KEEP_COLS = ["indiv_id", "firm_id", "year", "y", *[f"x{i}" for i in range(1, K + 1)]]
 
 
-for label, n in SIZES.items():
-    for dgp_type in ["simple", "difficult"]:
-        print(f"Generating {dgp_type} {label}...")
-        df = base_dgp(n=n, type_=dgp_type, k=K, max_k=K, seed=SEED)[KEEP_COLS]
-        path = ROOT / "benchmarks" / "data" / f"{dgp_type}_{label}.parquet"
-        df.to_parquet(path, index=False)
-        print(f"  -> {path} ({len(df):,} rows)")
+def main() -> None:
+    for label, n in SIZES.items():
+        for dgp_type in ["simple", "difficult"]:
+            print(f"Generating {dgp_type} {label}...")
+            df = base_dgp(n=n, type_=dgp_type, k=K, max_k=K, seed=SEED)[KEEP_COLS]
+            path = ROOT / "benchmarks" / "data" / f"{dgp_type}_{label}.parquet"
+            df.to_parquet(path, index=False)
+            print(f"  -> {path} ({len(df):,} rows)")
+
+
+if __name__ == "__main__":
+    main()

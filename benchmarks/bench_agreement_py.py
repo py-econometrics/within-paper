@@ -28,6 +28,7 @@ from pathlib import Path
 
 from benchmarks.modular.results import write_rows
 from benchmarks.modular.experiment import FE_COLS
+from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for
 import numpy as np
 import pandas as pd
@@ -139,126 +140,131 @@ def _format_diff(value: float | None) -> str:
     return f"{value:.2e}"
 
 
-print("PyFixest internal agreement")
-print(f"{'dgp':<12} {'metric':<28} {'MAP vs within':>16}")
-print("-" * 60)
+def main() -> None:
+    print("PyFixest internal agreement")
+    print(f"{'dgp':<12} {'metric':<28} {'MAP vs within':>16}")
+    print("-" * 60)
 
-for dgp_type in ["simple", "difficult"]:
-    data_path = ROOT / "benchmarks" / "data" / f"{dgp_type}_100k.parquet"
-    df = pd.read_parquet(data_path)
+    for dgp_type in ["simple", "difficult"]:
+        data_path = ROOT / "benchmarks" / "data" / f"{dgp_type}_100k.parquet"
+        df = pd.read_parquet(data_path)
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning)
-        fit_map = pf.feols(FML, data=df, vcov="iid", demeaner=demeaner_for("rust"),
-                           copy_data=False, store_data=True)
-        fit_within = pf.feols(FML, data=df, vcov="iid",
-                              demeaner=demeaner_for("rust-cg"),
-                              copy_data=False, store_data=True)
-    if not fit_map.convergence or not fit_within.convergence:
-        raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            fit_map = pf.feols(FML, data=df, vcov="iid", demeaner=demeaner_for("rust"),
+                               copy_data=False, store_data=True)
+            fit_within = pf.feols(FML, data=df, vcov="iid",
+                                  demeaner=demeaner_for("rust-cg"),
+                                  copy_data=False, store_data=True)
+        if not _fit_converged(fit_map) or not _fit_converged(fit_within):
+            raise RuntimeError(f"PyFixest agreement model did not converge for {dgp_type}")
 
-    # Coefficient differences
-    coef_map = np.asarray(fit_map.coef())
-    coef_within = np.asarray(fit_within.coef())
-    coef_map_named = _coef_dict(fit_map.coef().index, coef_map)
-    max_coef_diff = np.max(np.abs(coef_map - coef_within))
-    print(f"{dgp_type:<12} {'max |coef diff|':<28} {max_coef_diff:>16.2e}")
+        # Coefficient differences
+        coef_map = np.asarray(fit_map.coef())
+        coef_within = np.asarray(fit_within.coef())
+        coef_map_named = _coef_dict(fit_map.coef().index, coef_map)
+        max_coef_diff = np.max(np.abs(coef_map - coef_within))
+        print(f"{dgp_type:<12} {'max |coef diff|':<28} {max_coef_diff:>16.2e}")
 
-    # Residual differences
-    resid_map = np.asarray(fit_map.resid())
-    resid_within = np.asarray(fit_within.resid())
-    max_resid_diff = np.max(np.abs(resid_map - resid_within))
-    resid_norm_map = np.linalg.norm(resid_map)
-    rel_resid_diff = np.linalg.norm(resid_map - resid_within) / resid_norm_map
-    print(f"{'':<12} {'max |resid diff|':<28} {max_resid_diff:>16.2e}")
-    print(f"{'':<12} {'rel resid norm diff':<28} {rel_resid_diff:>16.2e}")
+        # Residual differences
+        resid_map = np.asarray(fit_map.resid())
+        resid_within = np.asarray(fit_within.resid())
+        max_resid_diff = np.max(np.abs(resid_map - resid_within))
+        resid_norm_map = np.linalg.norm(resid_map)
+        rel_resid_diff = np.linalg.norm(resid_map - resid_within) / resid_norm_map
+        print(f"{'':<12} {'max |resid diff|':<28} {max_resid_diff:>16.2e}")
+        print(f"{'':<12} {'rel resid norm diff':<28} {rel_resid_diff:>16.2e}")
 
-    # Firm-effect variance component
-    fe_map = fit_map.fixef()
-    fe_within = fit_within.fixef()
-    var_firm_map = np.var(list(fe_map["C(firm_id)"].values()))
-    var_firm_within = np.var(list(fe_within["C(firm_id)"].values()))
-    var_diff = abs(var_firm_map - var_firm_within)
-    print(f"{'':<12} {'var(firm FE) MAP':<28} {var_firm_map:>16.6f}")
-    print(f"{'':<12} {'var(firm FE) within':<28} {var_firm_within:>16.6f}")
-    print(f"{'':<12} {'|diff var(firm FE)|':<28} {var_diff:>16.2e}")
-    print()
+        # Firm-effect variance component
+        fe_map = fit_map.fixef()
+        fe_within = fit_within.fixef()
+        var_firm_map = np.var(list(fe_map["C(firm_id)"].values()))
+        var_firm_within = np.var(list(fe_within["C(firm_id)"].values()))
+        var_diff = abs(var_firm_map - var_firm_within)
+        print(f"{'':<12} {'var(firm FE) MAP':<28} {var_firm_map:>16.6f}")
+        print(f"{'':<12} {'var(firm FE) within':<28} {var_firm_within:>16.6f}")
+        print(f"{'':<12} {'|diff var(firm FE)|':<28} {var_diff:>16.2e}")
+        print()
 
-    external = _external_coefficients(data_path, FML)
-    coefficient_sets: dict[str, dict[str, float]] = {
-        "rust-map": coef_map_named,
-        "within": _coef_dict(fit_within.coef().index, coef_within),
-    }
-    skip_messages: dict[str, str] = {}
-    for backend, value in external.items():
-        if isinstance(value, str):
-            skip_messages[backend] = value
-            continue
-        coefficient_sets[backend] = value
+        external = _external_coefficients(data_path, FML)
+        coefficient_sets: dict[str, dict[str, float]] = {
+            "rust-map": coef_map_named,
+            "within": _coef_dict(fit_within.coef().index, coef_within),
+        }
+        skip_messages: dict[str, str] = {}
+        for backend, value in external.items():
+            if isinstance(value, str):
+                skip_messages[backend] = value
+                continue
+            coefficient_sets[backend] = value
 
-    reference_name = "rust-map"
-    reference = coefficient_sets[reference_name]
+        reference_name = "rust-map"
+        reference = coefficient_sets[reference_name]
 
-    print(f"{dgp_type:<12} coefficient summary relative to {reference_name}")
-    print(f"{'':<12} {'backend':<20} {'x1':>14} {'avg |diff|':>14} {'max |diff|':>14}")
-    for backend, coefficients in coefficient_sets.items():
-        try:
-            diffs = _named_coef_diffs(reference, coefficients)
-            avg_diff = sum(diffs) / len(diffs)
-            max_diff = max(diffs)
-        except ValueError as exc:
-            print(f"{'':<12} {backend:<20} {coefficients.get('x1', np.nan):>14.8f} {f'SKIP ({exc})':>28}")
-            continue
-        OUTPUT_ROWS.append(
-            {
-                "dgp": dgp_type,
-                "model_k": 1,
-                "backend": backend,
-                "x1": coefficients.get("x1", np.nan),
-                "avg_abs_diff": avg_diff,
-                "max_abs_diff": max_diff,
-                "success": True,
-                "error": "",
-            }
-        )
+        print(f"{dgp_type:<12} coefficient summary relative to {reference_name}")
+        print(f"{'':<12} {'backend':<20} {'x1':>14} {'avg |diff|':>14} {'max |diff|':>14}")
+        for backend, coefficients in coefficient_sets.items():
+            try:
+                diffs = _named_coef_diffs(reference, coefficients)
+                avg_diff = sum(diffs) / len(diffs)
+                max_diff = max(diffs)
+            except ValueError as exc:
+                print(f"{'':<12} {backend:<20} {coefficients.get('x1', np.nan):>14.8f} {f'SKIP ({exc})':>28}")
+                continue
+            OUTPUT_ROWS.append(
+                {
+                    "dgp": dgp_type,
+                    "model_k": 1,
+                    "backend": backend,
+                    "x1": coefficients.get("x1", np.nan),
+                    "avg_abs_diff": avg_diff,
+                    "max_abs_diff": max_diff,
+                    "success": True,
+                    "error": "",
+                }
+            )
+            print(
+                f"{'':<12} {backend:<20} "
+                f"{_format_float(coefficients.get('x1')):>14} "
+                f"{_format_diff(avg_diff):>14} "
+                f"{_format_diff(max_diff):>14}"
+            )
+        for backend, message in skip_messages.items():
+            print(f"{'':<12} {backend:<20} {'NA':>14} {'NA':>14} {message:>14}")
+        print()
+
+        print(f"{dgp_type:<12} full coefficient table")
         print(
-            f"{'':<12} {backend:<20} "
-            f"{_format_float(coefficients.get('x1')):>14} "
-            f"{_format_diff(avg_diff):>14} "
-            f"{_format_diff(max_diff):>14}"
+            f"{'':<12} {'term':<8} {'rust-map':>14} {'within':>14} "
+            f"{'fixest':>14} {'FixedEffectModels':>18}"
         )
-    for backend, message in skip_messages.items():
-        print(f"{'':<12} {backend:<20} {'NA':>14} {'NA':>14} {message:>14}")
-    print()
+        for term in COVARIATES:
+            print(
+                f"{'':<12} {term:<8} "
+                f"{_format_float(coefficient_sets.get('rust-map', {}).get(term)):>14} "
+                f"{_format_float(coefficient_sets.get('within', {}).get(term)):>14} "
+                f"{_format_float(coefficient_sets.get('fixest', {}).get(term)):>14} "
+                f"{_format_float(coefficient_sets.get('FixedEffectModels', {}).get(term)):>18}"
+            )
+        print()
 
-    print(f"{dgp_type:<12} full coefficient table")
-    print(
-        f"{'':<12} {'term':<8} {'rust-map':>14} {'within':>14} "
-        f"{'fixest':>14} {'FixedEffectModels':>18}"
+    # Column order is pinned: this file is read positionally by the agreement table.
+    write_rows(
+        OUTPUT_PATH,
+        OUTPUT_ROWS,
+        fieldnames=[
+            "dgp",
+            "model_k",
+            "backend",
+            "x1",
+            "avg_abs_diff",
+            "max_abs_diff",
+            "success",
+            "error",
+        ],
     )
-    for term in COVARIATES:
-        print(
-            f"{'':<12} {term:<8} "
-            f"{_format_float(coefficient_sets.get('rust-map', {}).get(term)):>14} "
-            f"{_format_float(coefficient_sets.get('within', {}).get(term)):>14} "
-            f"{_format_float(coefficient_sets.get('fixest', {}).get(term)):>14} "
-            f"{_format_float(coefficient_sets.get('FixedEffectModels', {}).get(term)):>18}"
-        )
-    print()
+    print(f"Wrote {OUTPUT_PATH}")
 
-# Column order is pinned: this file is read positionally by the agreement table.
-write_rows(
-    OUTPUT_PATH,
-    OUTPUT_ROWS,
-    fieldnames=[
-        "dgp",
-        "model_k",
-        "backend",
-        "x1",
-        "avg_abs_diff",
-        "max_abs_diff",
-        "success",
-        "error",
-    ],
-)
-print(f"Wrote {OUTPUT_PATH}")
+
+if __name__ == "__main__":
+    main()

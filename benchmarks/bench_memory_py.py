@@ -18,6 +18,7 @@ FML = "y ~ x1 | indiv_id + firm_id + year"
 SCRIPT = f"""\
 import resource, sys, time, warnings, gc
 from pathlib import Path
+from benchmarks.modular.feols_benchmarkers import _fit_converged
 from benchmarks.modular.settings import demeaner_for
 import pandas as pd
 import pyfixest as pf
@@ -31,7 +32,7 @@ with warnings.catch_warnings():
     fit = pf.feols("{FML}", data=df, vcov="iid",
                    demeaner=demeaner_for(backend),
                    copy_data=False, store_data=False)
-if not fit.convergence:
+if not _fit_converged(fit):
     raise RuntimeError("PyFixest model did not converge")
 elapsed = time.perf_counter() - t0
 divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
@@ -39,59 +40,64 @@ rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // divisor
 print(f"{{size:<6}} {{dgp_type:<12}} {{backend:<10}} {{elapsed:>8.2f}}s  {{rss:>6}} MB")
 """
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--out", type=Path, default=ROOT / "results" / "runs" / "latest" / "memory.csv",
-    help="Structured result CSV written in addition to the console table.",
-)
-args = parser.parse_args()
-rows = []
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--out", type=Path, default=ROOT / "results" / "runs" / "latest" / "memory.csv",
+        help="Structured result CSV written in addition to the console table.",
+    )
+    args = parser.parse_args()
+    rows = []
 
-for size in ["100k", "1m"]:
-    for dgp in ["simple", "difficult"]:
-        for backend in ["rust", "rust-cg"]:
-            try:
-                proc = subprocess.run(
-                    [sys.executable, "-c", SCRIPT, size, dgp, backend],
-                    capture_output=True, text=True, timeout=600,
-                )
-            except subprocess.TimeoutExpired as exc:
-                proc = subprocess.CompletedProcess(
-                    exc.cmd,
-                    returncode=124,
-                    stdout=exc.stdout or "",
-                    stderr=f"Timed out after {exc.timeout} seconds",
-                )
-            print(proc.stdout.strip())
-            fields = proc.stdout.split()
-            if proc.returncode == 0 and len(fields) >= 5:
-                rows.append(
-                    {
-                        "size": size,
-                        "dgp": dgp,
-                        "model_k": 1,
-                        "backend": backend,
-                        "time_s": fields[3].removesuffix("s"),
-                        "rss_mb": fields[4],
-                        "success": True,
-                        "error": "",
-                    }
-                )
-            else:
-                rows.append(
-                    {
-                        "size": size,
-                        "dgp": dgp,
-                        "model_k": 1,
-                        "backend": backend,
-                        "time_s": "",
-                        "rss_mb": "",
-                        "success": False,
-                        "error": proc.stderr.strip(),
-                    }
-                )
-            if proc.stderr.strip():
-                print(proc.stderr.strip(), file=sys.stderr)
+    for size in ["100k", "1m"]:
+        for dgp in ["simple", "difficult"]:
+            for backend in ["rust", "rust-cg"]:
+                try:
+                    proc = subprocess.run(
+                        [sys.executable, "-c", SCRIPT, size, dgp, backend],
+                        capture_output=True, text=True, timeout=600,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    proc = subprocess.CompletedProcess(
+                        exc.cmd,
+                        returncode=124,
+                        stdout=exc.stdout or "",
+                        stderr=f"Timed out after {exc.timeout} seconds",
+                    )
+                print(proc.stdout.strip())
+                fields = proc.stdout.split()
+                if proc.returncode == 0 and len(fields) >= 5:
+                    rows.append(
+                        {
+                            "size": size,
+                            "dgp": dgp,
+                            "model_k": 1,
+                            "backend": backend,
+                            "time_s": fields[3].removesuffix("s"),
+                            "rss_mb": fields[4],
+                            "success": True,
+                            "error": "",
+                        }
+                    )
+                else:
+                    rows.append(
+                        {
+                            "size": size,
+                            "dgp": dgp,
+                            "model_k": 1,
+                            "backend": backend,
+                            "time_s": "",
+                            "rss_mb": "",
+                            "success": False,
+                            "error": proc.stderr.strip(),
+                        }
+                    )
+                if proc.stderr.strip():
+                    print(proc.stderr.strip(), file=sys.stderr)
 
-write_rows(args.out, rows)
-print(f"Wrote {args.out}")
+    write_rows(args.out, rows)
+    print(f"Wrote {args.out}")
+
+
+if __name__ == "__main__":
+    main()
