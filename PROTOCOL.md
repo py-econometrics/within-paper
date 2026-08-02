@@ -97,8 +97,8 @@ turns on separating timings that differ by tens of milliseconds.
 Additional rules, all mandatory:
 
 - One discarded burn-in trial precedes the timed ones, per backend per design.
-- Backend order is randomized within a design so that thermal drift and background load
-  do not align with a backend.
+- Backends run sequentially in the fixed order shown by the experiment script. Production
+  runs use an otherwise idle machine.
 - Report the median and the interquartile range. A median without a spread cannot
   support an invariance claim.
 - Failed and capped trials stay in the record. They are never dropped before the median.
@@ -265,6 +265,7 @@ accuracy on that exact sample.
 | Amortization | 1M easy and hard | Primarily `diagonal` and `additive` | Setup reuse across right-hand sides and fits |
 | Selected Correia designs | Existing sizes | External packages plus `within-additive` | Robustness across graph families |
 | PPML simple/difficult | 1M | Three within configurations plus external packages | Inner solver versus outer IRLS convergence |
+| PPML reuse diagnostic | 100K | Exact PyFixest `fepois`, cache retained or cleared | Inner tolerance versus outer convergence |
 
 The mobility experiment carries the mechanism weight, because it varies the economic
 source of computational difficulty while holding the rest of the DGP fixed. Sorting
@@ -281,8 +282,6 @@ Resolved before the production runs, and struck from this list when done:
 - [x] Reconcile the factor order between the OLS/PPML specs and the AKM sweep spec. Done
       2026-07-26: all three now absorb `indiv_id, firm_id, year`. **The existing OLS and
       PPML tables were produced under the old order and must be regenerated.**
-- [ ] Randomized backend ordering. The compact runners currently use a fixed backend
-      order within each design, so the rule in section 4 is not yet met.
 - [x] Retained sample size. Every final Python, R, and Julia row records `n_retained`.
       The OLS and PPML runners reject a comparison if successful backends retained
       different row counts.
@@ -299,17 +298,15 @@ Resolved before the production runs, and struck from this list when done:
 - [x] Reduce the DGP replicate count for timing. Each timing runner now generates one
       sample per design and repeats the fit on that sample. DGP replication remains a
       separate robustness exercise.
-- [x] Settle PPML preconditioner reuse. Done 2026-07-28. The outer criterion was the
-      problem: `max |delta eta|` never fired, absolutely or relatively, so every
-      configuration read as non-converged. It now stops on relative deviance and relative
-      coefficient change. At 1M with an inner tolerance of 1e-12, reuse leaves every
-      configuration at the 100-step outer cap while rebuilding converges in 32 (simple)
-      and 63 (difficult) steps. Reported in the manuscript scoped to that tolerance.
-- [ ] Measure PPML reuse at the shipped inner tolerance. The result above is at 1e-12
-      with a 10000-iteration inner cap. PyFixest ships 1e-8 with 1000, reuses the
-      preconditioner across IRLS steps, and converges, so the two regimes disagree and
-      only one is measured. `pixi run ppml-inner-outer` now sweeps both; it needs an
-      otherwise idle machine, since the timings are the point.
+- [x] Define the PPML cache comparison on the package implementation. Both cells call
+      PyFixest `fepois`. Reuse leaves the package untouched; rebuild changes only
+      `_seed_preconditioner` so no factorization is retained between weighted demeaning
+      calls. A regression test requires both policies to retain the same sample and agree
+      on the coefficient and deviance.
+- [ ] Measure PPML reuse under both inner-solver regimes. The runner now discards one
+      burn-in and records seven fits per cell. Regenerate the table before making a
+      runtime claim from this diagnostic. PyFixest does not expose individual inner
+      LSMR iteration counts.
 - [x] Report iterations in solver-specific units. Done 2026-07-28.
       `pixi run within-preconditioners` runs counting MAP beside the three LSMR
       configurations on one sample. The renderer keeps MAP sweeps and LSMR iterations

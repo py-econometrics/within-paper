@@ -50,6 +50,7 @@ class RTests(unittest.TestCase):
     def test_ols_sibling_writes_a_converged_row(self) -> None:
         result = _run("r", "ols")
         self.assertTrue(result.loc[0, "converged"])
+        self.assertEqual(result.loc[0, "n_planned"], 1)
 
     @unittest.skipUnless(HAS_R, "Rscript not installed")
     def test_ppml_sibling_writes_a_converged_row(self) -> None:
@@ -62,6 +63,7 @@ class JuliaTests(unittest.TestCase):
     def test_ols_sibling_writes_a_converged_row(self) -> None:
         result = _run("julia", "ols")
         self.assertTrue(result.loc[0, "converged"])
+        self.assertEqual(result.loc[0, "n_planned"], 1)
 
     @unittest.skipUnless(HAS_JULIA, "Julia not installed")
     def test_ppml_sibling_writes_a_converged_row(self) -> None:

@@ -29,8 +29,6 @@ def repetitions_for_runtime(seconds: float) -> int:
 
 def benchmark_threads() -> int:
     threads = int(os.environ["BENCH_THREADS"])
-    if threads < 1:
-        raise RuntimeError("BENCH_THREADS must be positive")
     os.environ["RAYON_NUM_THREADS"] = str(threads)
     return threads
 
@@ -62,7 +60,7 @@ def run_experiment(
     *,
     experiment: str,
     designs: Sequence[tuple[str, Callable[[], pd.DataFrame]]],
-    output: Path,
+    output: Path | None,
     fixed_effects: Sequence[str] = ("indiv_id", "firm_id", "year"),
     backends: Sequence[str] = ("rust-map", "within", "fixest", "FEM.jl"),
     repetitions: int | None = None,
@@ -95,6 +93,7 @@ def run_experiment(
                         data_path, work / f"{backend}.csv",
                         fixed_effects, backend, repetitions,
                     )
+                    planned = int(measured[0]["n_planned"])
                 for row in measured:
                     row.update(
                         design=design,
@@ -102,22 +101,23 @@ def run_experiment(
                         n_fe=len(fixed_effects),
                         threads=threads,
                         view="default",
-                        n_planned=len(measured),
+                        n_planned=planned,
                     )
                 rows.extend(measured)
                 design_rows.extend(measured)
                 _print_cell(experiment, design, backend, measured)
             assert_same_retained(design_rows, "OLS", design)
         for backend, view, tolerance, maxiter in extra_python_cells:
+            planned = repetitions or 3
             measured = measure(
-                frame, backend, fixed_effects, repetitions or 3,
+                frame, backend, fixed_effects, planned,
                 tolerance=tolerance, maxiter=maxiter,
             )
             for row in measured:
                 row.update(
                     design=design, n_obs=len(frame),
                     n_fe=len(fixed_effects), threads=threads,
-                    view=view, n_planned=len(measured),
+                    view=view, n_planned=planned,
                 )
             rows.extend(measured)
             _print_cell(experiment, design, backend, measured)

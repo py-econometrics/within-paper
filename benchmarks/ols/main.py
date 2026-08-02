@@ -6,6 +6,8 @@ from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.ols.run import LATEST, run_experiment
 
 N_OBS = 10_000_000
+
+
 def main() -> None:
     run_experiment(
         experiment="ols",

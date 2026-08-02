@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from scripts.benchmark_methods import METHODS
+from scripts.plot_tolerance import tolerance_figure
 
 ROOT = Path(__file__).absolute().parents[1]
 
@@ -396,8 +397,6 @@ def main() -> None:
         raise SystemExit(
             f"{tolerance_source} is missing. Run `pixi run bench-tolerance`."
         )
-    from scripts.plot_tolerance import tolerance_figure
-
     tolerance_target = FIGURES / "tolerance_frontier.svg"
     tolerance_figure(pd.read_csv(tolerance_source), tolerance_target)
     print(f"[figures] wrote {tolerance_target.relative_to(ROOT)}")

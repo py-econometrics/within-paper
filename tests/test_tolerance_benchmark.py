@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from benchmarks.tolerance.measure import TOLERANCES, coefficient_error_se, residual_error
-from scripts import make_figures, plot_tolerance
+from scripts import make_figures
 from scripts.benchmark_methods import METHODS
 from scripts.make_figures import CROSS_PACKAGE_BACKENDS, CROSSOVER_FILES, MECHANISM_BACKENDS
 from scripts.plot_tolerance import METHOD_ORDER, aggregate_results, tolerance_figure
@@ -97,7 +97,7 @@ class TolerancePlotTests(unittest.TestCase):
                 patch.object(make_figures, "_load_crossover_results", return_value={}),
                 patch.object(make_figures, "headline_figure"),
                 patch.object(make_figures, "crossover_figure"),
-                patch.object(plot_tolerance, "tolerance_figure") as tolerance,
+                patch.object(make_figures, "tolerance_figure") as tolerance,
             ):
                 make_figures.main()
             tolerance.assert_called_once()

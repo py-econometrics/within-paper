@@ -23,7 +23,8 @@ def run_native(script: Path, arguments: list[str], output: Path) -> list[dict]:
             *arguments,
         ]
     environment = dict(os.environ)
-    environment["JULIA_NUM_THREADS"] = environment["BENCH_THREADS"]
+    if script.suffix != ".R":
+        environment["JULIA_NUM_THREADS"] = environment["BENCH_THREADS"]
     subprocess.run(command, check=True, env=environment)
     return pd.read_csv(output).to_dict("records")
 

@@ -21,7 +21,7 @@ OPTIONS = LsmrOptions(tol=1e-12, maxiter=10_000)
 
 def _measure(categories: np.ndarray, rhs: np.ndarray, name: str) -> dict:
     preconditioner = getattr(PreconditionerConfig, name.capitalize())
-    solve_batch(categories, rhs, OPTIONS, preconditioner=preconditioner)
+    solve_batch(categories, rhs, options=OPTIONS, preconditioner=preconditioner)
     started = time.perf_counter()
     solver = Solver(categories, preconditioner=preconditioner)
     setup = time.perf_counter() - started
@@ -52,7 +52,9 @@ def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
     for n_factors in range(2, 6):
         current = np.asfortranarray(full[:, :n_factors])
         reference = solve_batch(
-            current, rhs, LsmrOptions(tol=1e-14, maxiter=20_000),
+            current,
+            rhs,
+            options=LsmrOptions(tol=1e-14, maxiter=20_000),
             preconditioner=PreconditionerConfig.Additive,
         )
         for repetition in range(REPETITIONS):

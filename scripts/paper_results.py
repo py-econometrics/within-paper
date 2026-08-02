@@ -20,7 +20,7 @@ import subprocess
 import tomllib
 import urllib.request
 import zipfile
-from statistics import median
+from statistics import median, quantiles
 from pathlib import Path
 
 
@@ -302,11 +302,6 @@ def _table_fragment(name: str, table: dict) -> str:
 
 
 def render(_: argparse.Namespace) -> None:
-    # Synchronize before rendering so that a table fragment can never be built
-    # from a result file that is older than the raw benchmark output beside it.
-    # Rendering used to read the stored document as-is, which made every table
-    # correct only until the next benchmark run.
-    _synchronize_canonical_tables()
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
     prose = document.get("prose", {})
@@ -460,9 +455,9 @@ def _row_time(row: dict[str, str]) -> str:
 def _cell_is_complete(candidates: list[dict[str, str]]) -> bool:
     planned = {_integer_field(row, "n_planned") for row in candidates}
     planned.discard(None)
-    expected = planned.pop() if len(planned) == 1 else EXPECTED_TRIALS
+    expected = next(iter(planned)) if len(planned) == 1 else EXPECTED_TRIALS
     repetitions = {_integer_field(row, "repetition") for row in candidates}
-    return len(planned) == 0 and repetitions == set(range(expected))
+    return len(planned) <= 1 and repetitions == set(range(expected))
 
 
 def _trial_key(row: dict[str, str]) -> int | None:
@@ -637,14 +632,17 @@ def _format_hardness(gap: float, share: float) -> str:
 
 
 def _synchronize_hardness(document: dict) -> int:
-    rows = _latest_rows("hardness.csv") or []
+    rows = _latest_rows("hardness.csv")
+    # A partial collection must not erase an earlier gap.
+    if rows is None:
+        return 0
     diagnostics = {
         row["dataset_id"]: row
         for row in rows
         if {row["fe_a"], row["fe_b"]} in ({"indiv_id", "firm_id"}, {"id1", "id2"})
     }
 
-    def update(table_name: str, source_id: str, target_row: list[str]) -> int:
+    def update(source_id: str, target_row: list[str]) -> int:
         diagnostic = diagnostics.get(source_id)
         if diagnostic is None:
             if target_row[1] != "#miss":
@@ -669,19 +667,19 @@ def _synchronize_hardness(document: dict) -> int:
     ):
         for row in document["tables"][table_name]["rows"]:
             scenario = _clean_cell(row[0])
-            changed += update(table_name, scenario, row)
+            changed += update(scenario, row)
     for row in document["tables"]["ols"]["rows"]:
         family = row[0].split()[0]
-        changed += update("ols", family, row)
+        changed += update(family, row)
     for table_name in ("correia_synthetic", "correia_real"):
         for row in document["tables"][table_name]["rows"]:
-            changed += update(table_name, _clean_cell(row[0]), row)
+            changed += update(_clean_cell(row[0]), row)
     for index, row in enumerate(document["tables"]["memory"]["rows"]):
         if row[0].startswith("#"):
             continue
         family = row[0].split()[0]
         size = "100k" if index < 4 else "1m"
-        changed += update("memory", f"memory_{family}_{size}", row)
+        changed += update(f"memory_{family}_{size}", row)
     return changed
 
 
@@ -759,24 +757,34 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
     rows = [row for row in measured if _row_success(row)]
 
     labels = {"rust-map": "`rust-map`", "within-additive": "`within-additive`"}
+    grouped: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    for row in rows:
+        key = (row.get("design", ""), row.get("backend", ""), row["tolerance"])
+        grouped.setdefault(key, []).append(row)
+
     rendered: list[list[str]] = []
     for design in ("simple", "difficult"):
         for backend, label in labels.items():
             matching = [
-                row
-                for row in rows
-                if row.get("design") == design and row.get("backend") == backend
+                (tolerance, measurements)
+                for (row_design, row_backend, tolerance), measurements in grouped.items()
+                if row_design == design and row_backend == backend
             ]
-            for index, row in enumerate(
-                sorted(matching, key=lambda r: float(r["max_eta"]), reverse=True)
+            for index, (tolerance, measurements) in enumerate(
+                sorted(
+                    matching,
+                    key=lambda item: median(float(row["max_eta"]) for row in item[1]),
+                    reverse=True,
+                )
             ):
-                eta = float(row["max_eta"])
+                eta = median(float(row["max_eta"]) for row in measurements)
+                runtime = median(float(row["runtime_s"]) for row in measurements)
                 rendered.append(
                     [
                         f"{design}" if index == 0 and label == list(labels.values())[0] else "",
                         label if index == 0 else "",
-                        row["tolerance"],
-                        _format_seconds(float(row["runtime_s"])),
+                        tolerance,
+                        _format_seconds(runtime),
                         _format_typst_scientific(eta),
                     ]
                 )
@@ -787,47 +795,72 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
 
 
 def _synchronize_ppml_inner_outer(document: dict) -> int:
-    """Fill the PPML table separating outer IRLS steps from inner LSMR work.
-
-    A common outer iteration cap is not a common accuracy condition, so the
-    table reports whether the outer loop converged rather than only how many
-    steps it took.
-    """
+    """Fill the table comparing PyFixest's reuse and rebuild cache policies."""
     rows = _latest_rows("ppml_inner_outer.csv")
     table = document["tables"].get("ppml_inner_outer")
     if table is None or rows is None:
         return 0
+    rows = [
+        row
+        for row in rows
+        if _integer_field(row, "n_obs") == 100_000
+        and row.get("engine") == "pyfixest"
+    ]
+    if not rows:
+        return 0
+
+    grouped: dict[tuple[str, bool, float, int], list[dict[str, str]]] = {}
+    for row in rows:
+        key = (
+            row["design"],
+            str(row.get("rebuild_each_step", "")).lower() in {"true", "1"},
+            float(row["inner_tol"]),
+            int(float(row["inner_maxiter"])),
+        )
+        grouped.setdefault(key, []).append(row)
 
     rendered: list[list[str]] = []
-    preconditioner_order = {"off": 0, "diagonal": 1, "additive": 2}
     for design in ("simple", "difficult"):
         first = True
-        design_rows = sorted(
-            (r for r in rows if r.get("design") == design),
-            key=lambda row: (
-                -float(row["inner_tol"]),
-                preconditioner_order[row["preconditioner"]],
-                str(row.get("rebuild_each_step", "")).lower() in {"true", "1"},
-            ),
+        cells = sorted(
+            ((key, trials) for key, trials in grouped.items() if key[0] == design),
+            key=lambda item: (-item[0][2], item[0][1]),
         )
-        for row in design_rows:
-            converged = str(row.get("outer_converged", "")).lower() in {"true", "1"}
-            steps = row.get("outer_iterations", "")
+        for (_, rebuild, inner_tol, inner_maxiter), trials in cells:
+            successful = [
+                row
+                for row in trials
+                if str(row.get("outer_converged", "")).lower() in {"true", "1"}
+            ]
+            if not _cell_is_complete(trials):
+                outer_cell = total_cell = "incomplete"
+            elif successful:
+                steps = median(float(row["outer_iterations"]) for row in successful)
+                outer_cell = f"{steps:g}"
+                times = [float(row["runtime_s"]) for row in successful]
+                middle = _format_seconds(median(times))
+                if len(times) > 1:
+                    lower, _, upper = quantiles(times, n=4, method="inclusive")
+                    spread = (
+                        f"{_format_seconds(lower).removesuffix('s')}--"
+                        f"{_format_seconds(upper)}"
+                    )
+                    total_cell = f"{middle} [{spread}]"
+                else:
+                    total_cell = middle
+                if len(successful) < len(trials):
+                    total_cell += f" ({len(successful)}/{len(trials)})"
+            else:
+                outer_cell = "failed"
+                total_cell = f"failed (0/{len(trials)})"
             rendered.append(
                 [
                     design if first else "",
-                    f"`{row['preconditioner']}`",
-                    (
-                        "yes"
-                        if str(row.get("rebuild_each_step", "")).lower()
-                        in {"true", "1"}
-                        else "no"
-                    ),
-                    _format_typst_scientific(float(row["inner_tol"])),
-                    f"{int(float(row['inner_maxiter'])):,}".replace(",", "#h(0.18em)"),
-                    steps if converged else f"{steps} (capped)",
-                    f"{int(float(row['inner_iterations_sum'])):,}".replace(",", "#h(0.18em)"),
-                    _format_seconds(float(row["total_s"])),
+                    "rebuild" if rebuild else "reuse",
+                    _format_typst_scientific(inner_tol),
+                    f"{inner_maxiter:,}".replace(",", "#h(0.18em)"),
+                    outer_cell,
+                    total_cell,
                 ]
             )
             first = False
@@ -998,30 +1031,6 @@ def _synchronize_zigzag(document: dict) -> int:
     return changed
 
 
-def _reject_source_collision(
-    table: str, dataset: str, backend: str, candidates: list[dict[str, str]]
-) -> None:
-    """Fail loudly when two result files claim the same cell.
-
-    The harness writes one file per backend label, so this can only happen if a
-    file was renamed without relabelling the `backend` column inside it. The
-    renderer would otherwise report the cell as "incomplete" from duplicate
-    trial ids, which does not say why.
-    """
-    per_backend_sources = {
-        row.get("_source_file", "")
-        for row in candidates
-        if "__" in row.get("_source_file", "")
-    }
-    if len(per_backend_sources) > 1:
-        listed = ", ".join(sorted(per_backend_sources))
-        raise ValueError(
-            f"{table}/{dataset}/{backend} draws on more than one per-backend "
-            f"result file: {listed}. Two files carry the same `backend` label; "
-            "relabel or remove one."
-        )
-
-
 def _synchronize_canonical_tables(
     document: dict | None = None, *, write: bool = True
 ) -> int:
@@ -1046,6 +1055,12 @@ def _synchronize_canonical_tables(
         headers = [_clean_cell(cell) for cell in table["header"]]
         for row in table["rows"]:
             dataset, requirements, source_marker = _paper_runtime_target(name, row)
+            filename, _view = source_marker.split(":", 1)
+            # An absent raw result means that this experiment was not part of
+            # the current run. It is different from a present file with no
+            # matching row, which should continue to show as missing.
+            if not _latest(filename).exists():
+                continue
             for column, backend in enumerate(headers[2:], start=2):
                 candidates = [
                     source
@@ -1054,7 +1069,6 @@ def _synchronize_canonical_tables(
                         source, dataset, backend, requirements, source_marker
                     )
                 ]
-                _reject_source_collision(name, dataset, backend, candidates)
                 rendered = _render_trial_result(candidates)
                 if row[column] != rendered:
                     row[column] = rendered

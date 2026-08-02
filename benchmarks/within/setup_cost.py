@@ -21,7 +21,7 @@ def main() -> None:
     for design, seed in BASE_DESIGNS:
         categories, rhs = solver_data(make_base_data(N_OBS, design, seed))
         options = LsmrOptions()
-        solve_batch(categories, rhs, options)
+        solve_batch(categories, rhs, options=options)
         for repetition in range(REPETITIONS):
             started = time.perf_counter()
             solver = Solver(categories)

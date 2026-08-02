@@ -21,6 +21,8 @@ CORREIA = ROOT / "benchmarks" / "data" / "correia_data"
 OUTPUT = ROOT / "results" / "runs" / "latest" / "hardness.csv"
 DENSE_MAX_ENTRIES = 1_000_000
 PROPACK_MAX_MIN_DIM = 20_000
+
+
 @dataclass(frozen=True)
 class PairHardness:
     n_q_levels: int

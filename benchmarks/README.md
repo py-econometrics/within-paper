@@ -44,5 +44,7 @@ The source tree is organized by model or experiment:
 | `tolerance/` | Shared tolerance measurement and native siblings |
 | `within/` | Standalone solver diagnostics |
 | `accuracy.py` | External residual and projection-error calculations |
+| `memory.py` | Isolated-process memory measurements |
+| `runtime.py` | R and Julia process runner |
 
 The timing, accuracy, repetition, and fixed-effect rules remain in `PROTOCOL.md`.

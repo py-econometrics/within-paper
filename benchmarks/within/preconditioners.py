@@ -85,7 +85,7 @@ def main() -> None:
         reference_fit = solve_batch(
             categories,
             rhs,
-            LsmrOptions(tol=1e-14, maxiter=20_000),
+            options=LsmrOptions(tol=1e-14, maxiter=20_000),
             preconditioner=PreconditionerConfig.Additive,
         )
         reference = np.asarray(reference_fit.demeaned)
@@ -96,7 +96,7 @@ def main() -> None:
                 solve_batch(
                     categories,
                     rhs,
-                    LsmrOptions(tol=LSMR_TOLERANCE, maxiter=MAXITER),
+                    options=LsmrOptions(tol=LSMR_TOLERANCE, maxiter=MAXITER),
                     preconditioner=getattr(PreconditionerConfig, name.capitalize()),
                 )
             measured = []
@@ -104,7 +104,13 @@ def main() -> None:
                 row = (
                     _map(categories, rhs, reference, repetition)
                     if backend == "rust-map"
-                    else _lsmr(categories, rhs, reference, name, repetition)
+                    else _lsmr(
+                        categories,
+                        rhs,
+                        reference,
+                        backend.removeprefix("within-"),
+                        repetition,
+                    )
                 )
                 row.update(design=design, n_obs=len(categories))
                 rows.append(row)

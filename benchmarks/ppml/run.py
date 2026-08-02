@@ -38,8 +38,9 @@ def main() -> None:
             frame.to_parquet(data_path, index=False)
             design_rows = []
             for backend in BACKENDS:
+                planned = REPETITIONS
                 measured = (
-                    measure(frame, backend, REPETITIONS)
+                    measure(frame, backend, planned)
                     if backend in {"rust-map", "within"}
                     else _native(data_path, work / f"{backend}.csv", backend)
                 )
@@ -47,7 +48,7 @@ def main() -> None:
                     row.update(
                         design=design, n_obs=len(frame), n_fe=3,
                         threads=threads, view="default",
-                        n_planned=len(measured),
+                        n_planned=planned,
                     )
                 rows.extend(measured)
                 design_rows.extend(measured)

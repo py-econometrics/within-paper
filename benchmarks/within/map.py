@@ -52,6 +52,7 @@ def map_demean_with_sweeps(
     for column in range(values.shape[1]):
         current = values[:, column]
         done = False
+        sweep = 0
         for sweep in range(1, maxiter + 1):
             previous = current.copy()
             for factor in range(cats.shape[1]):

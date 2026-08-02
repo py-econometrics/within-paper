@@ -32,6 +32,7 @@
 #let miss = text(fill: rgb("#777777"))[--]
 #let dg(body) = text(fill: rgb("#2563eb"), body)
 #let cr(body) = text(fill: rgb("#c2410c"), body)
+#import "generated/paper_values.typ": *
 
 #align(center)[
   #set par(justify: false)
@@ -975,19 +976,21 @@ multiplied by the number of IRLS iterations.
 
 === Preconditioner reuse across IRLS
 
-The IRLS structure also enlarges the window over which a preconditioner setup cost
-can amortize. A factor-pair preconditioner depends on the fixed-effect graph
-(invariant across IRLS iterations) and on the IRLS weights (which do change between
-iterations). If the weights do not move much, a slightly stale preconditioner is
-still effective. We exploit this property by building the preconditioner once and reusing the
-stale version on subsequent IRLS iterations. Staleness slows the outer Krylov solver
-but does not bias its solution; the iteration still converges to the correct demeaned
-residuals. The construction cost is therefore paid once per regression rather than
-once per IRLS step. 
+IRLS repeats fixed-effect demeaning with the same incidence graph but new weights. The
+factor-pair preconditioner depends on both. Reusing the first preconditioner avoids later
+setup work, but its quality can fall as the weights move. Rebuilding updates the
+factorization at every IRLS step.
 
-We benchmark this strategy on the simple-versus-difficult DGPs from the `fixest`
-benchmark suite @berge2026fixest at $n = 1$M observations, with one covariate and worker,
-firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
+PyFixest currently keeps the preconditioner returned by its first weighted demeaning
+call. Our diagnostic runs the same `pyfixest.fepois` routine under two cache policies.
+The reuse cell leaves PyFixest unchanged. The rebuild cell prevents that first
+preconditioner from being stored, so PyFixest constructs a new one at every weighted
+demeaning call. Initialization, separation handling, convergence rules, and all other
+estimation code are identical.
+
+We next benchmark the full PPML estimators on the simple-versus-difficult DGPs from the
+`fixest` benchmark suite @berge2026fixest at $n = 1$M observations, with one covariate
+and worker, firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
 `rust-map` and the preconditioned `within` solver.
 
@@ -1046,9 +1049,9 @@ strategy. Both backends are executed in isolated processes and report peak RSS v
 		denotes $1-rho_(W F)$ for the worker-firm pair in the corresponding generated design.]
 		]
 
-At 100K observations, the preconditioner adds roughly 50 MB on both the easy and the
-hard graph. At 1M observations the overhead is larger in absolute terms (135--515 MB),
-but it remains modest relative to the full panel data footprint.
+At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M
+observations the overhead is #result_memory_1m_overhead, but it remains modest relative
+to the full panel data footprint.
 The preconditioned solver consumes more memory than MAP, yet the additional
 storage for factor-pair co-occurrences, partition weights, and local approximate
 Cholesky factors remains small relative to
@@ -1081,10 +1084,10 @@ Differences are absolute slope-coefficient deviations from `rust-map`. `within` 
 PyFixest preconditioned Rust backend.]
 ]
 
-The `within` and `FEM.jl` rows are almost identical to `rust-map` at the reported
-defaults. R `fixest` is also close, but not at machine precision: the largest
-coefficient difference is approximately $5 times 10^(-5)$. This difference is not
-surprising, because the packages use different stopping rules.
+On the simple design, the largest coefficient difference is
+#result_agreement_simple_max. On the difficult design it is
+#result_agreement_difficult_max. The methods use different stopping checks, so exact
+agreement is not expected on the poorly conditioned design.
 
 = Software
 
@@ -1158,12 +1161,11 @@ factor pair is sparsely connected, through low mobility, strong sorting, or near
 MAP passes information across the graph slowly, and the factor-pair preconditioner is
 faster, often by a wide margin. 
 
-The preconditioner depends only on the fixed-effect graph, so it can be built once and
-reused across demeaning calls. Reuse matters most when a single estimation issues many
-such calls: IRLS-based GLMs such as PPML demean once per iteration, so the construction
-cost is paid once while the faster convergence can accrue at every iteration step. In our PPML
-benchmark on a hard three-way design, `within` finishes in seconds where the MAP-based
-routines take minutes or fail to converge.
+The preconditioner depends on the fixed-effect graph and, in weighted problems, on the
+weights. A single factorization can be shared safely across right-hand sides when both
+are fixed. IRLS-based GLMs require a separate comparison because their weights change at
+every iteration. The appendix compares PyFixest's current reuse policy with rebuilding
+under otherwise identical `fepois` calls.
 
 Which solver to prefer depends on the fixed-effect graph. Accelerated MAP
 and diagonally preconditioned LSMR are good defaults across much of the range our
@@ -1331,13 +1333,14 @@ per unordered factor pair, so the pair count grows as $Q(Q-1)/2$.]
 design at 1M observations. Setup is paid once and reused across right-hand sides, so the
 per-RHS cost of the factor-pair preconditioner falls as $K$ grows.]
 
-== PPML Inner and Outer Convergence
+== PPML Cache Policy and Outer Convergence
 
 #include "generated/tables/ppml_inner_outer.typ"
 #v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] Outer IRLS steps and inner LSMR iterations for PPML fits
-at one million observations, with a 100-step outer cap. The table gives the inner
-tolerance and cap for each row and compares reuse with rebuilding at every outer step.]
+#text(size: 8.2pt)[#emph[Note:] Exact PyFixest `fepois` calls at 100K observations, with
+a 100-step outer cap and the additive factor-pair preconditioner. Reuse is unmodified
+PyFixest behavior. Rebuild changes only the cache policy. The two regimes use the shipped
+and tight inner-solver settings.]
 
 #pagebreak()
 

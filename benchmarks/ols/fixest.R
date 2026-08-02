@@ -32,12 +32,14 @@ for (index in seq_len(repetitions)) {
     fit <- fit_once()
     data.frame(
       backend = "fixest", repetition = index - 1L,
+      n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = nobs(fit), beta_x1 = unname(coef(fit)[["x1"]]),
       max_eta = NA_real_, converged = TRUE, error = ""
     )
   }, error = function(error) data.frame(
     backend = "fixest", repetition = index - 1L,
+    n_planned = repetitions,
     runtime_s = proc.time()[["elapsed"]] - started,
     n_retained = NA_integer_, beta_x1 = NA_real_, max_eta = NA_real_,
     converged = FALSE, error = conditionMessage(error)

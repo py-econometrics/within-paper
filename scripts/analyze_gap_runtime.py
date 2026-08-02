@@ -119,7 +119,6 @@ def analyze(
     if runtimes.empty:
         raise FileNotFoundError(f"no runtime CSVs with required columns in {results_dir}")
     medians = _median_runtime(runtimes)
-    medians["family"] = medians["design"].astype(str)
     medians["design"] = [
         _sized_key(str(design), n_obs)
         for design, n_obs in zip(medians["design"], medians["n_obs"], strict=True)

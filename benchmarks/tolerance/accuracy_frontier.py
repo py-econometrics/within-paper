@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarks.data import make_base_data
+from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.tolerance.measure import measure
 
 ROOT = Path(__file__).absolute().parents[2]
@@ -14,7 +14,7 @@ REPETITIONS = 3
 
 def main() -> None:
     rows = []
-    for design, seed in (("simple", 123), ("difficult", 124)):
+    for design, seed in BASE_DESIGNS:
         rows.append(
             measure(
                 make_base_data(100_000, design, seed),

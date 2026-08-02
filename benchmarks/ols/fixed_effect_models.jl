@@ -29,6 +29,7 @@ for repetition in 0:(repetitions - 1)
         fit = fit_once()
         push!(rows, (
             backend="FEM.jl", repetition=repetition,
+            n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=nobs(fit),
             beta_x1=Float64(coef(fit)[1]), max_eta=missing,
             converged=true, error="",
@@ -36,6 +37,7 @@ for repetition in 0:(repetitions - 1)
     catch error_value
         push!(rows, (
             backend="FEM.jl", repetition=repetition,
+            n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=missing,
             beta_x1=missing, max_eta=missing, converged=false,
             error=sprint(showerror, error_value),

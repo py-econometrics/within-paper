@@ -18,6 +18,7 @@ from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
 from benchmarks.data import drop_singletons, make_base_data, solver_data
 from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ppml.pyfixest import fit_ppml
+from benchmarks.within import ppml_inner_outer
 from benchmarks.within.map import map_demean_with_sweeps
 from scripts import analyze_gap_runtime, compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
@@ -81,6 +82,14 @@ class MapTests(unittest.TestCase):
             np.arange(4.0)[:, None], categories, tol=0.0, maxiter=1
         )
         self.assertEqual(result.iterations, [1])
+        self.assertEqual(result.converged, [False])
+
+    def test_zero_iteration_cap_reports_zero_sweeps(self) -> None:
+        categories = np.array([[0, 0], [1, 1]], dtype=np.uint32)
+        result = map_demean_with_sweeps(
+            np.arange(2.0)[:, None], categories, maxiter=0
+        )
+        self.assertEqual(result.iterations, [0])
         self.assertEqual(result.converged, [False])
 
 
@@ -166,6 +175,16 @@ class PythonFitTests(unittest.TestCase):
         fit = fit_ppml(frame, "rust-map")
         self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
 
+    def test_pyfixest_ppml_cache_policies_agree(self) -> None:
+        frame = make_base_data(2_000, "simple", 14)
+        reused = ppml_inner_outer.measure_policy(frame, False, 1e-8, 1_000)
+        rebuilt = ppml_inner_outer.measure_policy(frame, True, 1e-8, 1_000)
+        self.assertTrue(reused["outer_converged"])
+        self.assertTrue(rebuilt["outer_converged"])
+        self.assertEqual(reused["n_retained"], rebuilt["n_retained"])
+        self.assertAlmostEqual(reused["beta_x1"], rebuilt["beta_x1"], places=8)
+        self.assertAlmostEqual(reused["deviance"], rebuilt["deviance"], places=7)
+
 
 class PaperResultTests(unittest.TestCase):
     @staticmethod
@@ -228,7 +247,43 @@ class PaperResultTests(unittest.TestCase):
             self.assertEqual(document["tables"]["mechanism_mobility"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["correia_synthetic"]["rows"][0][2], "2.00s")
 
+    def test_missing_runtime_file_preserves_collected_cell(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+            document["tables"]["ols"]["rows"][0][2] = "2.00s"
+            with patch.object(paper_results, "LATEST_RUN", Path(directory)):
+                paper_results._synchronize_canonical_tables(document, write=False)
+            self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
+
+    def test_render_does_not_collect_raw_results(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                patch.object(paper_results, "GENERATED_DIR", Path(directory) / "tables"),
+                patch.object(paper_results, "_synchronize_canonical_tables") as synchronize,
+            ):
+                paper_results.render(None)
+        synchronize.assert_not_called()
+
+    def test_accuracy_frontier_uses_one_median_row_per_setting(self) -> None:
+        document = {"tables": {"accuracy_frontier": {"rows": []}}}
+        rows = [
+            {
+                "design": "simple", "backend": "rust-map", "tolerance": "1e-8",
+                "runtime_s": runtime, "max_eta": eta, "converged": "true",
+            }
+            for runtime, eta in (("0.02", "2e-8"), ("0.04", "4e-8"), ("0.06", "6e-8"))
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_accuracy_frontier(document)
+        rendered = document["tables"]["accuracy_frontier"]["rows"]
+        self.assertEqual(len(rendered), 1)
+        self.assertEqual(rendered[0][3], "0.040s")
+        self.assertEqual(rendered[0][4], "$4.0 times 10^(-8)$")
+
     def test_ppml_inner_outer_table_distinguishes_inner_regimes(self) -> None:
+        self.assertEqual(ppml_inner_outer.N_OBS, 100_000)
+        self.assertEqual(ppml_inner_outer.REBUILD_OPTIONS, (False, True))
+        self.assertEqual(ppml_inner_outer.REPETITIONS, 7)
         document = {
             "tables": {
                 "ppml_inner_outer": {
@@ -236,37 +291,38 @@ class PaperResultTests(unittest.TestCase):
                 }
             }
         }
-        rows = [
-            {
-                "design": "simple",
-                "preconditioner": "additive",
-                "rebuild_each_step": "true",
-                "inner_tol": "1e-12",
-                "inner_maxiter": "10000",
-                "outer_converged": "true",
-                "outer_iterations": "32",
-                "inner_iterations_sum": "1905",
-                "total_s": "2.17",
-            },
-            {
-                "design": "simple",
-                "preconditioner": "off",
-                "rebuild_each_step": "false",
-                "inner_tol": "1e-8",
-                "inner_maxiter": "1000",
-                "outer_converged": "false",
-                "outer_iterations": "100",
-                "inner_iterations_sum": "1234",
-                "total_s": "4.5",
-            },
-        ]
+        rows = []
+        for rebuild, tolerance, cap in (
+            (False, "1e-8", "1000"),
+            (True, "1e-12", "10000"),
+        ):
+            rows.extend(
+                {
+                    "design": "simple",
+                    "engine": "pyfixest",
+                    "n_obs": "100000",
+                    "rebuild_each_step": str(rebuild).lower(),
+                    "inner_tol": tolerance,
+                    "inner_maxiter": cap,
+                    "outer_converged": "true",
+                    "outer_iterations": "8",
+                    "runtime_s": str(repetition + 1),
+                    "repetition": str(repetition),
+                    "n_planned": "7",
+                    "error": "",
+                }
+                for repetition in range(7)
+            )
         with patch.object(paper_results, "_latest_rows", return_value=rows):
             paper_results._synchronize_ppml_inner_outer(document)
 
         rendered = document["tables"]["ppml_inner_outer"]["rows"]
-        self.assertEqual(len(rendered[0]), 8)
-        self.assertEqual(rendered[0][3:5], ["$1.0 times 10^(-8)$", "1#h(0.18em)000"])
-        self.assertEqual(rendered[1][3:5], ["$1.0 times 10^(-12)$", "10#h(0.18em)000"])
+        self.assertEqual(len(rendered[0]), 6)
+        self.assertEqual(rendered[0][1], "reuse")
+        self.assertEqual(rendered[0][2:4], ["$1.0 times 10^(-8)$", "1#h(0.18em)000"])
+        self.assertEqual(rendered[0][5], "4.00s [2.50--5.50s]")
+        self.assertEqual(rendered[1][1], "rebuild")
+        self.assertEqual(rendered[1][2:4], ["$1.0 times 10^(-12)$", "10#h(0.18em)000"])
 
 
 if __name__ == "__main__":
