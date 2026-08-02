@@ -42,12 +42,14 @@ def residual_error(residual: np.ndarray, reference: np.ndarray) -> float:
 
 def reference_solution(frame: pd.DataFrame) -> dict:
     """Build and validate the tight additive-LSMR reference fit."""
+    # This diagnostic reads residuals after fitting, which lean fits discard.
     fit = fit_ols(
         frame,
         "within-additive",
         FE_COLUMNS,
         REFERENCE_TOLERANCE,
         REFERENCE_MAXITER,
+        lean=False,
     )
     beta = float(fit.coef().loc["x1"])
     se = float(fit.se().loc["x1"])
@@ -85,13 +87,15 @@ def _python_rows(
     categories = np.column_stack(
         [pd.factorize(frame[name], sort=True)[0] for name in FE_COLUMNS]
     )
-    fit_ols(frame, backend, FE_COLUMNS, tolerances[0], maxiter)
+    fit_ols(frame, backend, FE_COLUMNS, tolerances[0], maxiter, lean=False)
     rows = []
     for tolerance in tolerances:
         for repetition in range(repetitions):
             started = time.perf_counter()
             try:
-                fit = fit_ols(frame, backend, FE_COLUMNS, tolerance, maxiter)
+                fit = fit_ols(
+                    frame, backend, FE_COLUMNS, tolerance, maxiter, lean=False
+                )
                 runtime = time.perf_counter() - started
                 beta = float(fit.coef().loc["x1"])
                 residual = np.asarray(fit.resid(), dtype=float).reshape(-1)

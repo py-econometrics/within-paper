@@ -28,7 +28,7 @@ def _worker(queue: mp.Queue, design: str, n_obs: int, seed: int, backend: str) -
     try:
         fit = pf.feols(
             "y ~ x1 | indiv_id + firm_id + year", frame, vcov="iid",
-            copy_data=False, store_data=False, demeaner=demeaner,
+            copy_data=False, store_data=False, lean=True, demeaner=demeaner,
         )
         peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         peak_mb = peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024

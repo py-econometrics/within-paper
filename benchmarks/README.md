@@ -27,9 +27,10 @@ pixi run bench-tolerance
 pixi run compute-hardness
 ```
 
-Each comparison generates one deterministic sample per design. Python uses the frame in
-memory. When R or Julia is part of the comparison, the experiment writes that same frame
-to a temporary Parquet file and removes it at the end. Backends run one after another.
+Each OLS comparison generates one deterministic sample per design and writes it to a
+temporary Parquet file. Every backend loads that same sample in a fresh process. Data
+loading is outside the timed region, and ending the process returns its working memory
+before the next backend starts. The temporary file is removed after the design finishes.
 
 Raw results live under `results/runs/latest/`. Each experiment writes its complete CSV
 once; medians and table labels belong to `scripts/paper_results.py`.

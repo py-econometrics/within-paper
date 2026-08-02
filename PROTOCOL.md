@@ -285,16 +285,16 @@ Resolved before the production runs, and struck from this list when done:
 - [x] Retained sample size. Every final Python, R, and Julia row records `n_retained`.
       The OLS and PPML runners reject a comparison if successful backends retained
       different row counts.
-- [x] One shared experiment layer. Each runner creates one frame per design, reuses it
-      for every in-process backend, and writes the same frame to a temporary Parquet file
-      for R and Julia. Seeds belong to designs rather than repetitions, and each result
-      file is written once after the complete run.
+- [x] One shared experiment layer. The OLS runner creates one temporary Parquet sample
+      per design. Every backend loads that sample in a fresh process, so process-local
+      memory is returned before the next cell starts. Seeds belong to designs rather
+      than repetitions, and each result file is written once after the complete run.
 - [ ] Run the standalone diagnostics on the AKM designs. The current standalone
       preconditioner diagnostic still uses the simple and difficult base designs.
 - [x] Wire the R1/R2/R3 repetition counts into the harness. Done. The PyFixest
       benchmarkers time one fit, choose the count from its runtime, and repeat on the
-      same in-memory frame. Final rows keep `repetition` and `n_planned`, and the renderer
-      checks a cell against that recorded plan rather than assuming three trials.
+      same backend-native frame. Final rows keep `repetition` and `n_planned`, and the
+      renderer checks a cell against that recorded plan rather than assuming three trials.
 - [x] Reduce the DGP replicate count for timing. Each timing runner now generates one
       sample per design and repeats the fit on that sample. DGP replication remains a
       separate robustness exercise.

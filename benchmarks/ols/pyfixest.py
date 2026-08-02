@@ -6,10 +6,7 @@ import time
 import warnings
 from collections.abc import Sequence
 
-import numpy as np
 import pandas as pd
-
-from benchmarks.accuracy import external_normal_residuals
 
 
 def demeaner(backend: str, tolerance: float | None = None, maxiter: int | None = None):
@@ -40,6 +37,8 @@ def fit_ols(
     fixed_effects: Sequence[str],
     tolerance: float | None = None,
     maxiter: int | None = None,
+    *,
+    lean: bool = True,
 ):
     import pyfixest as pf
 
@@ -50,22 +49,9 @@ def fit_ols(
         vcov="iid",
         copy_data=False,
         store_data=False,
+        lean=lean,
         demeaner=demeaner(backend, tolerance, maxiter),
     )
-
-
-def _max_eta(fit, frame: pd.DataFrame, fixed_effects: Sequence[str]) -> float | None:
-    retained = int(fit._N)
-    if retained != len(frame):
-        return None
-    raw = frame.loc[:, ["y", "x1"]].to_numpy(dtype=float)
-    residual = np.column_stack(
-        [np.asarray(fit._Y).reshape(retained, -1), np.asarray(fit._X).reshape(retained, -1)]
-    )
-    categories = np.column_stack(
-        [pd.factorize(fit._fe.iloc[:, index], sort=True)[0] for index in range(len(fixed_effects))]
-    )
-    return float(np.max(external_normal_residuals(categories, raw, residual)))
 
 
 def measure(
@@ -96,7 +82,7 @@ def measure(
                         "runtime_s": elapsed,
                         "n_retained": int(fit._N),
                         "beta_x1": float(fit.coef().loc["x1"]),
-                        "max_eta": _max_eta(fit, frame, fixed_effects),
+                        "max_eta": None,
                         "converged": True,
                         "error": "",
                     }

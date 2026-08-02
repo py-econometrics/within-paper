@@ -31,13 +31,15 @@ def make_base_data(n_obs: int, design: str, seed: int) -> pd.DataFrame:
     else:
         raise ValueError(f"unknown base design {design!r}")
 
-    x = rng.standard_normal((actual_n, 10))
-    mean = (
-        x[:, 0]
-        + rng.standard_normal(n_firms)[firm - 1]
-        + rng.standard_normal(n_individuals)[individual - 1]
-        + rng.standard_normal(n_years)[year - 1]
-    )
+    x1 = np.empty(actual_n)
+    for start in range(0, actual_n, 100_000):
+        stop = min(start + 100_000, actual_n)
+        x1[start:stop] = rng.standard_normal((stop - start, 10))[:, 0]
+
+    mean = x1.copy()
+    mean += rng.standard_normal(n_firms)[firm - 1]
+    mean += rng.standard_normal(n_individuals)[individual - 1]
+    mean += rng.standard_normal(n_years)[year - 1]
     y = mean + rng.standard_normal(actual_n)
     theta = 0.5
     probability = theta / (theta + np.exp(y))
@@ -47,7 +49,7 @@ def make_base_data(n_obs: int, design: str, seed: int) -> pd.DataFrame:
         "year": year,
         "y": y,
         "negbin_y": rng.negative_binomial(theta, probability),
-        "x1": x[:, 0],
+        "x1": x1,
     }
     return pd.DataFrame(values)
 

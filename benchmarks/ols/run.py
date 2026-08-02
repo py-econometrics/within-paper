@@ -1,7 +1,8 @@
-"""Run one OLS comparison on shared in-memory and temporary data."""
+"""Run one OLS comparison with one temporary sample per design."""
 
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
 import tempfile
 import time
@@ -10,6 +11,7 @@ from pathlib import Path
 from statistics import median
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from benchmarks.ols.pyfixest import fit_ols, measure
 from benchmarks.runtime import assert_same_retained, run_native
@@ -46,6 +48,50 @@ def _native_rows(
     return run_native(Path(__file__).with_name(script), arguments, output)
 
 
+def _run_process(target: Callable, *args) -> None:
+    process = mp.get_context("spawn").Process(target=target, args=args)
+    process.start()
+    process.join()
+    if process.exitcode:
+        raise RuntimeError(f"{target.__name__} exited with status {process.exitcode}")
+
+
+def _write_sample(generate: Callable[[], pd.DataFrame], path: Path) -> None:
+    generate().to_parquet(path, index=False)
+
+
+def _python_rows(
+    data_path: Path,
+    output: Path,
+    fixed_effects: tuple[str, ...],
+    backend: str,
+    repetitions: int | None,
+    tolerance: float | None = None,
+    maxiter: int | None = None,
+) -> None:
+    frame = pd.read_parquet(data_path)
+    warm_up = True
+    if repetitions is None:
+        started = time.perf_counter()
+        fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+        planned = repetitions_for_runtime(time.perf_counter() - started)
+        warm_up = False
+    else:
+        planned = repetitions
+    rows = measure(
+        frame,
+        backend,
+        fixed_effects,
+        planned,
+        warm_up=warm_up,
+        tolerance=tolerance,
+        maxiter=maxiter,
+    )
+    for row in rows:
+        row["n_planned"] = planned
+    pd.DataFrame(rows).to_csv(output, index=False)
+
+
 def _print_cell(experiment: str, design: str, backend: str, rows: list[dict]) -> None:
     times = [
         float(row["runtime_s"])
@@ -66,38 +112,38 @@ def run_experiment(
     repetitions: int | None = None,
     extra_python_cells: Sequence[tuple[str, str, float, int]] = (),
 ) -> pd.DataFrame:
-    """Generate one sample per design and write all measured rows once."""
+    """Generate one sample per design and measure each cell in a fresh process."""
     threads = benchmark_threads()
     rows = []
     for design, generate in designs:
-        frame = generate()
         design_rows = []
         with tempfile.TemporaryDirectory(prefix="within-ols-") as directory:
             work = Path(directory)
             data_path = work / "sample.parquet"
-            if any(backend not in PYTHON_BACKENDS for backend in backends):
-                frame.to_parquet(data_path, index=False)
+            _run_process(_write_sample, generate, data_path)
+            n_obs = pq.read_metadata(data_path).num_rows
             for backend in backends:
+                cell_output = work / f"{backend}.csv"
                 if backend in PYTHON_BACKENDS:
-                    warm_up = True
-                    if repetitions is None:
-                        started = time.perf_counter()
-                        fit_ols(frame, backend, fixed_effects)
-                        planned = repetitions_for_runtime(time.perf_counter() - started)
-                        warm_up = False
-                    else:
-                        planned = repetitions
-                    measured = measure(frame, backend, fixed_effects, planned, warm_up=warm_up)
+                    _run_process(
+                        _python_rows,
+                        data_path,
+                        cell_output,
+                        tuple(fixed_effects),
+                        backend,
+                        repetitions,
+                    )
+                    measured = pd.read_csv(cell_output).to_dict("records")
                 else:
                     measured = _native_rows(
-                        data_path, work / f"{backend}.csv",
+                        data_path, cell_output,
                         fixed_effects, backend, repetitions,
                     )
-                    planned = int(measured[0]["n_planned"])
+                planned = int(measured[0]["n_planned"])
                 for row in measured:
                     row.update(
                         design=design,
-                        n_obs=len(frame),
+                        n_obs=n_obs,
                         n_fe=len(fixed_effects),
                         threads=threads,
                         view="default",
@@ -107,20 +153,28 @@ def run_experiment(
                 design_rows.extend(measured)
                 _print_cell(experiment, design, backend, measured)
             assert_same_retained(design_rows, "OLS", design)
-        for backend, view, tolerance, maxiter in extra_python_cells:
-            planned = repetitions or 3
-            measured = measure(
-                frame, backend, fixed_effects, planned,
-                tolerance=tolerance, maxiter=maxiter,
-            )
-            for row in measured:
-                row.update(
-                    design=design, n_obs=len(frame),
-                    n_fe=len(fixed_effects), threads=threads,
-                    view=view, n_planned=planned,
+            for backend, view, tolerance, maxiter in extra_python_cells:
+                cell_output = work / f"{backend}-{view}.csv"
+                planned = repetitions or 3
+                _run_process(
+                    _python_rows,
+                    data_path,
+                    cell_output,
+                    tuple(fixed_effects),
+                    backend,
+                    planned,
+                    tolerance,
+                    maxiter,
                 )
-            rows.extend(measured)
-            _print_cell(experiment, design, backend, measured)
+                measured = pd.read_csv(cell_output).to_dict("records")
+                for row in measured:
+                    row.update(
+                        design=design, n_obs=n_obs,
+                        n_fe=len(fixed_effects), threads=threads,
+                        view=view, n_planned=planned,
+                    )
+                rows.extend(measured)
+                _print_cell(experiment, design, backend, measured)
     result = pd.DataFrame(rows)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)

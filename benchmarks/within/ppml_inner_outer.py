@@ -72,6 +72,7 @@ def measure_policy(
                     vcov="iid",
                     copy_data=False,
                     store_data=False,
+                    lean=True,
                     demeaner=demeaner,
                     iwls_tol=OUTER_TOL,
                     iwls_maxiter=OUTER_MAXITER,

@@ -6,6 +6,7 @@ import os
 import json
 import tempfile
 import unittest
+from functools import partial
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ from benchmarks.accuracy import external_normal_residuals, projection_errors
 from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
 from benchmarks.data import drop_singletons, make_base_data, solver_data
 from benchmarks.ols.pyfixest import fit_ols
+from benchmarks.ols.run import run_experiment
 from benchmarks.ppml.pyfixest import fit_ppml
 from benchmarks.within import ppml_inner_outer
 from benchmarks.within.map import map_demean_with_sweeps
@@ -169,11 +171,24 @@ class PythonFitTests(unittest.TestCase):
         frame = make_base_data(2_000, "simple", 12)
         fit = fit_ols(frame, "rust-map", ("indiv_id", "firm_id", "year"))
         self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
+        self.assertFalse(hasattr(fit, "_Y"))
 
     def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
         frame = make_base_data(2_000, "simple", 13)
         fit = fit_ppml(frame, "rust-map")
         self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
+        self.assertFalse(hasattr(fit, "_Y"))
+
+    def test_ols_runner_uses_an_isolated_python_cell(self) -> None:
+        result = run_experiment(
+            experiment="test",
+            designs=[("simple", partial(make_base_data, 2_000, "simple", 15))],
+            output=None,
+            backends=("rust-map",),
+            repetitions=1,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result.loc[0, "converged"])
 
     def test_pyfixest_ppml_cache_policies_agree(self) -> None:
         frame = make_base_data(2_000, "simple", 14)

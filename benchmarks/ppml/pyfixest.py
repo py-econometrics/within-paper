@@ -27,6 +27,7 @@ def fit_ppml(frame: pd.DataFrame, backend: str):
         vcov="iid",
         copy_data=False,
         store_data=False,
+        lean=True,
         demeaner=_demeaner(backend),
         iwls_maxiter=100,
     )
