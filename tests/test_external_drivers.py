@@ -22,17 +22,29 @@ def _run(language: str, model: str) -> pd.DataFrame:
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
         data, output = work / "sample.parquet", work / "result.csv"
-        make_base_data(1_000, "simple", 22).to_parquet(data, index=False)
+        design = "difficult" if model == "tolerance" else "simple"
+        frame = make_base_data(1_000, design, 22)
+        if model == "tolerance":
+            frame["reference_residual"] = 1.0
+        frame.to_parquet(data, index=False)
         if model == "ols":
             script = ROOT / "benchmarks" / "ols" / (
                 "fixest.R" if language == "r" else "fixed_effect_models.jl"
             )
             args = [str(data), str(output), "indiv_id,firm_id,year", "1"]
-        else:
+        elif model == "ppml":
             script = ROOT / "benchmarks" / "ppml" / (
                 "fixest.R" if language == "r" else "gl_fixed_effect_models.jl"
             )
-            args = [str(data), str(output), "1"]
+            args = [str(data), str(output), "1", "100"]
+        else:
+            script = ROOT / "benchmarks" / "tolerance" / (
+                "fixest.R" if language == "r" else "fixed_effect_models.jl"
+            )
+            args = [
+                str(data), str(output), design, "1e-8", "1e-6",
+                "1", "1", "0", "1",
+            ]
         if language == "r":
             command = ["Rscript", str(script), *args]
         else:
@@ -57,6 +69,12 @@ class RTests(unittest.TestCase):
         result = _run("r", "ppml")
         self.assertTrue(result.loc[0, "converged"])
 
+    @unittest.skipUnless(HAS_R, "Rscript not installed")
+    def test_tolerance_sibling_records_an_iteration_cap(self) -> None:
+        result = _run("r", "tolerance")
+        self.assertFalse(result.loc[0, "converged"])
+        self.assertTrue(result.loc[0, "capped"])
+
 
 class JuliaTests(unittest.TestCase):
     @unittest.skipUnless(HAS_JULIA, "Julia not installed")
@@ -69,6 +87,13 @@ class JuliaTests(unittest.TestCase):
     def test_ppml_sibling_writes_a_converged_row(self) -> None:
         result = _run("julia", "ppml")
         self.assertTrue(result.loc[0, "converged"])
+
+    @unittest.skipUnless(HAS_JULIA, "Julia not installed")
+    def test_tolerance_sibling_writes_convergence_status(self) -> None:
+        result = _run("julia", "tolerance")
+        self.assertIn("converged", result)
+        self.assertIn("capped", result)
+        self.assertFalse(bool(result.loc[0, "converged"] and result.loc[0, "capped"]))
 
 
 if __name__ == "__main__":

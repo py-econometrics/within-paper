@@ -737,6 +737,13 @@ residualization of the outcome and covariates, and estimation of the coefficient
 interest. Separate tables report the memory cost of storing factor-pair information and
 verify that the preconditioned solver matches MAP to numerical tolerance.
 
+For cross-package comparisons, every backend receives the same input data but uses its
+own default handling of singleton or separated observations. Successful fits record the
+retained-observation count; failed attempts record their convergence status and error.
+Any shared control is stated with the relevant table. The comparisons are not constrained
+to a common estimation sample. The single-package mechanism experiments later in the
+paper do use a common prepared sample, because their purpose is to isolate the preconditioner.
+
 The runtime tables also report the pairwise hardness statistic for the relevant factor
 pair and the observation share of the component attaining it. Smaller gaps indicate
 factor pairs on which MAP tends to converge more slowly; with three or more fixed
@@ -917,9 +924,10 @@ reference set for comparing the same software backends outside the AKM generator
   #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
   `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
   share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
-  geometry. The `synthetic-zigzag` dataset is omitted because every backend terminates
-  with a numerical error rather than a converged solution under default settings, making
-  it a stress case rather than a runtime comparison.]
+  geometry. The `synthetic-zigzag` dataset is omitted because the default MAP backends
+  hit their 10,000-iteration demeaning caps. With 10,002 observations and 10,001 fixed-effect
+  levels in one connected component, only two dimensions remain after absorption, making
+  this a numerical stress case rather than a useful runtime comparison.]
   ]
 
 These results are less clear than the controlled AKM experiments, which is itself informative.
@@ -993,6 +1001,9 @@ We next benchmark the full PPML estimators on the simple-versus-difficult DGPs f
 and worker, firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` backends: the default unpreconditioned
 `rust-map` and the preconditioned `within` solver.
+The general cross-package policy above matters particularly for PPML, where packages can
+make different default choices about separated observations. Each PPML backend receives
+the same 100-iteration outer IRLS limit.
 
 #v(0.35em)
 
@@ -1004,8 +1015,10 @@ and worker, firm, and year fixed effects. The compared backends are R `fixest`'s
   $n = 1$M with one covariate and three fixed effects. `fixest` is R `fixest::fepois`; `rust-map` and
   `within` are the PyFixest `fepois` routine with the unpreconditioned MAP backend and
   the factor-pair preconditioned solver, respectively; `GLFEM.jl` is
-  `GLFixedEffectModels.jl`. "failed" indicates that all three
-  iterations of `rust-map` reached the 10000-iteration MAP cap without converging.]
+  `GLFixedEffectModels.jl`. Each package applies its default separation handling; successful
+  fits record the retained-observation count. "capped" means that all
+  three planned trials reached an iteration limit without converging; "failed" denotes
+  another error.]
   ]
 
 The patterns observed in the OLS benchmarks carry over. On the simple design all four

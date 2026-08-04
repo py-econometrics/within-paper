@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from benchmarks.data import BASE_DESIGNS, make_base_data
+from benchmarks.runtime import failure_fields
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "ppml_inner_outer.csv"
@@ -77,17 +78,38 @@ def measure_policy(
                     iwls_tol=OUTER_TOL,
                     iwls_maxiter=OUTER_MAXITER,
                 )
+                outer_converged = bool(fit._convergence)
+                if not outer_converged:
+                    message = (
+                        f"PyFixest IRLS reached the maximum number of iterations "
+                        f"({OUTER_MAXITER})"
+                    )
+                    return {
+                        "engine": "pyfixest",
+                        "rebuild_each_step": rebuild_each_step,
+                        "inner_tol": inner_tol,
+                        "inner_maxiter": inner_maxiter,
+                        "outer_iterations": outer_iterations,
+                        "outer_converged": False,
+                        "runtime_s": time.perf_counter() - started,
+                        "n_retained": None,
+                        "beta_x1": None,
+                        "deviance": None,
+                        **failure_fields(message),
+                    }
                 return {
                     "engine": "pyfixest",
                     "rebuild_each_step": rebuild_each_step,
                     "inner_tol": inner_tol,
                     "inner_maxiter": inner_maxiter,
                     "outer_iterations": outer_iterations,
-                    "outer_converged": bool(fit._convergence),
+                    "outer_converged": True,
                     "runtime_s": time.perf_counter() - started,
                     "n_retained": int(fit._N),
                     "beta_x1": float(fit.coef().loc["x1"]),
                     "deviance": float(fit.deviance),
+                    "converged": True,
+                    "capped": False,
                     "error": "",
                 }
             except Exception as error:
@@ -102,7 +124,7 @@ def measure_policy(
                     "n_retained": None,
                     "beta_x1": None,
                     "deviance": None,
-                    "error": str(error),
+                    **failure_fields(error),
                 }
 
 

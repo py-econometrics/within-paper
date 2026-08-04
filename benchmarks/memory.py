@@ -8,10 +8,12 @@ import resource
 import sys
 import time
 from pathlib import Path
+from queue import Empty
 
 import pandas as pd
 
 from benchmarks.data import BASE_DESIGNS, make_base_data
+from benchmarks.runtime import failure_fields
 
 ROOT = Path(__file__).absolute().parents[1]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "memory.csv"
@@ -38,6 +40,7 @@ def _worker(queue: mp.Queue, design: str, n_obs: int, seed: int, backend: str) -
                 "rss_mb": peak_mb,
                 "n_retained": int(fit._N),
                 "converged": True,
+                "capped": False,
                 "error": "",
             }
         )
@@ -47,8 +50,7 @@ def _worker(queue: mp.Queue, design: str, n_obs: int, seed: int, backend: str) -
                 "runtime_s": time.perf_counter() - started,
                 "rss_mb": None,
                 "n_retained": None,
-                "converged": False,
-                "error": str(error),
+                **failure_fields(error),
             }
         )
 
@@ -66,13 +68,41 @@ def main() -> None:
                 process.start()
                 process.join()
                 if process.exitcode:
-                    raise RuntimeError(f"memory worker exited with status {process.exitcode}")
-                row = queue.get()
-                row.update(size=size, design=design, backend=backend, n_obs=n_obs)
+                    row = {
+                        "runtime_s": None,
+                        "rss_mb": None,
+                        "n_retained": None,
+                        **failure_fields(
+                            f"memory worker exited with status {process.exitcode}"
+                        ),
+                    }
+                else:
+                    try:
+                        row = queue.get(timeout=1)
+                    except Empty:
+                        row = {
+                            "runtime_s": None,
+                            "rss_mb": None,
+                            "n_retained": None,
+                            **failure_fields("memory worker returned no result"),
+                        }
+                row.update(
+                    size=size,
+                    design=design,
+                    backend=backend,
+                    n_obs=n_obs,
+                    repetition=0,
+                    n_planned=1,
+                )
                 rows.append(row)
+                if row["converged"]:
+                    value = f"{row['runtime_s']:.3f} s"
+                elif row["capped"]:
+                    value = "capped"
+                else:
+                    value = "failed"
                 print(
-                    f"bench-memory / OLS / {design}-{size} / {backend}: "
-                    f"{row['runtime_s']:.3f} s",
+                    f"bench-memory / OLS / {design}-{size} / {backend}: {value}",
                     flush=True,
                 )
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

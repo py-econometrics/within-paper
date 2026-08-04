@@ -8,6 +8,8 @@ from collections.abc import Sequence
 
 import pandas as pd
 
+from benchmarks.runtime import failure_fields
+
 
 def demeaner(backend: str, tolerance: float | None = None, maxiter: int | None = None):
     import pyfixest as pf
@@ -68,7 +70,12 @@ def measure(
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=r"\d+ singleton fixed effect\(s\) dropped")
         if warm_up:
-            fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+            try:
+                fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+            except Exception:
+                # A warm-up prepares package state but is not a benchmark trial. If the
+                # package default fails, record that failure in the measured rows below.
+                pass
         rows = []
         for repetition in range(repetitions):
             started = time.perf_counter()
@@ -84,6 +91,7 @@ def measure(
                         "beta_x1": float(fit.coef().loc["x1"]),
                         "max_eta": None,
                         "converged": True,
+                        "capped": False,
                         "error": "",
                     }
                 )
@@ -96,8 +104,7 @@ def measure(
                         "n_retained": None,
                         "beta_x1": None,
                         "max_eta": None,
-                        "converged": False,
-                        "error": str(error),
+                        **failure_fields(error),
                     }
                 )
     return rows

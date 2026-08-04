@@ -19,16 +19,32 @@ def main() -> None:
         repetitions=1,
     )
     rows = []
-    for design, group in raw[raw["converged"]].groupby("design"):
-        reference = float(group.loc[group["backend"] == "rust-map", "beta_x1"].iloc[0])
+    for design, group in raw.groupby("design"):
+        references = group[(group["backend"] == "rust-map") & group["converged"]]
+        reference = (
+            float(references["beta_x1"].iloc[0]) if len(references) else None
+        )
         for row in group.to_dict("records"):
+            converged = bool(row["converged"]) and reference is not None
             rows.append(
                 {
                     "design": design,
                     "backend": row["backend"],
-                    "x1": row["beta_x1"],
-                    "max_abs_diff": abs(float(row["beta_x1"]) - reference),
-                    "converged": True,
+                    "x1": row["beta_x1"] if converged else None,
+                    "max_abs_diff": (
+                        abs(float(row["beta_x1"]) - reference)
+                        if converged and reference is not None
+                        else None
+                    ),
+                    "converged": converged,
+                    "capped": bool(row.get("capped", False)),
+                    "error": (
+                        str(row.get("error", ""))
+                        if not row["converged"]
+                        else "rust-map agreement reference did not converge"
+                        if reference is None
+                        else ""
+                    ),
                 }
             )
     pd.DataFrame(rows).to_csv(LATEST / "agreement.csv", index=False)

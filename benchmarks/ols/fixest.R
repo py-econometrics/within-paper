@@ -16,10 +16,23 @@ if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")
 
 frame <- as.data.frame(read_parquet(data_path))
 formula <- as.formula(paste("y ~ x1 |", paste(fixed_effects, collapse = " + ")))
-fit_once <- function() feols(formula, frame, vcov = "iid", nthreads = threads)
+fit_once <- function() {
+  capped <- FALSE
+  fit <- withCallingHandlers(
+    feols(formula, frame, vcov = "iid", nthreads = threads),
+    warning = function(warning) {
+      if (grepl("Absence of convergence", conditionMessage(warning), fixed = TRUE)) {
+        capped <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  if (capped) stop("fixest demeaning returned without convergence")
+  fit
+}
 started <- proc.time()[["elapsed"]]
-warmup_fit <- fit_once()
-rm(warmup_fit)
+warmup_fit <- try(fit_once(), silent = TRUE)
+if (!inherits(warmup_fit, "try-error")) rm(warmup_fit)
 warmup <- proc.time()[["elapsed"]] - started
 repetitions <- if (requested == "adaptive") {
   if (warmup < 1) 20L else if (warmup < 10) 7L else 3L
@@ -35,15 +48,20 @@ for (index in seq_len(repetitions)) {
       n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = nobs(fit), beta_x1 = unname(coef(fit)[["x1"]]),
-      max_eta = NA_real_, converged = TRUE, error = ""
+      max_eta = NA_real_, converged = TRUE, capped = FALSE, error = ""
     )
-  }, error = function(error) data.frame(
-    backend = "fixest", repetition = index - 1L,
-    n_planned = repetitions,
-    runtime_s = proc.time()[["elapsed"]] - started,
-    n_retained = NA_integer_, beta_x1 = NA_real_, max_eta = NA_real_,
-    converged = FALSE, error = conditionMessage(error)
-  ))
+  }, error = function(error) {
+    message <- conditionMessage(error)
+    data.frame(
+      backend = "fixest", repetition = index - 1L,
+      n_planned = repetitions,
+      runtime_s = proc.time()[["elapsed"]] - started,
+      n_retained = NA_integer_, beta_x1 = NA_real_, max_eta = NA_real_,
+      converged = FALSE,
+      capped = grepl("without convergence", message, fixed = TRUE),
+      error = message
+    )
+  })
 }
 dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
 write.csv(do.call(rbind, rows), output_path, row.names = FALSE, na = "")

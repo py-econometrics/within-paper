@@ -10,6 +10,7 @@ import pandas as pd
 
 from benchmarks.accuracy import accuracy_metrics
 from benchmarks.data import make_base_data, solver_data
+from benchmarks.runtime import failure_fields
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
 ROOT = Path(__file__).absolute().parents[2]
@@ -21,21 +22,38 @@ OPTIONS = LsmrOptions(tol=1e-12, maxiter=10_000)
 
 def _measure(categories: np.ndarray, rhs: np.ndarray, name: str) -> dict:
     preconditioner = getattr(PreconditionerConfig, name.capitalize())
-    solve_batch(categories, rhs, options=OPTIONS, preconditioner=preconditioner)
-    started = time.perf_counter()
-    solver = Solver(categories, preconditioner=preconditioner)
-    setup = time.perf_counter() - started
-    started = time.perf_counter()
-    result = solver.solve_batch(rhs, OPTIONS)
-    solve = time.perf_counter() - started
-    return {
-        "setup_s": setup,
-        "solve_s": solve,
-        "total_s": setup + solve,
-        "iterations_max": max(result.iterations),
-        "converged": all(result.converged),
-        "demeaned": np.asarray(result.demeaned),
-    }
+    try:
+        solve_batch(categories, rhs, options=OPTIONS, preconditioner=preconditioner)
+    except Exception:
+        pass
+    try:
+        started = time.perf_counter()
+        solver = Solver(categories, preconditioner=preconditioner)
+        setup = time.perf_counter() - started
+        started = time.perf_counter()
+        result = solver.solve_batch(rhs, OPTIONS)
+        solve = time.perf_counter() - started
+        iterations = max(result.iterations)
+        converged = all(result.converged)
+        return {
+            "setup_s": setup,
+            "solve_s": solve,
+            "total_s": setup + solve,
+            "iterations_max": iterations,
+            "converged": converged,
+            "capped": not converged and iterations >= OPTIONS.maxiter,
+            "error": "" if converged else "within solver returned without convergence",
+            "demeaned": np.asarray(result.demeaned),
+        }
+    except Exception as error:
+        return {
+            "setup_s": None,
+            "solve_s": None,
+            "total_s": None,
+            "iterations_max": None,
+            "demeaned": None,
+            **failure_fields(error),
+        }
 
 
 def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
@@ -57,27 +75,44 @@ def factor_scaling(categories: np.ndarray, rhs: np.ndarray) -> list[dict]:
             options=LsmrOptions(tol=1e-14, maxiter=20_000),
             preconditioner=PreconditionerConfig.Additive,
         )
+        if not all(reference.converged):
+            raise RuntimeError(
+                f"tight factor-scaling reference did not converge for Q={n_factors}"
+            )
         for repetition in range(REPETITIONS):
             measured = _measure(current, rhs, "additive")
-            metrics = accuracy_metrics(
-                current,
-                rhs,
-                measured.pop("demeaned"),
-                np.asarray(reference.demeaned),
+            demeaned = measured.pop("demeaned")
+            metrics = (
+                accuracy_metrics(
+                    current, rhs, demeaned, np.asarray(reference.demeaned)
+                )
+                if demeaned is not None
+                else {"max_eta": None, "max_delta": None}
             )
             rows.append(
                 {
                     "design": "difficult",
                     "repetition": repetition,
+                    "n_planned": REPETITIONS,
                     "n_factors": n_factors,
-                    "setup_share": measured["setup_s"] / measured["total_s"],
+                    "setup_share": (
+                        measured["setup_s"] / measured["total_s"]
+                        if measured["total_s"] is not None
+                        else None
+                    ),
                     **measured,
                     **metrics,
                 }
             )
+        recent = rows[-REPETITIONS:]
+        successful = [row["total_s"] for row in recent if row["converged"]]
+        value = (
+            f"{np.median(successful):.3f} s"
+            if successful
+            else "capped" if all(row["capped"] for row in recent) else "failed"
+        )
         print(
-            f"bench-scaling / OLS / Q={n_factors} / within-additive: "
-            f"{pd.DataFrame(rows[-REPETITIONS:]).total_s.median():.3f} s",
+            f"bench-scaling / OLS / Q={n_factors} / within-additive: {value}",
             flush=True,
         )
     return rows
@@ -98,13 +133,20 @@ def amortization(categories: np.ndarray, base_rhs: np.ndarray) -> list[dict]:
                 rows.append(
                     {
                         "design": "difficult", "repetition": repetition,
+                        "n_planned": REPETITIONS,
                         "preconditioner": name, "k_rhs": k_rhs,
                         **measured,
                     }
                 )
+            recent = rows[-REPETITIONS:]
+            successful = [row["total_s"] for row in recent if row["converged"]]
+            value = (
+                f"{np.median(successful):.3f} s"
+                if successful
+                else "capped" if all(row["capped"] for row in recent) else "failed"
+            )
             print(
-                f"bench-scaling / OLS / K={k_rhs} / within-{name}: "
-                f"{pd.DataFrame(rows[-REPETITIONS:]).total_s.median():.3f} s",
+                f"bench-scaling / OLS / K={k_rhs} / within-{name}: {value}",
                 flush=True,
             )
     return rows

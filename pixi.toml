@@ -12,7 +12,7 @@ setup-julia-env = { cmd = "python -m scripts.paper_results setup-julia-env", des
 fetch-correia = { cmd = "python -m scripts.paper_results fetch-correia", description = "Download the Correia HDFE CSVs and verify their checksums" }
 check-correia-data = { cmd = "python -m scripts.paper_results fetch-correia --offline", description = "Verify the local Correia CSV collection without downloading" }
 agreement = { cmd = "python -m benchmarks.ols.agreement", depends-on = ["setup-julia-env"], description = "Run numerical agreement checks from the OLS implementations" }
-within-setup-cost = { cmd = "python -m benchmarks.within.setup_cost", description = "Measure setup and solve time for the standalone within Python API" }
+within-setup-cost = { cmd = "python -m benchmarks.within.setup_cost", description = "Measure factor-pair setup and solve cost on base and AKM mobility designs" }
 test = { cmd = "python -m unittest discover -s tests -t . -v", description = "Run benchmark regression tests" }
 bench-memory = { cmd = "python -m benchmarks.memory", description = "Measure peak RSS and runtime for PyFixest MAP and within (100K, 1M)" }
 bench-main = { cmd = "python -m benchmarks.ols.main", depends-on = ["setup-julia-env"], description = "Run the headline OLS comparison" }

@@ -448,6 +448,10 @@ def _row_success(row: dict[str, str]) -> bool:
     return str(row.get("converged", "")).strip().lower() in {"true", "1"}
 
 
+def _row_capped(row: dict[str, str]) -> bool:
+    return str(row.get("capped", "")).strip().lower() in {"true", "1"}
+
+
 def _row_time(row: dict[str, str]) -> str:
     return row.get("runtime_s", "")
 
@@ -482,7 +486,8 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
     except (TypeError, ValueError):
         return "incomplete"
     if successful == 0:
-        return f"failed (0/{total})"
+        status = "capped" if all(_row_capped(row) for row in candidates) else "failed"
+        return f"{status} (0/{total})"
     rendered = _format_seconds(median(values))
     if successful < total:
         return f"{rendered} ({successful}/{total})"
@@ -553,9 +558,9 @@ def _matches_runtime_target(
 
 
 def _numeric_cell(value: str) -> float | None:
-    if "failed" in value.lower():
-        # A failed cell such as "failed (0/3)" carries no runtime; do not let the
-        # "0" in the trial count read back as a 0.0-second measurement.
+    if "failed" in value.lower() or "capped" in value.lower():
+        # A failed or capped cell such as "capped (0/3)" carries no runtime; do not
+        # let the "0" in the trial count read back as a 0.0-second measurement.
         return None
     scientific = re.search(
         r"(-?\d[\d,]*\.?\d*)\s+times\s+10\^\((-?\d+)\)", value
@@ -615,7 +620,9 @@ def _clean_cell(value: str) -> str:
 
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
-    return "--" if value in {"#miss", "failed", "--"} else value
+    if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
+        return "--"
+    return value
 
 
 def _format_hardness(gap: float, share: float) -> str:
@@ -703,7 +710,8 @@ def _synchronize_agreement(document: dict) -> int:
         if source is None:
             replacement = ["#miss", "#miss"]
         elif not _row_success(source):
-            replacement = ["failed", "failed"]
+            status = "capped" if _row_capped(source) else "failed"
+            replacement = [status, status]
         else:
             replacement = [
                 f"{float(source['x1']):.8f}",
@@ -726,8 +734,22 @@ def _synchronize_setup_cost(document: dict) -> int:
         group = [row for row in rows if row["design"] == dgp]
         if len(group) != EXPECTED_TRIALS:
             raise ValueError(f"Setup results for {dgp} do not contain {EXPECTED_TRIALS} runs")
+        overrides = {
+            f"result_setup_{dgp}_setup",
+            f"result_setup_{dgp}_solve",
+            f"result_setup_{dgp}_share",
+        }
         if not all(_row_success(row) for row in group):
-            raise ValueError(f"Setup benchmark did not converge for {dgp}")
+            status = "capped" if all(_row_capped(row) for row in group) else "failed"
+            for key in overrides:
+                if prose.get(key) != status:
+                    prose[key] = status
+                    changed += 1
+            continue
+        for key in overrides:
+            if key in prose:
+                del prose[key]
+                changed += 1
         setup = median(float(row["setup_s"]) for row in group)
         solve = median(float(row["solve_s"]) for row in group)
         fields = {
@@ -754,11 +776,11 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
     table = document["tables"].get("accuracy_frontier")
     if table is None or measured is None:
         return 0
-    rows = [row for row in measured if _row_success(row)]
-
     labels = {"rust-map": "`rust-map`", "within-additive": "`within-additive`"}
     grouped: dict[tuple[str, str, str], list[dict[str, str]]] = {}
-    for row in rows:
+    for row in measured:
+        if row.get("backend") not in labels:
+            continue
         key = (row.get("design", ""), row.get("backend", ""), row["tolerance"])
         grouped.setdefault(key, []).append(row)
 
@@ -773,19 +795,34 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
             for index, (tolerance, measurements) in enumerate(
                 sorted(
                     matching,
-                    key=lambda item: median(float(row["max_eta"]) for row in item[1]),
+                    key=lambda item: float(item[0]),
                     reverse=True,
                 )
             ):
-                eta = median(float(row["max_eta"]) for row in measurements)
-                runtime = median(float(row["runtime_s"]) for row in measurements)
+                successful = [row for row in measurements if _row_success(row)]
+                if successful:
+                    eta = _format_typst_scientific(
+                        median(float(row["max_eta"]) for row in successful)
+                    )
+                    runtime = _format_seconds(
+                        median(float(row["runtime_s"]) for row in successful)
+                    )
+                    if len(successful) < len(measurements):
+                        runtime += f" ({len(successful)}/{len(measurements)})"
+                else:
+                    runtime = (
+                        f"capped (0/{len(measurements)})"
+                        if all(_row_capped(row) for row in measurements)
+                        else f"failed (0/{len(measurements)})"
+                    )
+                    eta = "--"
                 rendered.append(
                     [
                         f"{design}" if index == 0 and label == list(labels.values())[0] else "",
                         label if index == 0 else "",
                         tolerance,
-                        _format_seconds(runtime),
-                        _format_typst_scientific(eta),
+                        runtime,
+                        eta,
                     ]
                 )
     if rendered == table["rows"]:
@@ -851,8 +888,9 @@ def _synchronize_ppml_inner_outer(document: dict) -> int:
                 if len(successful) < len(trials):
                     total_cell += f" ({len(successful)}/{len(trials)})"
             else:
-                outer_cell = "failed"
-                total_cell = f"failed (0/{len(trials)})"
+                status = "capped" if all(_row_capped(row) for row in trials) else "failed"
+                outer_cell = status
+                total_cell = f"{status} (0/{len(trials)})"
             rendered.append(
                 [
                     design if first else "",
@@ -889,18 +927,39 @@ def _synchronize_factor_scaling(document: dict) -> int:
     rendered = []
     for n_factors in sorted(by_q):
         group = by_q[n_factors]
+        successful = [item for item in group if _row_success(item)]
+
+        if not successful:
+            status = "capped" if all(_row_capped(item) for item in group) else "failed"
+            rendered.append(
+                [
+                    str(n_factors),
+                    str(n_factors * (n_factors - 1) // 2),
+                    status,
+                    status,
+                    status,
+                    status,
+                ]
+            )
+            continue
 
         def med(field: str) -> float:
-            return float(median(float(item[field]) for item in group))
+            return float(median(float(item[field]) for item in successful))
+
+        suffix = (
+            f" ({len(successful)}/{len(group)})"
+            if len(successful) < len(group)
+            else ""
+        )
 
         rendered.append(
             [
                 str(n_factors),
                 str(n_factors * (n_factors - 1) // 2),
-                f"{med('setup_s'):.3f}",
-                f"{med('solve_s'):.3f}",
-                f"{med('setup_share'):.0%}",
-                f"{med('iterations_max'):.0f}",
+                f"{med('setup_s'):.3f}{suffix}",
+                f"{med('solve_s'):.3f}{suffix}",
+                f"{med('setup_share'):.0%}{suffix}",
+                f"{med('iterations_max'):.0f}{suffix}",
             ]
         )
     if rendered == table["rows"]:
@@ -925,13 +984,33 @@ def _synchronize_amortization(document: dict) -> int:
             float(item[field])
             for item in rows
             if int(item["k_rhs"]) == k and item["preconditioner"] == name
+            and _row_success(item)
         ]
         return float(median(picked)) if picked else None
+
+    def failure(k: int, name: str) -> str:
+        picked = [
+            item
+            for item in rows
+            if int(item["k_rhs"]) == k and item["preconditioner"] == name
+        ]
+        if not picked:
+            return "#miss"
+        return "capped" if all(_row_capped(item) for item in picked) else "failed"
 
     rendered = []
     for k in sorted({int(item["k_rhs"]) for item in rows}):
         diagonal, additive = med(k, "diagonal", "total_s"), med(k, "additive", "total_s")
         if diagonal is None or additive is None:
+            rendered.append(
+                [
+                    str(k),
+                    f"{diagonal:.2f}" if diagonal is not None else failure(k, "diagonal"),
+                    f"{additive:.2f}" if additive is not None else failure(k, "additive"),
+                    "--",
+                    f"{additive / k:.3f}" if additive is not None else "--",
+                ]
+            )
             continue
         rendered.append(
             [
@@ -1100,7 +1179,11 @@ def _synchronize_canonical_tables(
                 if match and match["rss_mb"]:
                     rendered = f"{int(float(match['rss_mb'])):,} MiB"
                 elif candidates:
-                    rendered = "failed"
+                    rendered = (
+                        "capped"
+                        if all(_row_capped(item) for item in candidates)
+                        else "failed"
+                    )
                 else:
                     rendered = "#miss"
                 if row[column] != rendered:

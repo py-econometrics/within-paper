@@ -12,7 +12,7 @@ import pandas as pd
 from benchmarks.accuracy import external_normal_residuals
 from benchmarks.data import FE_COLUMNS, drop_singletons
 from benchmarks.ols.pyfixest import fit_ols
-from benchmarks.runtime import run_native
+from benchmarks.runtime import failure_fields, run_native
 
 BASE_GRID = (1e-4, 1e-6, 1e-8, 1e-10)
 EXTENDED_GRID = (*BASE_GRID, 1e-12)
@@ -87,7 +87,12 @@ def _python_rows(
     categories = np.column_stack(
         [pd.factorize(frame[name], sort=True)[0] for name in FE_COLUMNS]
     )
-    fit_ols(frame, backend, FE_COLUMNS, tolerances[0], maxiter, lean=False)
+    try:
+        fit_ols(frame, backend, FE_COLUMNS, tolerances[0], maxiter, lean=False)
+    except Exception:
+        # The discarded warm-up must not prevent the measured failures from
+        # becoming result rows.
+        pass
     rows = []
     for tolerance in tolerances:
         for repetition in range(repetitions):
@@ -118,7 +123,6 @@ def _python_rows(
                     }
                 )
             except Exception as error:
-                message = str(error)
                 rows.append(
                     {
                         "design": design, "backend": backend, "tolerance": tolerance,
@@ -126,12 +130,7 @@ def _python_rows(
                         "runtime_s": time.perf_counter() - started, "beta_x1": None,
                         "coefficient_error_se": None, "residual_error": None,
                         "max_eta": None,
-                        "converged": False,
-                        "capped": any(
-                            word in message.lower()
-                            for word in ("iter", "converg", "maxiter")
-                        ),
-                        "error": message,
+                        **failure_fields(error),
                     }
                 )
     return rows
@@ -153,7 +152,28 @@ def _native_rows(
         ",".join(str(value) for value in tolerances), str(default),
         str(repetitions), str(maxiter), str(reference["beta"]), str(reference["se"]),
     ]
-    return run_native(Path(__file__).with_name(script), arguments, output)
+    try:
+        return run_native(Path(__file__).with_name(script), arguments, output)
+    except Exception as error:
+        rows = []
+        for tolerance in tolerances:
+            for repetition in range(repetitions):
+                rows.append(
+                    {
+                        "design": design,
+                        "backend": backend,
+                        "tolerance": tolerance,
+                        "default_tolerance": default,
+                        "repetition": repetition,
+                        "runtime_s": None,
+                        "beta_x1": None,
+                        "coefficient_error_se": None,
+                        "residual_error": None,
+                        "max_eta": None,
+                        **failure_fields(error),
+                    }
+                )
+        return rows
 
 
 def measure(
@@ -197,6 +217,14 @@ def measure(
                 for row in measured
                 if str(row["converged"]).lower() in {"true", "1"}
             ]
-            value = f"{np.median(successful):.3f} s" if successful else "failed"
+            if successful:
+                value = f"{np.median(successful):.3f} s"
+            elif measured and all(
+                str(row.get("capped", "")).lower() in {"true", "1"}
+                for row in measured
+            ):
+                value = "capped"
+            else:
+                value = "failed"
             print(f"tolerance / OLS / {design} / {backend}: {value}", flush=True)
     return pd.DataFrame(rows)

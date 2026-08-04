@@ -2,25 +2,30 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
+from benchmarks import runtime
 from benchmarks.accuracy import external_normal_residuals, projection_errors
 from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
 from benchmarks.data import drop_singletons, make_base_data, solver_data
+from benchmarks.ols import pyfixest as ols_pyfixest, run as ols_runner
 from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ols.run import run_experiment
+from benchmarks.ppml import pyfixest as ppml_pyfixest
 from benchmarks.ppml.pyfixest import fit_ppml
-from benchmarks.within import ppml_inner_outer
+from benchmarks.within import ppml_inner_outer, scaling, setup_cost
 from benchmarks.within.map import map_demean_with_sweeps
 from scripts import analyze_gap_runtime, compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
@@ -94,6 +99,65 @@ class MapTests(unittest.TestCase):
         self.assertEqual(result.iterations, [0])
         self.assertEqual(result.converged, [False])
 
+
+class FailureLoggingTests(unittest.TestCase):
+    def test_failure_fields_distinguish_caps_from_other_errors(self) -> None:
+        capped = runtime.failure_fields(
+            ValueError("Demeaning failed after 10000 iterations.")
+        )
+        failed = runtime.failure_fields(ValueError("invalid estimator input"))
+
+        self.assertTrue(capped["capped"])
+        self.assertFalse(failed["capped"])
+        self.assertFalse(capped["converged"])
+        self.assertFalse(failed["converged"])
+
+    def test_native_driver_failure_becomes_a_complete_failed_cell(self) -> None:
+        error = subprocess.CalledProcessError(
+            1, ["Rscript"], stderr="estimator process failed"
+        )
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(runtime.subprocess, "run", side_effect=error),
+        ):
+            rows = runtime.run_native(
+                Path("driver.R"),
+                [],
+                Path(directory) / "missing.csv",
+                backend="fixest",
+                failure_repetitions=3,
+            )
+
+        self.assertEqual([row["repetition"] for row in rows], [0, 1, 2])
+        self.assertTrue(all(not row["converged"] for row in rows))
+        self.assertTrue(all("estimator process failed" in row["error"] for row in rows))
+
+    def test_keyboard_interrupt_is_not_converted_to_estimator_failure(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(runtime.subprocess, "run", side_effect=KeyboardInterrupt),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            runtime.run_native(
+                Path("driver.R"),
+                [],
+                Path(directory) / "missing.csv",
+                backend="fixest",
+                failure_repetitions=3,
+            )
+
+    def test_standalone_scaling_exception_becomes_a_failed_row(self) -> None:
+        categories = np.zeros((4, 2), dtype=np.uint32)
+        rhs = np.ones((4, 1))
+        with (
+            patch.object(scaling, "solve_batch", return_value=None),
+            patch.object(scaling, "Solver", side_effect=RuntimeError("solver failed")),
+        ):
+            row = scaling._measure(categories, rhs, "additive")
+
+        self.assertFalse(row["converged"])
+        self.assertFalse(row["capped"])
+        self.assertEqual(row["error"], "solver failed")
 
 class HardnessTests(unittest.TestCase):
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
@@ -179,6 +243,55 @@ class PythonFitTests(unittest.TestCase):
         self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
         self.assertFalse(hasattr(fit, "_Y"))
 
+    def test_ppml_measure_records_a_failed_warmup(self) -> None:
+        error = ValueError("Demeaning failed after 10000 iterations.")
+        with patch.object(ppml_pyfixest, "fit_ppml", side_effect=error):
+            rows = ppml_pyfixest.measure(pd.DataFrame(), "rust-map", repetitions=3)
+
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(not row["converged"] for row in rows))
+        self.assertTrue(all(row["capped"] for row in rows))
+        self.assertTrue(all(row["error"] == str(error) for row in rows))
+
+    def test_ols_measure_records_a_failed_warmup(self) -> None:
+        error = ValueError("Demeaning failed after 10000 iterations.")
+        with patch.object(ols_pyfixest, "fit_ols", side_effect=error):
+            rows = ols_pyfixest.measure(
+                pd.DataFrame(), "rust-map", ("id1", "id2"), repetitions=3
+            )
+
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(not row["converged"] for row in rows))
+        self.assertTrue(all(row["capped"] for row in rows))
+        self.assertTrue(all(row["error"] == str(error) for row in rows))
+
+    def test_measured_estimator_errors_are_failed_not_capped(self) -> None:
+        error = ValueError("estimator rejected the model")
+        with patch.object(ols_pyfixest, "fit_ols", side_effect=error):
+            ols_rows = ols_pyfixest.measure(
+                pd.DataFrame(), "rust-map", ("id1", "id2"), repetitions=2
+            )
+        with patch.object(ppml_pyfixest, "fit_ppml", side_effect=error):
+            ppml_rows = ppml_pyfixest.measure(
+                pd.DataFrame(), "rust-map", repetitions=2
+            )
+
+        for rows in (ols_rows, ppml_rows):
+            self.assertEqual(len(rows), 2)
+            self.assertTrue(all(not row["converged"] for row in rows))
+            self.assertTrue(all(not row["capped"] for row in rows))
+            self.assertTrue(all(row["error"] == str(error) for row in rows))
+
+    def test_ppml_outer_nonconvergence_is_capped(self) -> None:
+        from pyfixest.errors import NonConvergenceError
+
+        error = NonConvergenceError("The IRLS algorithm did not converge.")
+        with patch.object(ppml_pyfixest, "fit_ppml", side_effect=error):
+            rows = ppml_pyfixest.measure(pd.DataFrame(), "rust-map", repetitions=1)
+
+        self.assertFalse(rows[0]["converged"])
+        self.assertTrue(rows[0]["capped"])
+
     def test_ols_runner_uses_an_isolated_python_cell(self) -> None:
         result = run_experiment(
             experiment="test",
@@ -190,6 +303,76 @@ class PythonFitTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertTrue(result.loc[0, "converged"])
 
+    def test_ols_runner_records_package_default_retained_counts(self) -> None:
+        def fake_process(target, *args, **_kwargs) -> None:
+            if target is ols_runner._write_sample:
+                target(*args)
+                return
+            _, output, _, backend, repetitions = args
+            retained = 100 if backend == "rust-map" else 99
+            pd.DataFrame(
+                [{
+                    "backend": backend,
+                    "repetition": 0,
+                    "n_planned": repetitions,
+                    "runtime_s": 0.01,
+                    "n_retained": retained,
+                    "beta_x1": 1.0,
+                    "max_eta": None,
+                    "converged": True,
+                    "error": "",
+                }]
+            ).to_csv(output, index=False)
+
+        with patch.object(ols_runner, "_run_process", side_effect=fake_process):
+            result = run_experiment(
+                experiment="test",
+                designs=[("simple", partial(make_base_data, 2_000, "simple", 16))],
+                output=None,
+                backends=("rust-map", "within"),
+                repetitions=1,
+            )
+
+        self.assertEqual(result["n_retained"].tolist(), [100, 99])
+
+    def test_ols_runner_continues_after_an_isolated_backend_crash(self) -> None:
+        def fake_process(target, *args, **_kwargs):
+            if target is ols_runner._write_sample:
+                target(*args)
+                return None
+            _, output, _, backend, repetitions = args
+            if backend == "rust-map":
+                return "python estimator worker exited with status 1"
+            pd.DataFrame(
+                [
+                    {
+                        "backend": backend,
+                        "repetition": 0,
+                        "n_planned": repetitions,
+                        "runtime_s": 0.01,
+                        "n_retained": 99,
+                        "beta_x1": 1.0,
+                        "max_eta": None,
+                        "converged": True,
+                        "capped": False,
+                        "error": "",
+                    }
+                ]
+            ).to_csv(output, index=False)
+            return None
+
+        with patch.object(ols_runner, "_run_process", side_effect=fake_process):
+            result = run_experiment(
+                experiment="test",
+                designs=[("simple", partial(make_base_data, 2_000, "simple", 17))],
+                output=None,
+                backends=("rust-map", "within"),
+                repetitions=1,
+            )
+
+        self.assertEqual(result["converged"].tolist(), [False, True])
+        self.assertIn("exited with status 1", result.loc[0, "error"])
+
     def test_pyfixest_ppml_cache_policies_agree(self) -> None:
         frame = make_base_data(2_000, "simple", 14)
         reused = ppml_inner_outer.measure_policy(frame, False, 1e-8, 1_000)
@@ -199,6 +382,50 @@ class PythonFitTests(unittest.TestCase):
         self.assertEqual(reused["n_retained"], rebuilt["n_retained"])
         self.assertAlmostEqual(reused["beta_x1"], rebuilt["beta_x1"], places=8)
         self.assertAlmostEqual(reused["deviance"], rebuilt["deviance"], places=7)
+
+
+class SetupCostTests(unittest.TestCase):
+    def test_akm_mobility_setup_contract(self) -> None:
+        self.assertEqual(
+            setup_cost.MOBILITY_DESIGNS,
+            tuple(name for name in SCENARIOS if name.startswith("akm_mobility_")),
+        )
+        self.assertEqual(setup_cost.AKM_REPETITIONS, 20)
+        self.assertEqual(setup_cost.OPTIONS.tol, 1e-12)
+        self.assertEqual(setup_cost.OPTIONS.maxiter, 10_000)
+
+        categories, rhs = solver_data(make_base_data(1_000, "difficult", 43))
+        rows = setup_cost._measure(
+            "small",
+            categories,
+            rhs,
+            experiment="test",
+            repetitions=1,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["preconditioner"], "additive")
+        self.assertEqual(row["n_planned"], 1)
+        self.assertTrue(row["converged"])
+        self.assertLess(row["max_eta"], 1e-8)
+        self.assertLess(row["max_delta"], 1e-7)
+
+    def test_setup_cost_rejects_a_capped_reference(self) -> None:
+        categories = np.zeros((4, 2), dtype=np.uint32)
+        rhs = np.ones((4, 1))
+        warmup = SimpleNamespace(converged=[True], demeaned=rhs)
+        reference = SimpleNamespace(converged=[False], demeaned=rhs)
+
+        with patch.object(setup_cost, "solve_batch", side_effect=[warmup, reference]):
+            with self.assertRaisesRegex(RuntimeError, "tight reference did not converge"):
+                setup_cost._measure(
+                    "capped-reference",
+                    categories,
+                    rhs,
+                    experiment="test",
+                    repetitions=1,
+                )
 
 
 class PaperResultTests(unittest.TestCase):
@@ -236,6 +463,16 @@ class PaperResultTests(unittest.TestCase):
             {"repetition": "2", "n_planned": "3", "runtime_s": "3", "converged": "true"},
         ]
         self.assertEqual(_render_trial_result(rows), "2.00s (2/3)")
+
+    def test_capped_trials_are_labelled_in_the_paper_table(self) -> None:
+        rows = [
+            {
+                "repetition": str(index), "n_planned": "3",
+                "runtime_s": str(index + 1), "converged": "false", "capped": "true",
+            }
+            for index in range(3)
+        ]
+        self.assertEqual(_render_trial_result(rows), "capped (0/3)")
 
     def test_all_four_final_runtime_files_feed_the_paper_reader(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -294,6 +531,57 @@ class PaperResultTests(unittest.TestCase):
         self.assertEqual(len(rendered), 1)
         self.assertEqual(rendered[0][3], "0.040s")
         self.assertEqual(rendered[0][4], "$4.0 times 10^(-8)$")
+
+    def test_accuracy_frontier_keeps_a_capped_setting(self) -> None:
+        document = {"tables": {"accuracy_frontier": {"rows": []}}}
+        rows = [
+            {
+                "design": "simple",
+                "backend": "rust-map",
+                "tolerance": "1e-10",
+                "runtime_s": "1",
+                "max_eta": "",
+                "repetition": str(repetition),
+                "n_planned": "3",
+                "converged": "false",
+                "capped": "true",
+            }
+            for repetition in range(3)
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_accuracy_frontier(document)
+
+        rendered = document["tables"]["accuracy_frontier"]["rows"]
+        self.assertEqual(rendered[0][3:], ["capped (0/3)", "--"])
+
+    def test_factor_scaling_does_not_average_failed_trials(self) -> None:
+        document = {"tables": {"factor_scaling": {"rows": []}}}
+        rows = [
+            {
+                "n_factors": "2",
+                "setup_s": "1",
+                "solve_s": "2",
+                "setup_share": "0.333",
+                "iterations_max": "5",
+                "converged": "true",
+                "capped": "false",
+            },
+            {
+                "n_factors": "2",
+                "setup_s": "100",
+                "solve_s": "100",
+                "setup_share": "0.5",
+                "iterations_max": "10000",
+                "converged": "false",
+                "capped": "true",
+            },
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_factor_scaling(document)
+
+        rendered = document["tables"]["factor_scaling"]["rows"][0]
+        self.assertEqual(rendered[2], "1.000 (1/2)")
+        self.assertEqual(rendered[3], "2.000 (1/2)")
 
     def test_ppml_inner_outer_table_distinguishes_inner_regimes(self) -> None:
         self.assertEqual(ppml_inner_outer.N_OBS, 100_000)

@@ -53,6 +53,9 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
 
     data = raw.copy()
     data["converged"] = _coerce_bool_series(data["converged"])
+    data["capped"] = _coerce_bool_series(
+        data["capped"] if "capped" in data else pd.Series(False, index=data.index)
+    )
     numeric = [
         "tolerance",
         "default_tolerance",
@@ -77,6 +80,7 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
                 **dict(zip(keys, key, strict=True)),
                 "n_trials": len(group),
                 "n_success": len(successful),
+                "n_capped": int(group["capped"].sum()),
                 "median_time_s": (
                     float(successful["runtime_s"].median())
                     if len(successful)
@@ -131,9 +135,14 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         if subset.empty:
             continue
         label = METHODS[method][0].replace("\n", " — ")
-        count = len(subset)
-        suffix = "setting" if count == 1 else "settings"
-        entries.append(f"{label}: {count} {suffix}")
+        capped = int((subset["n_capped"] == subset["n_trials"]).sum())
+        failed_count = len(subset) - capped
+        parts = []
+        if capped:
+            parts.append(f"{capped} capped")
+        if failed_count:
+            parts.append(f"{failed_count} failed")
+        entries.append(f"{label}: {', '.join(parts)}")
     return "No returned solution\n" + "\n".join(entries)
 
 

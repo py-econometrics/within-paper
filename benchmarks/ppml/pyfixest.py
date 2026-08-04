@@ -7,6 +7,9 @@ import warnings
 
 import pandas as pd
 
+from benchmarks.runtime import failure_fields
+
+OUTER_MAXITER = 100
 
 def _demeaner(backend: str):
     import pyfixest as pf
@@ -18,7 +21,9 @@ def _demeaner(backend: str):
     raise ValueError(f"unknown PyFixest backend {backend!r}")
 
 
-def fit_ppml(frame: pd.DataFrame, backend: str):
+def fit_ppml(
+    frame: pd.DataFrame, backend: str, outer_maxiter: int = OUTER_MAXITER
+):
     import pyfixest as pf
 
     return pf.fepois(
@@ -29,19 +34,29 @@ def fit_ppml(frame: pd.DataFrame, backend: str):
         store_data=False,
         lean=True,
         demeaner=_demeaner(backend),
-        iwls_maxiter=100,
+        iwls_maxiter=outer_maxiter,
     )
 
 
-def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
+def measure(
+    frame: pd.DataFrame,
+    backend: str,
+    repetitions: int,
+    outer_maxiter: int = OUTER_MAXITER,
+) -> list[dict]:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=r"\d+ singleton fixed effect\(s\) dropped")
-        fit_ppml(frame, backend)
+        try:
+            fit_ppml(frame, backend, outer_maxiter)
+        except Exception:
+            # A warm-up only prepares package state. A package-default failure belongs
+            # in the measured rows below, not as a failure of the whole comparison.
+            pass
         rows = []
         for repetition in range(repetitions):
             started = time.perf_counter()
             try:
-                fit = fit_ppml(frame, backend)
+                fit = fit_ppml(frame, backend, outer_maxiter)
                 rows.append(
                     {
                         "backend": backend,
@@ -50,6 +65,7 @@ def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
                         "n_retained": int(fit._N),
                         "beta_x1": float(fit.coef().loc["x1"]),
                         "converged": True,
+                        "capped": False,
                         "error": "",
                     }
                 )
@@ -61,8 +77,7 @@ def measure(frame: pd.DataFrame, backend: str, repetitions: int) -> list[dict]:
                         "runtime_s": time.perf_counter() - started,
                         "n_retained": None,
                         "beta_x1": None,
-                        "converged": False,
-                        "error": str(error),
+                        **failure_fields(error),
                     }
                 )
     return rows

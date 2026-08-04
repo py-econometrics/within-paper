@@ -14,7 +14,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from benchmarks.ols.pyfixest import fit_ols, measure
-from benchmarks.runtime import assert_same_retained, run_native
+from benchmarks.runtime import failed_trials, run_native
 
 ROOT = Path(__file__).absolute().parents[2]
 LATEST = ROOT / "results" / "runs" / "latest"
@@ -45,15 +45,27 @@ def _native_rows(
     script = "fixest.R" if backend == "fixest" else "fixed_effect_models.jl"
     count = "adaptive" if repetitions is None else str(repetitions)
     arguments = [str(data_path), str(output), ",".join(fixed_effects), count]
-    return run_native(Path(__file__).with_name(script), arguments, output)
+    return run_native(
+        Path(__file__).with_name(script),
+        arguments,
+        output,
+        backend=backend,
+        failure_repetitions=repetitions or 3,
+    )
 
 
-def _run_process(target: Callable, *args) -> None:
+def _run_process(
+    target: Callable, *args, tolerate_failure: bool = False
+) -> str | None:
     process = mp.get_context("spawn").Process(target=target, args=args)
     process.start()
     process.join()
     if process.exitcode:
-        raise RuntimeError(f"{target.__name__} exited with status {process.exitcode}")
+        message = f"{target.__name__} exited with status {process.exitcode}"
+        if tolerate_failure:
+            return message
+        raise RuntimeError(message)
+    return None
 
 
 def _write_sample(generate: Callable[[], pd.DataFrame], path: Path) -> None:
@@ -73,7 +85,12 @@ def _python_rows(
     warm_up = True
     if repetitions is None:
         started = time.perf_counter()
-        fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+        try:
+            fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+        except Exception:
+            # Use the failed package-default attempt only to choose a repetition count.
+            # The measured calls below retain and report the actual failure.
+            pass
         planned = repetitions_for_runtime(time.perf_counter() - started)
         warm_up = False
     else:
@@ -98,7 +115,14 @@ def _print_cell(experiment: str, design: str, backend: str, rows: list[dict]) ->
         for row in rows
         if str(row["converged"]).lower() in {"true", "1"}
     ]
-    value = f"{median(times):.3f} s" if times else "failed"
+    if times:
+        value = f"{median(times):.3f} s"
+    elif rows and all(
+        str(row.get("capped", "")).lower() in {"true", "1"} for row in rows
+    ):
+        value = "capped"
+    else:
+        value = "failed"
     print(f"{experiment} / OLS / {design} / {backend}: {value}", flush=True)
 
 
@@ -116,7 +140,6 @@ def run_experiment(
     threads = benchmark_threads()
     rows = []
     for design, generate in designs:
-        design_rows = []
         with tempfile.TemporaryDirectory(prefix="within-ols-") as directory:
             work = Path(directory)
             data_path = work / "sample.parquet"
@@ -125,15 +148,20 @@ def run_experiment(
             for backend in backends:
                 cell_output = work / f"{backend}.csv"
                 if backend in PYTHON_BACKENDS:
-                    _run_process(
+                    process_error = _run_process(
                         _python_rows,
                         data_path,
                         cell_output,
                         tuple(fixed_effects),
                         backend,
                         repetitions,
+                        tolerate_failure=True,
                     )
-                    measured = pd.read_csv(cell_output).to_dict("records")
+                    measured = (
+                        failed_trials(backend, repetitions or 3, process_error)
+                        if process_error
+                        else pd.read_csv(cell_output).to_dict("records")
+                    )
                 else:
                     measured = _native_rows(
                         data_path, cell_output,
@@ -150,13 +178,11 @@ def run_experiment(
                         n_planned=planned,
                     )
                 rows.extend(measured)
-                design_rows.extend(measured)
                 _print_cell(experiment, design, backend, measured)
-            assert_same_retained(design_rows, "OLS", design)
             for backend, view, tolerance, maxiter in extra_python_cells:
                 cell_output = work / f"{backend}-{view}.csv"
                 planned = repetitions or 3
-                _run_process(
+                process_error = _run_process(
                     _python_rows,
                     data_path,
                     cell_output,
@@ -165,8 +191,13 @@ def run_experiment(
                     planned,
                     tolerance,
                     maxiter,
+                    tolerate_failure=True,
                 )
-                measured = pd.read_csv(cell_output).to_dict("records")
+                measured = (
+                    failed_trials(backend, planned, process_error)
+                    if process_error
+                    else pd.read_csv(cell_output).to_dict("records")
+                )
                 for row in measured:
                     row.update(
                         design=design, n_obs=n_obs,

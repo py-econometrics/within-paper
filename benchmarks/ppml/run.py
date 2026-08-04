@@ -10,8 +10,8 @@ from statistics import median
 import pandas as pd
 
 from benchmarks.data import BASE_DESIGNS, make_base_data
-from benchmarks.ppml.pyfixest import measure
-from benchmarks.runtime import assert_same_retained, run_native
+from benchmarks.ppml.pyfixest import OUTER_MAXITER, measure
+from benchmarks.runtime import run_native
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "ppml.csv"
@@ -22,8 +22,14 @@ REPETITIONS = 3
 
 def _native(data_path: Path, output: Path, backend: str) -> list[dict]:
     script = "fixest.R" if backend == "fixest" else "gl_fixed_effect_models.jl"
-    arguments = [str(data_path), str(output), str(REPETITIONS)]
-    return run_native(Path(__file__).with_name(script), arguments, output)
+    arguments = [str(data_path), str(output), str(REPETITIONS), str(OUTER_MAXITER)]
+    return run_native(
+        Path(__file__).with_name(script),
+        arguments,
+        output,
+        backend=backend,
+        failure_repetitions=REPETITIONS,
+    )
 
 
 def main() -> None:
@@ -36,11 +42,10 @@ def main() -> None:
             work = Path(directory)
             data_path = work / "sample.parquet"
             frame.to_parquet(data_path, index=False)
-            design_rows = []
             for backend in BACKENDS:
                 planned = REPETITIONS
                 measured = (
-                    measure(frame, backend, planned)
+                    measure(frame, backend, planned, OUTER_MAXITER)
                     if backend in {"rust-map", "within"}
                     else _native(data_path, work / f"{backend}.csv", backend)
                 )
@@ -48,18 +53,24 @@ def main() -> None:
                     row.update(
                         design=design, n_obs=len(frame), n_fe=3,
                         threads=threads, view="default",
-                        n_planned=planned,
+                        n_planned=planned, outer_maxiter=OUTER_MAXITER,
                     )
                 rows.extend(measured)
-                design_rows.extend(measured)
                 times = [
                     float(row["runtime_s"])
                     for row in measured
                     if str(row["converged"]).lower() in {"true", "1"}
                 ]
-                value = f"{median(times):.3f} s" if times else "failed"
+                if times:
+                    value = f"{median(times):.3f} s"
+                elif measured and all(
+                    str(row.get("capped", "")).lower() in {"true", "1"}
+                    for row in measured
+                ):
+                    value = "capped"
+                else:
+                    value = "failed"
                 print(f"bench-fepois / PPML / {design} / {backend}: {value}", flush=True)
-            assert_same_retained(design_rows, "PPML", design)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(OUTPUT, index=False)
 
