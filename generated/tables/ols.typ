@@ -12,7 +12,7 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [#miss], [#miss], [#miss], [#miss], [#miss],
-  [difficult (near-nested)], [#miss], [#miss], [#miss], [#miss], [#miss],
+  [simple (well-connected)], [0.857 (1.00)], [2.30s], [2.54s], [2.09s], [11.0s],
+  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [306.2s], [62.3s], [26.9s], [4.10s],
   table.hline(stroke: 0.8pt + table-rule),
 )
