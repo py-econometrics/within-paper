@@ -19,9 +19,9 @@ pixi install --locked
 pixi run compile
 ```
 
-The compiled PDF is written to `graph_preconditioner_hdfe.pdf`. Compiling the
-paper uses the tables and figures already in the repository; it does not rerun
-the benchmarks.
+The compiled PDF is written to `graph_preconditioner_hdfe.pdf`. Compilation rebuilds
+the paper's tables and measured prose values from the tracked result snapshot; it does
+not rerun the benchmarks.
 
 ## Reproduce the benchmark results
 
@@ -40,5 +40,7 @@ describes how the benchmark code is organized.
 - `benchmarks/` contains run-local data generators, native runners, explicit
   experiment configs, and the small coordinator.
 - `scripts/` turns recorded measurements into paper tables and figures.
-- `generated/` contains the table fragments and values included by the paper.
+- `results/paper/benchmark_tables.json` is the tracked snapshot behind the paper's
+  tables and measured prose values.
+- `generated/` is untracked build output created from that snapshot during compilation.
 - `within-docs/` contains technical notes about the solver.

@@ -301,9 +301,10 @@ Resolved before the production runs, and struck from this list when done:
       per design. Every backend loads that sample in a fresh process, so process-local
       memory is returned before the next cell starts. Seeds belong to designs rather
       than repetitions, and each result file is written once after the complete run.
-- [ ] Run the standalone setup diagnostic on the AKM mobility designs. The runner records
-      additive setup, solve, and accuracy separately on all six designs; its production
-      output still needs to be collected.
+- [ ] Run `pixi run within-setup-cost-akm` when the standalone setup diagnostic is added
+      to a table or figure. The optional runner records additive setup, solve, and accuracy
+      separately on all six AKM mobility designs; it is outside the default reproduction
+      until its output is collected into the paper.
 - [x] Wire the R1/R2/R3 repetition counts into the harness. Done. The PyFixest
       benchmarkers time one fit, choose the count from its runtime, and repeat on the
       same backend-native frame. Final rows keep `repetition` and `n_planned`, and the

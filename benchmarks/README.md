@@ -19,6 +19,7 @@ pixi run bench-correia
 pixi run agreement
 pixi run bench-memory
 pixi run within-setup-cost
+pixi run within-setup-cost-akm
 pixi run within-preconditioners
 pixi run bench-scaling
 pixi run ppml-inner-outer
@@ -44,10 +45,10 @@ still stops the command normally.
 Raw results live under `results/runs/latest/`. Each experiment writes its complete CSV
 once; medians and table labels belong to `scripts/paper_results.py`.
 
-`within-setup-cost` retains the 10M simple and difficult endpoint cases and adds the six
-1M AKM mobility designs. It times the additive factor-pair solver's construction and
-batch solve separately, at the matched-accuracy LSMR settings used in the mechanism
-benchmark.
+`within-setup-cost` measures the 10M simple and difficult endpoints that feed the paper.
+The optional `within-setup-cost-akm` task applies the same setup/solve split to the six
+1M AKM mobility designs. Its output remains separate until that sweep is used in a table
+or figure.
 
 The source tree is organized by model or experiment:
 

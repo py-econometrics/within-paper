@@ -11,6 +11,16 @@ from benchmarks.runtime import failure_fields
 
 OUTER_MAXITER = 100
 
+
+def _outer_converged(fit) -> bool:
+    """Read the outer-IRLS convergence flag exposed by PyFixest."""
+    for name in ("_convergence", "convergence", "converged"):
+        value = getattr(fit, name, None)
+        if value is not None:
+            return bool(value)
+    return False
+
+
 def _demeaner(backend: str):
     import pyfixest as pf
 
@@ -26,7 +36,7 @@ def fit_ppml(
 ):
     import pyfixest as pf
 
-    return pf.fepois(
+    fit = pf.fepois(
         "negbin_y ~ x1 | indiv_id + firm_id + year",
         frame,
         vcov="iid",
@@ -36,6 +46,11 @@ def fit_ppml(
         demeaner=_demeaner(backend),
         iwls_maxiter=outer_maxiter,
     )
+    if not _outer_converged(fit):
+        raise RuntimeError(
+            f"PyFixest IRLS reached the maximum number of iterations ({outer_maxiter})"
+        )
+    return fit
 
 
 def measure(

@@ -31,6 +31,7 @@ LATEST_RUN = ROOT / "results" / "runs" / "latest"
 CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
+PAPER_PATH = ROOT / "graph_preconditioner_hdfe.typ"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXPECTED_TRIALS = 3
 
@@ -310,18 +311,15 @@ def render(_: argparse.Namespace) -> None:
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
-    ppml_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["ppml"]["rows"]
-    }
+    ppml_rows = {_clean_cell(row[0]): row for row in tables["ppml"]["rows"]}
     ppml_simple = ppml_rows["simple (well-connected)"]
     ppml_difficult = ppml_rows["difficult (near-nested)"]
     ols_difficult = tables["ols"]["rows"][1]
-    correia_real_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["correia_real"]["rows"]
+    mobility_rows = tables["akm_mobility"]["rows"]
+    sorting_rows = tables["akm_sorting"]["rows"]
+    correia_synthetic_rows = {
+        _clean_cell(row[0]): row for row in tables["correia_synthetic"]["rows"]
     }
-    enron = correia_real_rows["enron"]
     agreement_rows = tables["agreement"]["rows"]
     memory_rows = tables["memory"]["rows"]
 
@@ -352,50 +350,82 @@ def render(_: argparse.Namespace) -> None:
     memory_1m = memory_overheads(memory_rows[4:6])
     directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
     prose_values = {
+        "result_akm_mobility_first_gap": gap_without_share(mobility_rows[0][1]),
+        "result_akm_mobility_last_gap": gap_without_share(mobility_rows[-1][1]),
+        "result_akm_sorting_first_gap": gap_without_share(sorting_rows[0][1]),
+        "result_akm_sorting_last_gap": gap_without_share(sorting_rows[-1][1]),
         "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
         "result_ols_difficult_rust_map": ols_difficult[2],
-        "result_ols_difficult_fixest": ols_difficult[3],
-        "result_ols_difficult_fem": ols_difficult[4],
         "result_ols_difficult_within": ols_difficult[5],
-        "result_correia_enron_fem": enron[4],
-        "result_correia_enron_within": enron[5],
+        "result_ols_difficult_within_vs_fixest": _format_ratio(
+            _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
+        ),
+        "result_correia_uniform_harder_gap": gap_without_share(
+            correia_synthetic_rows["synthetic-uniform-harder"][1]
+        ),
+        "result_directors_component_share": (
+            f"{directors_share:.0%}" if directors_share is not None else "--"
+        ),
         "result_ppml_simple_range": seconds_range(ppml_simple, range(2, 6)),
-        "result_ppml_difficult_three_fixest": ppml_difficult[3],
-        "result_ppml_difficult_three_glfem": ppml_difficult[4],
-        "result_ppml_difficult_three_within": ppml_difficult[5],
+        "result_ppml_difficult_fixest": ppml_difficult[3],
+        "result_ppml_difficult_glfem": ppml_difficult[4],
+        "result_ppml_difficult_within": ppml_difficult[5],
+        "result_ppml_within_vs_fixest": _format_ratio(
+            _numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])
+        ),
         "result_agreement_simple_gap": gap_without_share(memory_rows[1][1]),
         "result_agreement_difficult_gap": gap_without_share(memory_rows[2][1]),
         "result_agreement_simple_max": _largest_metric(agreement_rows[:4], 3),
         "result_agreement_difficult_max": _largest_metric(agreement_rows[4:], 3),
-        "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
-        "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
+        "result_setup_simple_setup": _format_seconds(
+            float(prose["setup_simple_setup_s"])
+        ),
+        "result_setup_simple_solve": _format_seconds(
+            float(prose["setup_simple_solve_s"])
+        ),
         "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
-        "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
-        "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
+        "result_setup_difficult_setup": _format_seconds(
+            float(prose["setup_difficult_setup_s"])
+        ),
+        "result_setup_difficult_solve": _format_seconds(
+            float(prose["setup_difficult_solve_s"])
+        ),
         "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
-        # The abstract quotes a magnitude, so it has to move with the run
-        # rather than be typed in once and go stale.
-        "result_ols_difficult_within_vs_rust_map": _format_ratio(
-            _numeric_cell(ols_difficult[2]), _numeric_cell(ols_difficult[5])
+        "result_memory_100k_overhead": (
+            f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB"
+            if memory_100k
+            else "--"
         ),
-        "result_ols_difficult_within_vs_fixest": _format_ratio(
-            _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
+        "result_memory_1m_overhead": (
+            f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB"
+            if memory_1m
+            else "--"
         ),
-        "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
-        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
-        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
-        "result_directors_component_share": (
-            f"{directors_share:.0%}" if directors_share is not None else "--"
-        ),
-        "result_zigzag_within": _format_seconds(float(prose["zigzag_within_s"])),
-        "result_zigzag_fem": _format_seconds(float(prose["zigzag_fem_s"])),
     }
-    # Values synchronized straight into the result file, such as the legacy CUDA
-    # timings of Appendix C, are published without further formatting.
     prose_values.update(
         {name: value for name, value in prose.items() if name.startswith("result_")}
     )
-    values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
+    references = list(
+        dict.fromkeys(
+            re.findall(
+                r"#(result_[A-Za-z0-9_]+)\b",
+                PAPER_PATH.read_text(encoding="utf-8"),
+            )
+        )
+    )
+    missing = sorted(set(references) - prose_values.keys())
+    unused = sorted(prose_values.keys() - set(references))
+    if missing or unused:
+        details = []
+        if missing:
+            details.append("missing result values: " + ", ".join(missing))
+        if unused:
+            details.append("unused result values: " + ", ".join(unused))
+        raise ValueError("; ".join(details))
+    values.extend(
+        f"#let {name} = [{_prose_cell(str(prose_values[name]))}]"
+        for name in references
+    )
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
     print(f"[render] wrote {len(tables)} table fragments to {destination}")
 
@@ -1083,33 +1113,6 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
     return rendered
 
 
-def _synchronize_zigzag(document: dict) -> int:
-    """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
-
-    Read both times directly from the raw benchmark output.
-    """
-    rows = _latest_rows("correia.csv")
-    if rows is None:
-        return 0
-    rows = [row for row in rows if row.get("design") == "synthetic-zigzag"]
-    times: dict[str, float] = {}
-    for row in rows:
-        backend = row.get("backend", "")
-        if backend in {"within", "FEM.jl"} and _row_success(row):
-            try:
-                times[backend] = float(_row_time(row))
-            except (KeyError, TypeError, ValueError):
-                continue
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for backend, key in (("within", "zigzag_within_s"), ("FEM.jl", "zigzag_fem_s")):
-        value = times.get(backend)
-        if value is not None and prose.get(key) != value:
-            prose[key] = value
-            changed += 1
-    return changed
-
-
 def _synchronize_canonical_tables(
     document: dict | None = None, *, write: bool = True
 ) -> int:
@@ -1197,7 +1200,6 @@ def _synchronize_canonical_tables(
     changed += _synchronize_iterations(document)
     changed += _synchronize_factor_scaling(document)
     changed += _synchronize_amortization(document)
-    changed += _synchronize_zigzag(document)
     if write:
         _write_json(TABLES_PATH, document)
     return changed

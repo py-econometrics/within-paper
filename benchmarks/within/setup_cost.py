@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import time
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
 ROOT = Path(__file__).absolute().parents[2]
 OUTPUT = ROOT / "results" / "runs" / "latest" / "within_setup_cost.csv"
+AKM_OUTPUT = ROOT / "results" / "runs" / "latest" / "within_setup_cost_akm.csv"
 BASE_N_OBS = 10_000_000
 BASE_REPETITIONS = 3
 AKM_REPETITIONS = 20
@@ -121,32 +123,37 @@ def _print(design: str, rows: list[dict]) -> None:
 
 
 def main() -> None:
-    rows = []
-    for design, seed in BASE_DESIGNS:
-        categories, rhs = solver_data(make_base_data(BASE_N_OBS, design, seed))
-        measured = _measure(
-            design,
-            categories,
-            rhs,
-            experiment="base",
-            repetitions=BASE_REPETITIONS,
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--akm",
+        action="store_true",
+        help="run the optional AKM mobility sweep instead of the paper endpoints",
+    )
+    args = parser.parse_args()
+    if args.akm:
+        samples = ((design, make_akm_data(design)) for design in MOBILITY_DESIGNS)
+        experiment, repetitions, output = "akm_mobility", AKM_REPETITIONS, AKM_OUTPUT
+    else:
+        samples = (
+            (design, make_base_data(BASE_N_OBS, design, seed))
+            for design, seed in BASE_DESIGNS
         )
-        rows.extend(measured)
-        _print(design, measured)
+        experiment, repetitions, output = "base", BASE_REPETITIONS, OUTPUT
 
-    for design in MOBILITY_DESIGNS:
-        categories, rhs = solver_data(make_akm_data(design))
+    rows = []
+    for design, data in samples:
+        categories, rhs = solver_data(data)
         measured = _measure(
             design,
             categories,
             rhs,
-            experiment="akm_mobility",
-            repetitions=AKM_REPETITIONS,
+            experiment=experiment,
+            repetitions=repetitions,
         )
         rows.extend(measured)
         _print(design, measured)
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(OUTPUT, index=False)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(output, index=False)
 
 
 if __name__ == "__main__":

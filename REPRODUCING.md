@@ -27,8 +27,16 @@ environment before running Julia runners:
 julia --project=benchmarks/julia-env -e 'using Pkg; Pkg.instantiate()'
 ```
 
-Use `pixi run test` to run the checks and `pixi run compile` to build the paper
-from the recorded results. To regenerate the benchmark results, figures,
+The Correia benchmark data are verified downloads and are not stored in Git. Fetch them
+once before running the full reproduction:
+
+```bash
+pixi run fetch-correia
+```
+
+Use `pixi run test` to run the checks and `pixi run compile` to regenerate the Typst
+result fragments from `results/paper/benchmark_tables.json` and build the paper. To
+regenerate the benchmark results, figures,
 tables, and PDF, run:
 
 ```bash

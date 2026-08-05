@@ -822,8 +822,8 @@ Krylov solver should become relatively more competitive in the low-mobility desi
 The mobility benchmark matches the predicted pattern. When mobility is high,
 preconditioning yields little advantage: `fixest` is the fastest backend in
 `akm_mobility_1`, and `within` incurs setup costs that are not offset by improved
-convergence. As mobility declines, the worker-firm gap falls by more than two orders
-of magnitude, from $1.38 times 10^(-1)$ to below $10^(-3)$ (the decline is not
+convergence. As mobility declines, the worker-firm gap falls from
+#result_akm_mobility_first_gap to #result_akm_mobility_last_gap (the decline is not
 strictly monotone, because the reported gap is attained on different connected
 components), and MAP runtimes rise sharply. `within`'s runtime stays nearly flat across
 all designs. In the lowest-mobility configurations, the
@@ -856,7 +856,8 @@ factor-pair solves use the worker-firm graph directly.
 
 The sorting benchmark gives the parallel result. As movers sort more strongly across
 firms, the worker-firm graph separates into weakly connected blocks. The worker-firm gap
-falls by more than two orders of magnitude, and MAP-based runtimes rise. The gap does not fall
+falls from #result_akm_sorting_first_gap to #result_akm_sorting_last_gap, and MAP-based
+runtimes rise. The gap does not fall
 monotonically, because different components attain the reported value in different rows,
 but its overall decline is clear. `within` remains nearly flat because its factor-pair
 preconditioner uses the worker-firm links directly, rather than relying on residual
@@ -887,25 +888,28 @@ amortize its setup cost on the simple design.
   $1-rho_(W F)$ for the worker-firm pair, reported from the generated 1M version of the
   same DGP family; the runtime rows use the identical simple/difficult graph construction
   at 10M observations. The standalone `within` demeaning API decomposes one-shot runtime
-into reusable solver construction and batch solve: simple design 5.76s + 1.51s
-(roughly 80% setup); difficult design 0.40s + 1.00s (roughly 29% setup). PyFixest
+into reusable solver construction and batch solve: simple design
+#result_setup_simple_setup + #result_setup_simple_solve
+(#result_setup_simple_share setup); difficult design #result_setup_difficult_setup +
+#result_setup_difficult_solve (#result_setup_difficult_share setup). PyFixest
 regression overhead is incurred in addition to these figures.]
   ]
 
 On the "simple" design, the graph is dense and the worker-firm gap is large. MAP
 therefore converges quickly: `fixest` with Irons-Tuck acceleration is fastest, while
 `within` is slowest because the factor-pair preconditioner does not repay its setup cost.
-In the standalone demeaning breakdown, roughly four fifths of `within`'s demeaning time
-on the simple design is spent building the preconditioner.
+In the standalone demeaning breakdown, #result_setup_simple_share of `within`'s
+demeaning time on the simple design is spent building the preconditioner.
 
-On the difficult design, the ranking reverses. MAP convergence degrades sharply, to
-the point that `rust-map` without acceleration needs over six minutes.
-`within` completes in 3.25s, an order of magnitude faster than the best MAP backend,
+On the difficult design, the ranking reverses. The worker-firm gap falls to
+#result_ols_difficult_gap, and `rust-map` without acceleration takes
+#result_ols_difficult_rust_map. `within` completes in #result_ols_difficult_within and is
+#result_ols_difficult_within_vs_fixest faster than the best MAP backend,
 because its factor-pair preconditioner captures the sparse worker-firm coupling
 directly. A nearly zero diagnostic gap identifies the regime in which MAP requires many
 sweeps to disentangle worker and firm effects. The setup share of the standalone
-demeaning time falls to about 29%, indicating that the preconditioner setup is now
-amortized.
+demeaning time falls to #result_setup_difficult_share, indicating that the
+preconditioner setup is now amortized.
 
 #v(0.35em)
 
@@ -934,8 +938,8 @@ These results are less clear than the controlled AKM experiments, which is itsel
 Several datasets are small enough, or sufficiently well connected, that setup cost
 matters as much as conditioning; on the complete and easier uniform designs, the gap is
 large and low-overhead methods perform well. The harder rows reverse the ranking. By
-`synthetic-uniform-harder`, the gap has fallen to $2.49 times 10^(-2)$ and `within` is
-already the fastest backend. On the assortative benchmark, the preconditioned method
+`synthetic-uniform-harder`, the gap has fallen to #result_correia_uniform_harder_gap and
+`within` is already the fastest backend. On the assortative benchmark, the preconditioned method
 exhibits its clearest advantage: sorting generates cross-factor structure that MAP's
 updates handle only slowly.
 
@@ -966,9 +970,9 @@ DGPs only approximate.
 The empirical datasets show the same pattern in less stylized form. Accelerated MAP is
 difficult to outperform on small or compact graphs such as `credit` and `soccer`, where
 the gaps are large. The `directors` row illustrates why the component share is useful:
-the worst component is hard, but it contains about thirty percent of the observations, so
-the full problem is not as costly for MAP as the gap alone would suggest. On larger
-networks with hard components covering a substantial portion of the sample, particularly
+the worst component is hard, but it contains #result_directors_component_share of the
+observations, so the full problem is not as costly for MAP as the gap alone would suggest.
+On larger networks with hard components covering a substantial portion of the sample, particularly
 `enron`, `github`, `patents`, `workers`, and `schools`, the factor-pair preconditioner is
 fastest by a wide margin. 
 
@@ -1022,12 +1026,13 @@ the same 100-iteration outer IRLS limit.
   ]
 
 The patterns observed in the OLS benchmarks carry over. On the simple design all four
-backends converge: `within` and `fixest` finish in under ten seconds, while `rust-map`
-and `GLFEM.jl` take about 26 and 48 seconds. The difficult design provides the sharpest
-contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes 167
-seconds, `fixest` takes 320 seconds, and `within` finishes in about five seconds. The factor-pair preconditioner captures
-the same sparse worker-firm coupling that drove the OLS benchmark results, and the IRLS outer
-loop inherits the gain without modification.
+backends converge in #result_ppml_simple_range. The difficult design provides the
+sharpest contrast: `rust-map` does not converge within the iteration cap, `GLFEM.jl` takes
+#result_ppml_difficult_glfem, `fixest` takes #result_ppml_difficult_fixest, and `within`
+finishes in #result_ppml_difficult_within, #result_ppml_within_vs_fixest faster than
+`fixest`. The factor-pair preconditioner captures the same sparse worker-firm coupling
+that drove the OLS benchmark results, and the IRLS outer loop inherits the gain without
+modification.
 
 == Memory Use
 
@@ -1082,9 +1087,9 @@ benchmarks as diagnostic cases. The simple
 design examines the "easy-to-converge" regime where all methods should agree almost exactly. The
 difficult design examines the regime where conditioning is poor and small differences in
 stopping rules are most likely to emerge. The graph diagnostic distinguishes these
-cases: the worker-firm gap is approximately 0.857 in the simple design and
-approximately 0.00130 in the difficult design. The table below collects one regression
-coefficient for all four backends.
+cases: the worker-firm gap is #result_agreement_simple_gap in the simple design and
+#result_agreement_difficult_gap in the difficult design. The table below collects one
+regression coefficient for all four backends.
 
 #v(0.4em)
 

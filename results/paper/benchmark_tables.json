@@ -5,9 +5,7 @@
     "setup_difficult_solve_s": 1.5896287919895258,
     "setup_simple_setup_s": 7.946194832999026,
     "setup_simple_share": 0.7602119423826158,
-    "setup_simple_solve_s": 2.506409749999875,
-    "zigzag_fem_s": 0.714179708,
-    "zigzag_within_s": 0.0171077920022071
+    "setup_simple_solve_s": 2.506409749999875
   },
   "schema_version": 1,
   "tables": {

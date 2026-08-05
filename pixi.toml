@@ -6,13 +6,14 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
-compile = "typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
+compile = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
 check-external-runtimes ={ cmd = "python -m scripts.paper_results check-external-runtimes", description = "Check installed R and Julia versions, packages, and thread counts" }
 setup-julia-env = { cmd = "python -m scripts.paper_results setup-julia-env", description = "Install Julia packages from the tracked project" }
 fetch-correia = { cmd = "python -m scripts.paper_results fetch-correia", description = "Download the Correia HDFE CSVs and verify their checksums" }
 check-correia-data = { cmd = "python -m scripts.paper_results fetch-correia --offline", description = "Verify the local Correia CSV collection without downloading" }
 agreement = { cmd = "python -m benchmarks.ols.agreement", depends-on = ["setup-julia-env"], description = "Run numerical agreement checks from the OLS implementations" }
-within-setup-cost = { cmd = "python -m benchmarks.within.setup_cost", description = "Measure factor-pair setup and solve cost on base and AKM mobility designs" }
+within-setup-cost = { cmd = "python -m benchmarks.within.setup_cost", description = "Measure factor-pair setup and solve cost at the base-design endpoints used in the paper" }
+within-setup-cost-akm = { cmd = "python -m benchmarks.within.setup_cost --akm", description = "Run the optional factor-pair setup and solve sweep over AKM mobility designs" }
 test = { cmd = "python -m unittest discover -s tests -t . -v", description = "Run benchmark regression tests" }
 bench-memory = { cmd = "python -m benchmarks.memory", description = "Measure peak RSS and runtime for PyFixest MAP and within (100K, 1M)" }
 bench-main = { cmd = "python -m benchmarks.ols.main", depends-on = ["setup-julia-env"], description = "Run the headline OLS comparison" }
@@ -28,9 +29,9 @@ bench-tolerance = { cmd = "python -m benchmarks.tolerance.akm_frontier", depends
 bench-correia = { cmd = "python -m benchmarks.ols.correia", depends-on = ["setup-julia-env", "check-correia-data"], description = "Run the local Correia comparisons after checksum verification" }
 compute-hardness = { cmd = "python -m scripts.compute_hardness", depends-on = ["check-correia-data"], description = "Compute pairwise spectral gaps after singleton pruning" }
 collect-paper-results = { cmd = "python -m scripts.paper_results collect", description = "Fold existing benchmark CSVs into the paper tables without rerunning benchmarks" }
-reproduce-results = { cmd = "python -m scripts.paper_results collect", depends-on = ["check-external-runtimes", "agreement", "within-setup-cost", "bench-memory", "within-preconditioners", "bench-accuracy-frontier", "ppml-inner-outer", "bench-scaling", "bench-tolerance", "make-figures"], description = "Run the full benchmark suite, generate figures, and save result hashes and environment details" }
+reproduce-results = { cmd = "python -m scripts.paper_results collect", depends-on = ["check-external-runtimes", "agreement", "within-setup-cost", "bench-memory", "within-preconditioners", "bench-accuracy-frontier", "ppml-inner-outer", "bench-scaling", "bench-tolerance", "analyze-gap-runtime"], description = "Run the full benchmark suite and collect the paper result tables" }
 render-paper-results = { cmd = "python -m scripts.paper_results render", description = "Write Typst tables from the paper result file" }
-reproduce-paper = { cmd = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Run benchmarks, render tables, and build the PDF" }
+reproduce-paper = { cmd = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results", "make-figures"], description = "Run benchmarks, generate figures, render tables, and build the PDF" }
 
 [dependencies]
 # Figures are generated from recorded results, never drawn by hand.

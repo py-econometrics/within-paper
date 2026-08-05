@@ -47,6 +47,7 @@ def main() -> None:
                     ),
                 }
             )
+    LATEST.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(LATEST / "agreement.csv", index=False)
 
 
