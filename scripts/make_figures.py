@@ -118,7 +118,7 @@ def _runtime_panel(
     title: str,
     note: str,
 ) -> None:
-    """Draw one runtime-gap panel and fit slopes on the controlled AKM sweeps."""
+    """Draw one runtime-gap panel and fit slopes on the controlled AKM designs."""
 
     for raw_name in backends:
         display, colour, marker, line = METHODS[raw_name]
@@ -240,18 +240,21 @@ def headline_figure(points: list[dict], out: Path) -> None:
         view="matched",
         title="(b) Same code path, matched accuracy",
         note=(
-            "same AKM samples at 1M; log-log fits\n"
+            "same samples at 1M; log-log fits\n"
             "failed cells omitted; hollow: partial convergence"
         ),
     )
 
+    # A smaller gap means weaker connectivity. Running the scale from large
+    # to small makes the figure read from the easy designs to the hard ones.
+    axes[0].invert_xaxis()
     axes[0].set_ylabel("Median runtime (s)")
     fig.subplots_adjust(left=0.08, right=0.99, top=0.91, bottom=0.20)
     fig.text(
         0.535,
         0.05,
         "Worker-firm spectral gap  $1-\\rho_{WF}$  "
-        "(weaker connectivity to the left)",
+        "(weaker connectivity to the right)",
         ha="center",
         fontsize=9,
     )

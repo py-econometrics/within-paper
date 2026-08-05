@@ -72,8 +72,10 @@
       We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
       built from small, local factor-pair subproblems - worker-firm, worker-year, and
       so on - that use the graph directly. 
-      Benchmarks show MAP remains fastest on dense designs, while graph preconditioning
-      reduces runtime on sparse worker-firm graphs and under strong sorting.
+      Benchmarks show that all methods are fast on well-connected designs. As
+      connectivity weakens, MAP and diagonally preconditioned LSMR slow down, while
+      factor-pair preconditioning remains fast and its runtime falls because the graph
+      preconditioner is cheaper to construct on sparser graphs.
     ]
   ]
 ]
@@ -143,12 +145,36 @@ then solved with a Krylov solver, an iterative method for large linear systems.#
 of fixed-effect regression, `FixedEffectModels.jl` @fixedeffectmodels, uses the same
 Krylov solver as we do - LSMR @fong2011 - but only with diagonal
 preconditioning, which ignores the off-diagonal co-occurrence structure entirely; our
-contribution is the preconditioner, not the use of LSMR for the outer iteration.] In a range of benchmarks
-against mature implementations of the method of alternating projections, we find that on
-sparse, poorly connected graphs (the regime where MAP convergence deteriorates) the
-graph-preconditioned solver lowers runtime, while on dense,
-well-connected graphs the preconditioner setup cost does not amortize and MAP should
-remain the natural default.
+contribution is the preconditioner, not the use of LSMR for the outer iteration.]
+
+We benchmark widely used fixed-effect regression implementations available through
+PyFixest, R's `fixest`, and Julia's `FixedEffectModels.jl`. They cover MAP variants and
+LSMR with diagonal preconditioning. We compare them with our additive factor-pair
+preconditioner as worker-firm connectivity varies.
+
+The paper's main result appears in @fig-gap-runtime. The horizontal axis moves from
+well-connected worker-firm graphs on the left to weakly connected graphs on the right.
+
+#figure(
+  image(result-img("gap_runtime.svg"), width: 100%),
+  caption: [Median runtime against the worker-firm spectral gap, on log-log axes. Because
+  smaller gaps mean weaker connectivity, the horizontal scale decreases from left to
+  right. Both panels report simulated worker-firm-year panels with 1 million observations,
+  in which worker mobility and sorting vary. Within each design, every implementation
+  receives the same stored sample. Panel (a) compares package defaults. Panel (b) holds
+  the PyFixest code path and achieved accuracy fixed, isolating the comparison from
+  language and implementation differences across packages. Solid lines are log-log fits
+  to the median runtimes. Failed cells are omitted; hollow markers indicate that some
+  trials did not converge.]
+) <fig-gap-runtime>
+
+At high connectivity, all implementations finish quickly. As the spectral gap narrows,
+MAP and the unpreconditioned or diagonally preconditioned LSMR configurations slow down.
+The additive factor-pair preconditioner behaves differently: its runtime remains low and
+even falls across the hardest designs because the setup cost of the preconditioner
+decreases. Low-connectivity worker-firm subproblems are sparser and take less time to
+factorize, so constructing the preconditioner becomes cheaper as the other solvers slow
+down.
 
 The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
 absorption problem, and Section 3 introduces the AKM model as our running example.
@@ -1247,18 +1273,6 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 This appendix collects the diagnostics behind the claims in Section 7. Each experiment is
 generated from the recorded benchmark output by `scripts/paper_results.py`; none of the
 numbers here are entered by hand.
-
-== Runtime Against Connectivity
-
-#figure(
-  image(result-img("gap_runtime.svg"), width: 92%),
-  caption: [Runtime against the worker-firm spectral gap, log-log, on common axes. Both
-  panels show the controlled 1M-observation AKM sweep; every marker uses the same stored
-  sample for its scenario. Solid lines are log-log fits to the AKM medians. Panel (a)
-  compares package defaults. Panel (b) reruns the PyFixest configurations on the same
-  samples at matched accuracy under a shared iteration cap. Failed cells are omitted, and
-  hollow markers denote partial convergence.]
-) <fig-gap-runtime>
 
 == Simple and Difficult Designs
 

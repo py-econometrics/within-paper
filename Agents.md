@@ -12,3 +12,7 @@ The paper should be pleasant to read and informative. Any smart 4th-year undergr
 # Language
 
 Make sure to always use human-sounding language. Invoke the "no llm style" skill.
+
+Do not use "sweep" as shorthand for a collection of benchmark designs or parameter
+values. State which feature varies instead. Reserve "sweep" for its precise algorithmic
+meaning: one complete MAP pass over the fixed-effect dimensions.
