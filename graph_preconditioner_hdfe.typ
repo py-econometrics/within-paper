@@ -182,9 +182,9 @@ Section 4 develops the graph structure of the fixed-effect Gramian, and Section 
 connects this structure to the convergence behavior of MAP. Section 6 builds up
 the factor-pair Schwarz preconditioner, starting from a general discussion of
 preconditioning and culminating in the construction of the graph-based preconditioner.
-Section 7 reports benchmarks on runtime and numerical equivalence; Section 8 describes
-the software through which the new algorithm is available; and Section 9 concludes.
-Appendix B reports memory use and additional benchmark diagnostics.
+Section 7 reports the runtime benchmarks; Section 8 describes the software through which
+the new algorithm is available; and Section 9 concludes. Appendix B reports numerical
+equivalence, memory use, and additional benchmark diagnostics.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -760,9 +760,9 @@ The main runtime tables use package-level regression APIs, matching the public
 PyFixest benchmark suite, rather than isolated demeaning kernels. Each timing covers the
 full regression workflow: model setup, construction of the fixed-effect representation,
 residualization of the outcome and covariates, and estimation of the coefficient of
-interest. The main text also verifies that the preconditioned solver matches MAP to
-numerical tolerance. Appendix B reports the memory cost of storing factor-pair
-information and additional solver diagnostics.
+interest. Appendix B verifies that the preconditioned solver matches MAP to numerical
+tolerance and reports the memory cost of storing factor-pair information and additional
+solver diagnostics.
 
 For cross-package comparisons, every backend receives the same input data but uses its
 own default handling of singleton or separated observations. Successful fits record the
@@ -943,38 +943,6 @@ seconds, `fixest` takes 320 seconds, and `within` finishes in about five seconds
 the same sparse worker-firm coupling that drove the OLS benchmark results, and the IRLS outer
 loop inherits the gain without modification.
 
-== Numerical Equivalence
-
-Before trusting a new fixed-effect solver, we must verify that it reproduces the
-estimates of existing routines. MAP and LSMR-style routines differ in their convergence
-checks, residual norms, stopping thresholds, and iteration caps, so two correct
-implementations can return coefficients that agree only up to their tolerances.
-
-We use the 100K-observation simple and difficult data generating processes from the fixest
-benchmarks as diagnostic cases. The simple
-design examines the "easy-to-converge" regime where all methods should agree almost exactly. The
-difficult design examines the regime where conditioning is poor and small differences in
-stopping rules are most likely to emerge. The graph diagnostic distinguishes these
-cases: the worker-firm gap is approximately 0.857 in the simple design and
-approximately 0.00130 in the difficult design. The table below collects one regression
-coefficient for all four backends.
-
-#v(0.4em)
-
-#text(size: 9.2pt)[
-#strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
-#include "generated/tables/agreement.typ"
-#v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
-Differences are absolute slope-coefficient deviations from `rust-map`. `within` is the
-PyFixest preconditioned Rust backend.]
-]
-
-On the simple design, the largest coefficient difference is
-#result_agreement_simple_max. On the difficult design it is
-#result_agreement_difficult_max. The methods use different stopping checks, so exact
-agreement is not expected on the poorly conditioned design.
-
 = Software
 
 The solver studied in this paper is available as open-source software through the
@@ -1117,9 +1085,10 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 
 = Appendix B: Supplementary Benchmark Results
 
-This appendix reports additional benchmarks, memory use, and the diagnostics behind the
-claims in Section 7. Each experiment is generated from the recorded benchmark output by
-`scripts/paper_results.py`; none of the numbers here are entered by hand.
+This appendix reports additional benchmarks, numerical equivalence, memory use, and the
+diagnostics behind the claims in Section 7. Each experiment is generated from the
+recorded benchmark output by `scripts/paper_results.py`; none of the numbers here are
+entered by hand.
 
 == Simple and Difficult Designs
 
@@ -1281,6 +1250,38 @@ At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1
 observations the overhead is #result_memory_1m_overhead, but it remains modest relative
 to the full panel data footprint. The additional storage holds factor-pair
 co-occurrences, partition weights, and local approximate Cholesky factors.
+
+#pagebreak()
+
+== Numerical Equivalence
+
+Numerical agreement is a separate diagnostic because MAP and LSMR-style routines use
+different convergence checks, residual norms, stopping thresholds, and iteration caps.
+Two correct implementations can therefore return coefficients that agree only up to
+their tolerances.
+
+We use the 100K-observation simple and difficult data generating processes from the
+`fixest` benchmarks as diagnostic cases. All methods should agree closely on the simple
+design. The difficult design is poorly conditioned, so small differences in stopping
+rules are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
+design and 0.00130 in the difficult design. The table below compares one regression
+coefficient across the four backends.
+
+#v(0.4em)
+
+#text(size: 9.2pt)[
+#strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
+#include "generated/tables/agreement.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
+Differences are absolute slope-coefficient deviations from `rust-map`. `within` is the
+PyFixest preconditioned Rust backend.]
+]
+
+On the simple design, the largest coefficient difference is
+#result_agreement_simple_max. On the difficult design it is
+#result_agreement_difficult_max. The methods use different stopping checks, so exact
+agreement is not expected on the poorly conditioned design.
 
 #pagebreak()
 
