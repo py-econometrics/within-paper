@@ -777,12 +777,9 @@ factor pairs on which MAP tends to converge more slowly; with three or more fixe
 effects, the statistic remains a pairwise diagnostic rather than a full convergence
 bound.
 
-The benchmark section moves from controlled AKM designs to standard synthetic benchmarks
-and then to empirical datasets. The AKM designs vary mobility and sorting directly. The
-standard synthetic benchmarks use the simple/difficult DGPs from the fixest benchmark
-suite and synthetic datasets from the HDFE benchmark collection assembled by Sergio
-Correia. The empirical datasets from the same collection are included because synthetic
-DGPs can miss irregularities in real fixed-effect structures.
+The main text focuses on controlled AKM designs, which vary mobility and sorting
+directly, and on PPML. Appendix B reports the simple/difficult `fixest` designs and the
+synthetic and empirical HDFE benchmarks assembled by Sergio Correia.
 
 We benchmark four backends that separate MAP baselines from Krylov solvers with
 diagonal versus factor-pair preconditioning:
@@ -888,116 +885,6 @@ monotonically, because different components attain the reported value in differe
 but its overall decline is clear. `within` remains nearly flat because its factor-pair
 preconditioner uses the worker-firm links directly, rather than relying on residual
 updates that cycle through one fixed-effect dimension at a time.
-
-=== Standard Synthetic Benchmarks: fixest DGPs + Correia Synthetic
-
-The AKM benchmarks varied mobility and sorting directly. We now turn to synthetic
-datasets that have become standard reference cases in fixed-effect software: they are
-public, easily reproducible, and already used to compare implementations.
-
-The first family is the simple-versus-difficult benchmark data generating process from
-`fixest` @berge2026fixest. Both designs use 10M observations, one covariate, and three
-fixed effects (worker, firm, year). The simple design has dense random mobility, whereas
-the difficult design has a sparse, nearly nested worker-firm structure. The simple design
-should be easy for MAP because its updates can pass information rapidly through a
-well-connected graph. The
-difficult design should be harder because worker and firm effects are nearly collinear.
-Factor-pair preconditioning should perform well on the difficult design, but may fail to
-amortize its setup cost on the simple design.
-
-#text(size: 8.8pt)[
-#strong[Simple vs. difficult design (10M observations, 3 FE).]
-#include "generated/tables/ols.typ"
-  #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. Both designs
-  use 10M observations, one covariate, and three fixed effects. Gap denotes
-  $1-rho_(W F)$ for the worker-firm pair, reported from the generated 1M version of the
-  same DGP family; the runtime rows use the identical simple/difficult graph construction
-  at 10M observations. The standalone `within` demeaning API decomposes one-shot runtime
-into reusable solver construction and batch solve: simple design 5.76s + 1.51s
-(roughly 80% setup); difficult design 0.40s + 1.00s (roughly 29% setup). PyFixest
-regression overhead is incurred in addition to these figures.]
-  ]
-
-On the "simple" design, the graph is dense and the worker-firm gap is large. MAP
-therefore converges quickly: `fixest` with Irons-Tuck acceleration is fastest, while
-`within` is slowest because the factor-pair preconditioner does not repay its setup cost.
-In the standalone demeaning breakdown, roughly four fifths of `within`'s demeaning time
-on the simple design is spent building the preconditioner.
-
-On the difficult design, the ranking reverses. MAP convergence degrades sharply, to
-the point that `rust-map` without acceleration needs over six minutes.
-`within` completes in 3.25s, an order of magnitude faster than the best MAP backend,
-because its factor-pair preconditioner captures the sparse worker-firm coupling
-directly. A nearly zero diagnostic gap identifies the regime in which MAP requires many
-sweeps to disentangle worker and firm effects. The setup share of the standalone
-demeaning time falls to about 29%, indicating that the preconditioner setup is now
-amortized.
-
-#v(0.35em)
-
-The second family of benchmarks comprises synthetic datasets drawn from the Correia HDFE
-benchmark collection. These datasets span a broader set of graph shapes: complete
-bipartite matching, uniform random matching with varying degrees of connectivity,
-assortative matching, and a small path-like design. They provide an independent public
-reference set for comparing the same software backends outside the AKM generator.
-
-#v(0.35em)
-
-#text(size: 8.9pt)[
-#strong[Correia synthetic benchmarks.]
-#include "generated/tables/correia_synthetic.typ"
-  #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
-  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
-  share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
-  geometry. The `synthetic-zigzag` dataset is omitted because the default MAP backends
-  hit their 10,000-iteration demeaning caps. With 10,002 observations and 10,001 fixed-effect
-  levels in one connected component, only two dimensions remain after absorption, making
-  this a numerical stress case rather than a useful runtime comparison.]
-  ]
-
-These results are less clear than the controlled AKM experiments, which is itself informative.
-Several datasets are small enough, or sufficiently well connected, that setup cost
-matters as much as conditioning; on the complete and easier uniform designs, the gap is
-large and low-overhead methods perform well. The harder rows reverse the ranking. By
-`synthetic-uniform-harder`, the gap has fallen to $2.49 times 10^(-2)$ and `within` is
-already the fastest backend. On the assortative benchmark, the preconditioned method
-exhibits its clearest advantage: sorting generates cross-factor structure that MAP's
-updates handle only slowly.
-
-=== Standard Real-Data Benchmarks: Correia Collection
-
-We next turn to real benchmark data from the Correia collection. Synthetic data sets
-match the overall shape of empirical co-occurrence graphs but smooth away the
-irregularities that often drive runtime: a few units that appear far more often than the rest,
-thin connections between otherwise dense groups, many small disconnected pieces, and
-interactions between identifiers that go beyond a single two-way pair. Real data carries
-these features by default, and therefore tests the solvers in conditions that controlled
-DGPs only approximate.
-
-#v(0.35em)
-
-#text(size: 8.9pt)[
-#strong[Correia real-data benchmarks.]
-#include "generated/tables/correia_real.typ"
-  #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three runs on singleton-dropped
-  samples, as produced by the PyFixest benchmark suite. The gap is $1-rho$ for the
-  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
-  share of the component attaining the gap. A small gap with a limited component share,
-  as in `directors`, indicates a hard subcomponent but not necessarily whole-sample MAP
-  difficulty.]
-  ]
-
-The empirical datasets show the same pattern in less stylized form. Accelerated MAP is
-difficult to outperform on small or compact graphs such as `credit` and `soccer`, where
-the gaps are large. The `directors` row illustrates why the component share is useful:
-the worst component is hard, but it contains about thirty percent of the observations, so
-the full problem is not as costly for MAP as the gap alone would suggest. On larger
-networks with hard components covering a substantial portion of the sample, particularly
-`enron`, `github`, `patents`, `workers`, and `schools`, the factor-pair preconditioner is
-fastest by a wide margin. 
 
 == Poisson / PPML Benchmark
 
@@ -1230,8 +1117,8 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 
 = Appendix B: Supplementary Benchmark Results
 
-This appendix reports memory use and collects the diagnostics behind the claims in
-Section 7. Each experiment is generated from the recorded benchmark output by
+This appendix reports additional benchmarks, memory use, and the diagnostics behind the
+claims in Section 7. Each experiment is generated from the recorded benchmark output by
 `scripts/paper_results.py`; none of the numbers here are entered by hand.
 
 == Simple and Difficult Designs
@@ -1241,6 +1128,121 @@ Section 7. Each experiment is generated from the recorded benchmark output by
   caption: [Median runtime on the simple and difficult `fixest` designs, for OLS at 10M
   observations and PPML at 1M. Each point is the median of three full regression calls.]
 ) <fig-crossover>
+
+#pagebreak()
+
+== More Benchmarks
+
+=== Standard Synthetic Benchmarks: fixest DGPs + Correia Synthetic
+
+The controlled AKM benchmarks in Section 7 vary mobility and sorting directly. The
+synthetic reference cases below are public, reproducible, and already used to compare
+fixed-effect implementations.
+
+The first family is the simple-versus-difficult benchmark data generating process from
+`fixest` @berge2026fixest. Both designs use 10M observations, one covariate, and three
+fixed effects (worker, firm, year). The simple design has dense random mobility, whereas
+the difficult design has a sparse, nearly nested worker-firm structure. The simple design
+should be easy for MAP because its updates can pass information rapidly through a
+well-connected graph. The difficult design should be harder because worker and firm
+effects are nearly collinear. Factor-pair preconditioning should perform well on the
+difficult design, but may fail to amortize its setup cost on the simple design.
+
+#text(size: 8.8pt)[
+#strong[Simple vs. difficult design (10M observations, 3 FE).]
+#include "generated/tables/ols.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. Both designs
+  use 10M observations, one covariate, and three fixed effects. Gap denotes
+  $1-rho_(W F)$ for the worker-firm pair, reported from the generated 1M version of the
+  same DGP family; the runtime rows use the identical simple/difficult graph construction
+  at 10M observations. The standalone `within` demeaning API decomposes one-shot runtime
+into reusable solver construction and batch solve: simple design 5.76s + 1.51s
+(roughly 80% setup); difficult design 0.40s + 1.00s (roughly 29% setup). PyFixest
+regression overhead is incurred in addition to these figures.]
+  ]
+
+On the "simple" design, the graph is dense and the worker-firm gap is large. MAP
+therefore converges quickly: `fixest` with Irons-Tuck acceleration is fastest, while
+`within` is slowest because the factor-pair preconditioner does not repay its setup cost.
+In the standalone demeaning breakdown, roughly four fifths of `within`'s demeaning time
+on the simple design is spent building the preconditioner.
+
+On the difficult design, the ranking reverses. MAP convergence degrades sharply, to
+the point that `rust-map` without acceleration needs over six minutes.
+`within` completes in 3.25s, an order of magnitude faster than the best MAP backend,
+because its factor-pair preconditioner captures the sparse worker-firm coupling
+directly. A nearly zero diagnostic gap identifies the regime in which MAP requires many
+sweeps to disentangle worker and firm effects. The setup share of the standalone
+demeaning time falls to about 29%, indicating that the preconditioner setup is now
+amortized.
+
+#v(0.35em)
+
+The second family of benchmarks comprises synthetic datasets drawn from the Correia HDFE
+benchmark collection. These datasets span a broader set of graph shapes: complete
+bipartite matching, uniform random matching with varying degrees of connectivity,
+assortative matching, and a small path-like design. They provide an independent public
+reference set for comparing the same software backends outside the AKM generator.
+
+#v(0.35em)
+
+#text(size: 8.9pt)[
+#strong[Correia synthetic benchmarks.]
+#include "generated/tables/correia_synthetic.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
+  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
+  share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
+  geometry. The `synthetic-zigzag` dataset is omitted because the default MAP backends
+  hit their 10,000-iteration demeaning caps. With 10,002 observations and 10,001 fixed-effect
+  levels in one connected component, only two dimensions remain after absorption, making
+  this a numerical stress case rather than a useful runtime comparison.]
+  ]
+
+The Correia synthetic results are less uniform than the controlled AKM results. Several
+datasets are small enough, or sufficiently well connected, that setup cost matters as
+much as conditioning; on the complete and easier uniform designs, the gap is large and
+low-overhead methods perform well. The harder rows reverse the ranking. By
+`synthetic-uniform-harder`, the gap has fallen to $2.49 times 10^(-2)$ and `within` is
+already the fastest backend. On the assortative benchmark, the preconditioned method
+exhibits its clearest advantage: sorting generates cross-factor structure that MAP's
+updates handle only slowly.
+
+#pagebreak()
+
+=== Standard Real-Data Benchmarks: Correia Collection
+
+The Correia collection also includes real benchmark data. Synthetic data sets match the
+overall shape of empirical co-occurrence graphs but smooth away irregularities that
+often drive runtime: a few units that appear far more often than the rest, thin
+connections between otherwise dense groups, many small disconnected pieces, and
+interactions between identifiers that go beyond a single two-way pair. The empirical
+datasets contain these features and therefore test the solvers in conditions that
+controlled DGPs only approximate.
+
+#v(0.35em)
+
+#text(size: 8.9pt)[
+#strong[Correia real-data benchmarks.]
+#include "generated/tables/correia_real.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] Medians over three runs on singleton-dropped
+  samples, as produced by the PyFixest benchmark suite. The gap is $1-rho$ for the
+  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
+  share of the component attaining the gap. A small gap with a limited component share,
+  as in `directors`, indicates a hard subcomponent but not necessarily whole-sample MAP
+  difficulty.]
+  ]
+
+The empirical datasets show the same pattern in less stylized form. Accelerated MAP is
+difficult to outperform on small or compact graphs such as `credit` and `soccer`, where
+the gaps are large. The `directors` row illustrates why the component share is useful:
+the worst component is hard, but it contains about thirty percent of the observations, so
+the full problem is not as costly for MAP as the gap alone would suggest. On larger
+networks with hard components covering a substantial portion of the sample, particularly
+`enron`, `github`, `patents`, `workers`, and `schools`, the factor-pair preconditioner is
+fastest by a wide margin.
 
 #pagebreak()
 
