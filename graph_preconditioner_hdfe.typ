@@ -182,9 +182,9 @@ Section 4 develops the graph structure of the fixed-effect Gramian, and Section 
 connects this structure to the convergence behavior of MAP. Section 6 builds up
 the factor-pair Schwarz preconditioner, starting from a general discussion of
 preconditioning and culminating in the construction of the graph-based preconditioner.
-Section 7 reports benchmarks on runtime, memory, and numerical equivalence; 
-Section 8 describes the software through which the new algorithm is available; 
-and Section 9 concludes.
+Section 7 reports benchmarks on runtime and numerical equivalence; Section 8 describes
+the software through which the new algorithm is available; and Section 9 concludes.
+Appendix B reports memory use and additional benchmark diagnostics.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -760,8 +760,9 @@ The main runtime tables use package-level regression APIs, matching the public
 PyFixest benchmark suite, rather than isolated demeaning kernels. Each timing covers the
 full regression workflow: model setup, construction of the fixed-effect representation,
 residualization of the outcome and covariates, and estimation of the coefficient of
-interest. Separate tables report the memory cost of storing factor-pair information and
-verify that the preconditioned solver matches MAP to numerical tolerance.
+interest. The main text also verifies that the preconditioned solver matches MAP to
+numerical tolerance. Appendix B reports the memory cost of storing factor-pair
+information and additional solver diagnostics.
 
 For cross-package comparisons, every backend receives the same input data but uses its
 own default handling of singleton or separated observations. Successful fits record the
@@ -1055,47 +1056,6 @@ seconds, `fixest` takes 320 seconds, and `within` finishes in about five seconds
 the same sparse worker-firm coupling that drove the OLS benchmark results, and the IRLS outer
 loop inherits the gain without modification.
 
-== Memory Use
-
-MAP uses little memory: a sweep needs only the current residuals and per-level group
-sums. A factor-pair preconditioner, by contrast, must retain the pair structure between
-iterations. A practically relevant question is therefore how much more memory the 
-preconditioned Krylov solver requires relative to MAP.
-
-We measure peak resident set size (peak RSS), the largest quantity of physical memory
-consumed by the process during a run, on the simple and difficult fixed-effect DGPs.
-These serve as representative probes rather than special memory cases: the dominant
-storage terms are the data matrix, the fixed-effect encodings, and the reusable
-factor-pair objects, so the results should largely generalize across datasets of
-comparable dimensions. We do not use this section to compare against `fixest` or
-`FixedEffectModels.jl`, because cross-language peak RSS also reflects R and Julia runtime
-overhead, data-loading choices, garbage collection, and package internals. The diagnostic
-of interest is the incremental memory cost of substituting the preconditioned Rust
-backend for Rust MAP within the same Python package. Because the surrounding regression
-code is shared, this comparison isolates the difference attributable to the demeaning
-strategy. Both backends are executed in isolated processes and report peak RSS via
-`ru_maxrss`.
-
-#v(0.4em)
-
-#text(size: 8.9pt)[
-#strong[Memory footprint (3 FE, one covariate).]
-#include "generated/tables/memory.typ"
-		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
-		isolated Python processes. One covariate, three fixed effects. These two DGPs serve as
-		representative probes; we do not claim that memory behavior is design-specific. Gap
-		denotes $1-rho_(W F)$ for the worker-firm pair in the corresponding generated design.]
-		]
-
-At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M
-observations the overhead is #result_memory_1m_overhead, but it remains modest relative
-to the full panel data footprint.
-The preconditioned solver consumes more memory than MAP, yet the additional
-storage for factor-pair co-occurrences, partition weights, and local approximate
-Cholesky factors remains small relative to
-the full regression problem.
-
 == Numerical Equivalence
 
 Before trusting a new fixed-effect solver, we must verify that it reproduces the
@@ -1270,9 +1230,9 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 
 = Appendix B: Supplementary Benchmark Results
 
-This appendix collects the diagnostics behind the claims in Section 7. Each experiment is
-generated from the recorded benchmark output by `scripts/paper_results.py`; none of the
-numbers here are entered by hand.
+This appendix reports memory use and collects the diagnostics behind the claims in
+Section 7. Each experiment is generated from the recorded benchmark output by
+`scripts/paper_results.py`; none of the numbers here are entered by hand.
 
 == Simple and Difficult Designs
 
@@ -1281,6 +1241,46 @@ numbers here are entered by hand.
   caption: [Median runtime on the simple and difficult `fixest` designs, for OLS at 10M
   observations and PPML at 1M. Each point is the median of three full regression calls.]
 ) <fig-crossover>
+
+#pagebreak()
+
+== Memory Use
+
+MAP uses little memory: a sweep needs only the current residuals and per-level group
+sums. A factor-pair preconditioner, by contrast, must retain the pair structure between
+iterations. We therefore measure how much additional memory the preconditioned Krylov
+solver requires relative to MAP.
+
+We record peak resident set size (peak RSS), the largest amount of physical memory used
+by the process during a run, on the simple and difficult fixed-effect DGPs. These are
+representative cases rather than special memory experiments: the main storage terms are
+the data matrix, the fixed-effect encodings, and the reusable factor-pair objects, so the
+results should largely carry over to datasets of comparable size. We do not compare
+`fixest` and `FixedEffectModels.jl` here, because peak RSS across languages also reflects
+R and Julia runtime overhead, data-loading choices, garbage collection, and package
+internals. Instead, we compare the preconditioned Rust backend with Rust MAP inside the
+same Python package. The surrounding regression code is shared, leaving the demeaning
+strategy as the relevant difference. Both backends run in isolated processes and report
+peak RSS through `ru_maxrss`.
+
+#v(0.4em)
+
+#text(size: 8.9pt)[
+#strong[Memory footprint (3 FE, one covariate).]
+#include "generated/tables/memory.typ"
+		#v(0.25em)
+		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
+		isolated Python processes. One covariate, three fixed effects. These two DGPs serve as
+		representative probes; we do not claim that memory behavior is design-specific. Gap
+		denotes $1-rho_(W F)$ for the worker-firm pair in the corresponding generated design.]
+		]
+
+At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M
+observations the overhead is #result_memory_1m_overhead, but it remains modest relative
+to the full panel data footprint. The additional storage holds factor-pair
+co-occurrences, partition weights, and local approximate Cholesky factors.
+
+#pagebreak()
 
 == Matched-Accuracy Mechanism
 
