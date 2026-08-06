@@ -1061,53 +1061,19 @@ therefore calls the demeaning routine repeatedly. The fixed-effect incidence gra
 the same, but the weights change between calls. This distinction matters for `ppmlhdfe`,
 Poisson fixed-effect estimators, and IRLS-based GLM implementations more generally.
 
-=== Reusing or rebuilding across IRLS
+PyFixest currently reuses the preconditioner built during the first weighted demeaning
+call. This avoids a new factorization at every IRLS step, but later weighted problems are
+then solved with an increasingly stale approximation. Reuse can be faster when the saved
+setup time exceeds the cost of additional LSMR iterations. Rebuilding would reverse this
+tradeoff: it may reduce the iteration count, but it pays the construction cost at every
+step. Which policy is faster depends on the size of these two effects. The table reports
+the current PyFixest reuse behavior.
 
-The factor-pair preconditioner depends on both the incidence graph and the weights.
-Keeping the first preconditioner avoids later setup work, but it may require more LSMR
-iterations as the weights move. Rebuilding pays the setup cost at every IRLS step but
-updates the factorization for the current weighted problem. Neither policy is always
-faster.
-
-PyFixest currently keeps the preconditioner returned by its first weighted demeaning
-call. Our diagnostic runs the same `pyfixest.fepois` routine under two cache policies.
-The reuse cell leaves PyFixest unchanged. The rebuild cell prevents that first
-preconditioner from being stored, so PyFixest constructs a new one at every weighted
-demeaning call. Initialization, separation handling, convergence rules, and all other
-estimation code are identical.
-
-#block(breakable: false)[#text(size: 8.8pt)[
-#strong[Preconditioner reuse and rebuilding inside PPML.]
-#include "generated/tables/ppml_inner_outer.typ"
-  #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three exact PyFixest `fepois` calls
-  at 1M observations. Both policies use the shipped inner tolerance of $10^(-8)$,
-  an inner cap of 1,000 iterations, an outer tolerance of $10^(-8)$, and a 100-step
-  outer cap. FE setup and solve times sum over the IRLS steps. At each step, PyFixest
-  demeans the working response and covariate in parallel; the reported LSMR count takes
-  the larger count and then sums across steps. Iteration counts come from one additional
-  fit under the same policy; its diagnostic reruns are excluded from the reported time.]
-]]
-
-The two policies retain the same observations and agree on the coefficient and deviance.
-They also take the same number of outer steps. On the simple design, reuse spends only
-0.338 seconds on setup, compared with 3.27 seconds under rebuilding. Yet the total LSMR
-count rises from 127 to 566 and FE solve time rises from 1.51 to 7.55 seconds. Rebuilding
-therefore reduces the full fit from 9.25 to 6.06 seconds. On the difficult design,
-rebuilding raises setup time from 0.076 to 0.845 seconds, but cuts the LSMR
-count from 510 to 141 and the full fit from 5.43 to 3.75 seconds. The first-step
-preconditioner becomes less effective as the IRLS weights change. Reuse remains useful
-across linear regressions with unchanged weights, but rebuilding is faster in these PPML
-designs.
-
-=== Full PPML Benchmark
-
-The full PPML comparison uses the simple-versus-difficult DGPs from the
+The PPML comparison uses the simple-versus-difficult DGPs from the
 `fixest` benchmark suite @berge2026fixest at $n = 1$M observations, with one covariate
 and worker, firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
-`GLFixedEffectModels.jl`, and three PyFixest `fepois` paths: the default unpreconditioned
-`rust-map`, `within` with PyFixest's current reuse policy, and `within` with the
-preconditioner rebuilt at every IRLS step.
+`GLFixedEffectModels.jl`, and two PyFixest `fepois` paths: the default unpreconditioned
+`rust-map` and `within` with PyFixest's current reuse policy.
 The general cross-package policy above matters particularly for PPML, where packages can
 make different default choices about separated observations. Each PPML backend receives
 the same 100-iteration outer IRLS limit.
@@ -1120,25 +1086,20 @@ the same 100-iteration outer IRLS limit.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
   $n = 1$M with one covariate and three fixed effects. `fixest` is R `fixest::fepois`;
-  `rust-map` and the two `within` columns use the PyFixest `fepois` routine; `GLFEM.jl` is
-  `GLFixedEffectModels.jl`. Each package applies its default separation handling; successful
-  fits record the retained-observation count. `within-reuse` is the current PyFixest
-  cache policy; `within-rebuild` changes only that policy. "capped" means that all
+  `rust-map` and `within` use the PyFixest `fepois` routine; `GLFEM.jl` is
+  `GLFixedEffectModels.jl`. The `within` column uses PyFixest's current policy of reusing
+  the first preconditioner. Each package applies its default separation handling;
+  successful fits record the retained-observation count. "capped" means that all
   three planned trials reached an iteration limit without converging; "failed" denotes
   another error.]
   ]
 
-On the simple design, all five paths finish in under ten seconds. `fixest` takes 4.72
-seconds, `GLFEM.jl` 5.76, rebuilt `within` 6.06, `rust-map` 7.86, and reused `within`
-9.25. Runtime differences are much larger on the difficult design. `rust-map` does not converge within
+#block(breakable: false)[On the simple design, all four paths finish in under ten seconds. `fixest` takes 4.72
+seconds, `GLFEM.jl` 5.76, `rust-map` 7.86, and `within` 9.25. Runtime differences are
+much larger on the difficult design. `rust-map` does not converge within
 the iteration cap, `GLFEM.jl` takes 129.8 seconds, and `fixest` takes 439.4 seconds.
-Reused `within` finishes in 5.43 seconds and rebuilding lowers this to 3.75 seconds.
-The factor-pair preconditioner handles the sparse worker-firm coupling that makes MAP
-slow. Rebuilding keeps it matched to the current PPML weights. The two tables use the
-same `within` runs: the first reports their demeaning costs and iteration counts, while
-the second compares their total runtimes with the other packages.
-
-#pagebreak()
+`within` finishes in 5.43 seconds. The factor-pair preconditioner handles the sparse
+worker-firm coupling that makes MAP slow.]
 
 = Software
 
@@ -1213,11 +1174,9 @@ total time from 1.77 to 1.23 seconds.
 
 Faster fixed-effect solves also matter when one estimator calls the demeaning routine
 repeatedly. PPML is one such case: every IRLS step solves a new weighted problem. In our
-benchmark, rebuilding the preconditioner at each step is faster than keeping the first
-factorization. Caching is therefore useful when the weights remain fixed, but it is not a
-general rule for GLMs. Factor-pair preconditioning is most useful when the gap diagnostic
-is small, a fit is unexpectedly slow, or an estimator requires several fixed-effect
-solves.
+benchmark, PyFixest reuses the first preconditioner as the weights change. Factor-pair
+preconditioning is most useful when the gap diagnostic is small, a fit is unexpectedly
+slow, or an estimator requires several fixed-effect solves.
 
 #set heading(numbering: none)
 #pagebreak()

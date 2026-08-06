@@ -17,15 +17,15 @@ metric is read. A claim with no row is not a claim the paper may make.
 
 | # | Claim | Experiment | Deciding metric | Accuracy gate |
 |---|---|---|---|---|
-| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility sweep at 1M | Median total wall time, all backends | Gate A on every reported cell |
-| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM mobility and sorting sweeps | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
-| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy arms of the AKM sweep | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
+| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility designs at 1M | Median total wall time, all backends | Gate A on every reported cell |
+| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
+| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy arms of the AKM mobility comparison | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
 | 4 | Diagonal scaling removes them only partially | Matched-accuracy arms | LSMR iterations, `diagonal` vs `additive` | Gate A |
 | 5 | Factor-pair preconditioning reduces LSMR iterations relative to diagonal preconditioning where pair coupling matters | Matched-accuracy arms | Median, max, and sum of per-RHS iterations | Gate A |
-| 6 | It reduces total runtime only when iteration savings exceed setup and application cost | Additive setup/solve split on the AKM mobility sweep and the 10M endpoints | `T_setup` vs `T_solve` vs `T_total` | Gate A |
-| 7 | Setup is most expensive on the dense graphs that need it least | Standalone additive diagnostics over the AKM mobility sweep | Factorization time against graph density | Gate A on the paired solve |
-| 8 | `within` runtime is close to invariant to connectivity, and mildly decreasing in it | AKM mobility sweep | Median and IQR of total time across the sweep | Gate A; repetition rule R1 |
-| 9 | Setup amortizes across repeated fits with unchanged weights; repeated solves also matter inside IRLS, where rebuilding may be faster as the weights change | Ten-regression experiment on the simple and difficult designs; PPML reuse/rebuild comparison | Setup time, solve time, and total time under each policy | Gate A for every reported policy |
+| 6 | It reduces total runtime only when iteration savings exceed setup and application cost | Additive setup/solve split across AKM mobility designs and the 10M endpoints | `T_setup` vs `T_solve` vs `T_total` | Gate A |
+| 7 | Setup is most expensive on the dense graphs that need it least | Standalone additive diagnostics across AKM mobility designs | Factorization time against graph density | Gate A on the paired solve |
+| 8 | `within` runtime is close to invariant to connectivity, and mildly decreasing in it | AKM designs varying mobility | Median and IQR of total time across the designs | Gate A; repetition rule R1 |
+| 9 | Setup amortizes across repeated fits with unchanged weights; PPML is a separate repeated-solve use case in which the weights change between IRLS steps | Ten-regression experiment on the simple and difficult designs; main PPML benchmark | Setup and solve time for repeated OLS fits; total PPML runtime | Gate A for every reported cell |
 | 10 | Pairwise spectral gaps describe difficult designs but are not a solver-selection rule | Pooled gap-versus-runtime analysis over all collected designs | Slope of log runtime on log gap by backend, plus named counter-examples | Uses existing recorded runtimes |
 | 11 | The method loses on well-connected designs at scale | 10M simple design | Total time and setup share | Gate A |
 | 12 | Scaling in the number of absorbed factors Q | Q in {2,3,4,5} at fixed n | Setup, solve, iterations, accuracy | Gate A |
@@ -268,9 +268,9 @@ accuracy on that exact sample.
 |---|---|---|---|
 | Correctness pilot | 100K simple/difficult | MAP + three within configurations | Validate metrics against a direct reference; freeze Gate A |
 | Standalone setup diagnostic | 1M AKM mobility designs; 10M base endpoints | `within-additive` | Setup/solve split, iterations, and external accuracy across connectivity |
-| AKM mobility sweep | 1M | MAP + three within configurations | Main mechanism experiment |
-| AKM sorting sweep | 1M | MAP + three within configurations | Corroborating connectivity experiment |
-| Accelerated-MAP check | 1M mobility sweep | R `fixest` plus selected same-package results | Whether acceleration mitigates the MAP slowdown |
+| AKM designs varying mobility | 1M | MAP + three within configurations | Main mechanism experiment |
+| AKM designs varying sorting | 1M | MAP + three within configurations | Corroborating connectivity experiment |
+| Accelerated-MAP check | 1M mobility designs | R `fixest` plus selected same-package results | Whether acceleration mitigates the MAP slowdown |
 | Large-scale simple/difficult | 10M | Same-package four-way plus external packages | Headline total-runtime comparison |
 | Accuracy frontier | 10M simple and difficult | All external packages | Time versus achieved accuracy |
 | Factor scaling | 1M, Q in {2,3,4,5} | `within-additive`, plus MAP for reference | Structural weak point of the pair construction |
@@ -291,7 +291,7 @@ Resolved before the production runs, and struck from this list when done:
       the numerical checks now live in the test suite rather than a public benchmark.
 - [x] Verify that all three within configurations reach the same projection. Done.
 - [x] Test MAP and LSMR failure and cap reporting. Done.
-- [x] Reconcile the factor order between the OLS/PPML specs and the AKM sweep spec. Done
+- [x] Reconcile the factor order between the OLS/PPML specs and the AKM mobility spec. Done
       2026-07-26: all three now absorb `indiv_id, firm_id, year`. **The existing OLS and
       PPML tables were produced under the old order and must be regenerated.**
 - [x] Retained sample size. Every final Python, R, and Julia row records `n_retained`.
@@ -311,15 +311,9 @@ Resolved before the production runs, and struck from this list when done:
 - [x] Reduce the DGP replicate count for timing. Each timing runner now generates one
       sample per design and repeats the fit on that sample. DGP replication remains a
       separate robustness exercise.
-- [x] Define the PPML cache comparison on the package implementation. Both cells call
-      PyFixest `fepois`. Reuse leaves the package untouched; rebuild changes only
-      `_seed_preconditioner` so no factorization is retained between weighted demeaning
-      calls. A regression test requires both policies to retain the same sample and agree
-      on the coefficient and deviance.
-- [ ] Measure PPML reuse under both inner-solver regimes. The runner now discards one
-      burn-in and records seven fits per cell. Regenerate the table before making a
-      runtime claim from this diagnostic. PyFixest does not expose individual inner
-      LSMR iteration counts.
+- [x] Keep the PPML benchmark on package behavior. PyFixest `fepois` reuses the first
+      factor-pair preconditioner as the IRLS weights change. The paper reports this path
+      in the main PPML table and does not retain a separate rebuild treatment.
 - [x] Report iterations in solver-specific units. Done 2026-07-28.
       `pixi run within-preconditioners` runs counting MAP beside the three LSMR
       configurations on one sample. The renderer keeps MAP sweeps and LSMR iterations

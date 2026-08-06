@@ -836,16 +836,15 @@
       ]
     },
     "ppml": {
-      "align": "(left, right, right, right, right, right, right)",
-      "columns": "(1.18fr, 0.42fr, 0.68fr, 0.68fr, 0.75fr, 0.82fr, 0.82fr)",
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 0.42fr, 0.72fr, 0.72fr, 0.80fr, 0.90fr)",
       "header": [
         "Design",
         "FE",
         "`rust-map`",
         "`fixest`",
         "`GLFEM.jl`",
-        "`within-reuse`",
-        "`within-rebuild`"
+        "`within`"
       ],
       "rows": [
         [
@@ -854,8 +853,7 @@
           "7.86s",
           "4.72s",
           "5.76s",
-          "9.25s",
-          "6.06s"
+          "9.25s"
         ],
         [
           "difficult (near-nested)",
@@ -863,59 +861,7 @@
           "capped (0/3)",
           "439.4s",
           "129.8s",
-          "5.43s",
-          "3.75s"
-        ]
-      ]
-    },
-    "ppml_inner_outer": {
-      "align": "(left, left, right, right, right, right, right)",
-      "columns": "(0.9fr, 0.72fr, 0.65fr, 0.72fr, 0.72fr, 0.82fr, 0.92fr)",
-      "header": [
-        "Design",
-        "Treatment",
-        "Outer steps",
-        "FE setup",
-        "FE solve",
-        "LSMR iter.",
-        "Total"
-      ],
-      "rows": [
-        [
-          "simple",
-          "reuse",
-          "9",
-          "0.338s",
-          "7.55s",
-          "566",
-          "9.25s [9.20--9.36s]"
-        ],
-        [
-          "",
-          "rebuild",
-          "9",
-          "3.27s",
-          "1.51s",
-          "127",
-          "6.06s [6.06--6.10s]"
-        ],
-        [
-          "difficult",
-          "reuse",
-          "8",
-          "0.076s",
-          "4.08s",
-          "510",
-          "5.43s [5.42--5.43s]"
-        ],
-        [
-          "",
-          "rebuild",
-          "8",
-          "0.845s",
-          "1.63s",
-          "141",
-          "3.75s [3.75--3.94s]"
+          "5.43s"
         ]
       ]
     },

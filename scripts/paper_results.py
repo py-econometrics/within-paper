@@ -20,7 +20,7 @@ import subprocess
 import tomllib
 import urllib.request
 import zipfile
-from statistics import median, quantiles
+from statistics import median
 from pathlib import Path
 
 
@@ -427,7 +427,6 @@ def _rows_from_csvs() -> list[dict[str, str]]:
     for filename in (
         "ols.csv",
         "ppml.csv",
-        "ppml_policy.csv",
         "akm.csv",
         "correia.csv",
     ):
@@ -512,7 +511,7 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
         {
             str(row.get("n_fe") or "missing")
             for row in rows
-            if row.get("_source_file") in {"ppml.csv", "ppml_policy.csv"}
+            if row.get("_source_file") == "ppml.csv"
             and _integer_field(row, "n_fe") != 3
         }
     )
@@ -771,7 +770,7 @@ def _synchronize_setup_cost(document: dict) -> int:
 
 
 def _synchronize_accuracy_frontier(document: dict) -> int:
-    """Fill the frontier table from the tolerance sweep.
+    """Fill the frontier table from the tolerance comparison.
 
     Each package is swept over its own tolerance settings and the achieved
     external residual is recorded beside the wall time, so the reader sees the
@@ -835,128 +834,6 @@ def _synchronize_accuracy_frontier(document: dict) -> int:
         return 0
     table["rows"] = rendered
     return len(rendered)
-
-
-def _synchronize_ppml_inner_outer(document: dict) -> int:
-    """Fill the table comparing PyFixest's reuse and rebuild cache policies."""
-    rows = _latest_rows("ppml_policy.csv")
-    step_rows = _latest_rows("ppml_policy_steps.csv")
-    table = document["tables"].get("ppml_inner_outer")
-    if table is None or rows is None:
-        return 0
-    rows = [
-        row
-        for row in rows
-        if _integer_field(row, "n_obs") == 1_000_000
-        and row.get("engine") == "pyfixest"
-    ]
-    if not rows:
-        return 0
-
-    grouped: dict[tuple[str, bool], list[dict[str, str]]] = {}
-    for row in rows:
-        key = (
-            row["design"],
-            str(row.get("rebuild_each_step", "")).lower() in {"true", "1"},
-        )
-        grouped.setdefault(key, []).append(row)
-
-    rendered: list[list[str]] = []
-    for design in ("simple", "difficult"):
-        first = True
-        cells = sorted(
-            ((key, trials) for key, trials in grouped.items() if key[0] == design),
-            key=lambda item: item[0][1],
-        )
-        for (_, rebuild), trials in cells:
-            successful = [
-                row
-                for row in trials
-                if str(row.get("outer_converged", "")).lower() in {"true", "1"}
-            ]
-            if not _cell_is_complete(trials):
-                outer_cell = setup_cell = solve_cell = iterations_cell = total_cell = (
-                    "incomplete"
-                )
-            elif successful:
-                steps = median(float(row["outer_iterations"]) for row in successful)
-                outer_cell = f"{steps:g}"
-                setup_cell = _format_seconds(
-                    median(float(row["setup_s"]) for row in successful)
-                )
-                solve_cell = _format_seconds(
-                    median(float(row["solve_s"]) for row in successful)
-                )
-                backend = "within-rebuild" if rebuild else "within-reuse"
-                policy_steps = [
-                    row
-                    for row in (step_rows or [])
-                    if row.get("design") == design and row.get("backend") == backend
-                ]
-                expected_steps = int(steps)
-                observed_steps = {
-                    _integer_field(row, "outer_step") for row in policy_steps
-                }
-                if observed_steps == set(range(1, expected_steps + 1)):
-                    iterations_total = sum(
-                        float(row["inner_iterations"]) for row in policy_steps
-                    )
-                    iterations_cell = f"{iterations_total:g}"
-                else:
-                    iterations_cell = "incomplete"
-                times = [float(row["runtime_s"]) for row in successful]
-                middle = _format_seconds(median(times))
-                if len(times) > 1:
-                    lower, _, upper = quantiles(times, n=4, method="inclusive")
-                    spread = (
-                        f"{_format_seconds(lower).removesuffix('s')}--"
-                        f"{_format_seconds(upper)}"
-                    )
-                    total_cell = f"{middle} [{spread}]"
-                else:
-                    total_cell = middle
-                if len(successful) < len(trials):
-                    total_cell += f" ({len(successful)}/{len(trials)})"
-            else:
-                status = "capped" if all(_row_capped(row) for row in trials) else "failed"
-                outer_cell = setup_cell = solve_cell = iterations_cell = status
-                total_cell = f"{status} (0/{len(trials)})"
-            rendered.append(
-                [
-                    design if first else "",
-                    "rebuild" if rebuild else "reuse",
-                    outer_cell,
-                    setup_cell,
-                    solve_cell,
-                    iterations_cell,
-                    total_cell,
-                ]
-            )
-            first = False
-    changed = 0
-    if rendered != table["rows"]:
-        table["rows"] = rendered
-        changed += len(rendered)
-
-    full_table = document["tables"].get("ppml")
-    if full_table is not None:
-        headers = [_clean_cell(value) for value in full_table["header"]]
-        for full_row in full_table["rows"]:
-            design = _clean_cell(full_row[0]).split()[0]
-            for backend in ("within-reuse", "within-rebuild"):
-                if backend not in headers:
-                    continue
-                column = headers.index(backend)
-                candidates = [
-                    row
-                    for row in rows
-                    if row.get("design") == design and row.get("backend") == backend
-                ]
-                value = _render_trial_result(candidates)
-                if full_row[column] != value:
-                    full_row[column] = value
-                    changed += 1
-    return changed
 
 
 def _synchronize_factor_scaling(document: dict) -> int:
@@ -1309,13 +1186,6 @@ def _synchronize_canonical_tables(
                 continue
             for column, backend in enumerate(headers[2:], start=2):
                 backend_source = source_marker
-                if name == "ppml" and backend in {
-                    "within-reuse",
-                    "within-rebuild",
-                }:
-                    backend_source = "ppml_policy.csv:default"
-                    if not _latest("ppml_policy.csv").exists():
-                        continue
                 candidates = [
                     source
                     for source in raw
@@ -1368,7 +1238,6 @@ def _synchronize_canonical_tables(
     changed += _synchronize_agreement(document)
     changed += _synchronize_setup_cost(document)
     changed += _synchronize_accuracy_frontier(document)
-    changed += _synchronize_ppml_inner_outer(document)
     changed += _synchronize_iterations(document)
     changed += _synchronize_factor_scaling(document)
     changed += _synchronize_amortization(document)

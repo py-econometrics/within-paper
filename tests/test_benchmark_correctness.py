@@ -25,7 +25,7 @@ from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ols.run import run_experiment
 from benchmarks.ppml import pyfixest as ppml_pyfixest
 from benchmarks.ppml.pyfixest import fit_ppml
-from benchmarks.within import amortization, ppml_inner_outer, scaling, setup_cost
+from benchmarks.within import amortization, scaling, setup_cost
 from benchmarks.within.map import map_demean_with_sweeps
 from scripts import analyze_gap_runtime, compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
@@ -239,9 +239,10 @@ class PythonFitTests(unittest.TestCase):
 
     def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
         frame = make_base_data(2_000, "simple", 13)
-        fit = fit_ppml(frame, "rust-map")
-        self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
-        self.assertFalse(hasattr(fit, "_Y"))
+        for backend in ("rust-map", "within"):
+            fit = fit_ppml(frame, backend)
+            self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
+            self.assertFalse(hasattr(fit, "_Y"))
 
     def test_ppml_measure_records_a_failed_warmup(self) -> None:
         error = ValueError("Demeaning failed after 10000 iterations.")
@@ -372,23 +373,6 @@ class PythonFitTests(unittest.TestCase):
 
         self.assertEqual(result["converged"].tolist(), [False, True])
         self.assertIn("exited with status 1", result.loc[0, "error"])
-
-    def test_pyfixest_ppml_cache_policies_agree(self) -> None:
-        frame = make_base_data(2_000, "simple", 14)
-        reused = ppml_inner_outer.measure_policy(frame, False, 1e-8, 1_000)
-        rebuilt = ppml_inner_outer.measure_policy(frame, True, 1e-8, 1_000)
-        self.assertTrue(reused["outer_converged"])
-        self.assertTrue(rebuilt["outer_converged"])
-        self.assertEqual(reused["n_retained"], rebuilt["n_retained"])
-        self.assertAlmostEqual(reused["beta_x1"], rebuilt["beta_x1"], places=8)
-        self.assertAlmostEqual(reused["deviance"], rebuilt["deviance"], places=7)
-        self.assertEqual(
-            len(json.loads(reused["inner_iterations_by_step"])),
-            reused["outer_iterations"],
-        )
-        self.assertGreater(reused["setup_s"], 0)
-        self.assertGreater(reused["solve_s"], 0)
-
 
 class SetupCostTests(unittest.TestCase):
     def test_akm_mobility_setup_contract(self) -> None:
@@ -670,78 +654,6 @@ class PaperResultTests(unittest.TestCase):
             self.assertEqual(len(regressions), 10)
             self.assertEqual(categories.shape[1], 3)
             self.assertTrue(all(rhs.shape == (1_000, 2) for rhs in regressions))
-
-    def test_ppml_inner_outer_table_reports_full_benchmark_policy(self) -> None:
-        self.assertEqual(ppml_inner_outer.N_OBS, 1_000_000)
-        self.assertEqual(ppml_inner_outer.REBUILD_OPTIONS, (False, True))
-        self.assertEqual(ppml_inner_outer.REPETITIONS, 3)
-        self.assertEqual(ppml_inner_outer.REGIMES, ((1e-8, 1_000),))
-        document = {
-            "tables": {
-                "ppml_inner_outer": {
-                    "rows": [],
-                },
-                "ppml": {
-                    "header": [
-                        "Design",
-                        "FE",
-                        "`within-reuse`",
-                        "`within-rebuild`",
-                    ],
-                    "rows": [["simple (well-connected)", "3", "#miss", "#miss"]],
-                },
-            }
-        }
-        rows = []
-        for rebuild in (False, True):
-            rows.extend(
-                {
-                    "design": "simple",
-                    "engine": "pyfixest",
-                    "backend": "within-rebuild" if rebuild else "within-reuse",
-                    "n_obs": "1000000",
-                    "rebuild_each_step": str(rebuild).lower(),
-                    "outer_converged": "true",
-                    "converged": "true",
-                    "outer_iterations": "8",
-                    "setup_s": str((repetition + 1) / 10),
-                    "solve_s": str(repetition + 1),
-                    "inner_iterations_sum": str(10 * (repetition + 1)),
-                    "runtime_s": str(repetition + 1),
-                    "repetition": str(repetition),
-                    "n_planned": "3",
-                    "error": "",
-                }
-                for repetition in range(3)
-            )
-        step_rows = [
-            {
-                "design": "simple",
-                "backend": backend,
-                "outer_step": str(step),
-                "inner_iterations": "2.5",
-            }
-            for backend in ("within-reuse", "within-rebuild")
-            for step in range(1, 9)
-        ]
-
-        def latest(filename):
-            return step_rows if filename == "ppml_policy_steps.csv" else rows
-
-        with patch.object(paper_results, "_latest_rows", side_effect=latest):
-            paper_results._synchronize_ppml_inner_outer(document)
-
-        rendered = document["tables"]["ppml_inner_outer"]["rows"]
-        self.assertEqual(len(rendered[0]), 7)
-        self.assertEqual(rendered[0][1], "reuse")
-        self.assertEqual(rendered[0][2:6], ["8", "0.200s", "2.00s", "20"])
-        self.assertEqual(rendered[0][6], "2.00s [1.50--2.50s]")
-        self.assertEqual(rendered[1][1], "rebuild")
-        self.assertEqual(
-            document["tables"]["ppml"]["rows"][0][2:],
-            ["2.00s", "2.00s"],
-        )
-
 
 if __name__ == "__main__":
     unittest.main()
