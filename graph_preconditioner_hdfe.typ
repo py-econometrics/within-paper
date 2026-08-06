@@ -1011,9 +1011,9 @@ million observations, with the same outcome and covariate used in both specifica
 ]]
 
 On balance, setup is cheaper in the low-mobility designs. With two fixed effects, median setup declines
-from 0.110 seconds in `akm_mobility_1` to 0.062 seconds in `akm_mobility_6`; with three
-fixed effects, it falls from 0.114 to 0.069 seconds. Solve time falls as well, from 0.288
-to 0.051 seconds with two effects and from 0.217 to 0.161 seconds with three. The
+from 0.119 seconds in `akm_mobility_1` to 0.067 seconds in `akm_mobility_6`; with three
+fixed effects, it falls from 0.123 to 0.073 seconds. Solve time falls as well, from 0.323
+to 0.057 seconds with two effects and from 0.239 to 0.176 seconds with three. The
 low-mobility worker-firm graph has fewer cross-firm links to store and factorize. This is
 why the additive runtime in @fig-gap-runtime can decline while MAP and diagonal LSMR
 slow down.
