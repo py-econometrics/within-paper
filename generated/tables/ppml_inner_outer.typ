@@ -5,20 +5,16 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (0.95fr, 0.85fr, 1.0fr, 0.82fr, 0.95fr, 0.82fr),
+  columns: (0.9fr, 0.72fr, 0.65fr, 0.72fr, 0.72fr, 0.82fr, 0.92fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, left, right, right, right, right),
+  align: (left, left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Treatment], th[Inner tol.], th[Inner cap], th[Outer steps], th[Total]),
+  table.header(th[Design], th[Treatment], th[Outer steps], th[FE setup], th[FE solve], th[LSMR iter.], th[Total]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple], [reuse], [$1.0 times 10^(-8)$], [1#h(0.18em)000], [8], [1.44s [1.43--1.48s]],
-  [], [rebuild], [$1.0 times 10^(-8)$], [1#h(0.18em)000], [8], [0.799s [0.770--0.831s]],
-  [], [reuse], [$1.0 times 10^(-12)$], [10#h(0.18em)000], [8], [1.95s [1.93--2.01s]],
-  [], [rebuild], [$1.0 times 10^(-12)$], [10#h(0.18em)000], [8], [0.932s [0.918--0.941s]],
-  [difficult], [reuse], [$1.0 times 10^(-8)$], [1#h(0.18em)000], [8], [1.53s [1.43--1.56s]],
-  [], [rebuild], [$1.0 times 10^(-8)$], [1#h(0.18em)000], [8], [0.791s [0.757--0.817s]],
-  [], [reuse], [$1.0 times 10^(-12)$], [10#h(0.18em)000], [8], [1.84s [1.81--1.87s]],
-  [], [rebuild], [$1.0 times 10^(-12)$], [10#h(0.18em)000], [8], [0.913s [0.818--1.03s]],
+  [simple], [reuse], [9], [0.338s], [7.55s], [566], [9.25s [9.20--9.36s]],
+  [], [rebuild], [9], [3.27s], [1.51s], [127], [6.06s [6.06--6.10s]],
+  [difficult], [reuse], [8], [0.076s], [4.08s], [510], [5.43s [5.42--5.43s]],
+  [], [rebuild], [8], [0.845s], [1.63s], [141], [3.75s [3.75--3.94s]],
   table.hline(stroke: 0.8pt + table-rule),
 )

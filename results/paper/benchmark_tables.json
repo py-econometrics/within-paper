@@ -272,6 +272,68 @@
         ]
       ]
     },
+    "akm_setup_cost": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 1.05fr, 0.8fr, 0.8fr, 0.8fr, 0.8fr)",
+      "header": [
+        "Scenario",
+        "Gap (share)",
+        "2 FE setup",
+        "2 FE solve",
+        "3 FE setup",
+        "3 FE solve"
+      ],
+      "rows": [
+        [
+          "`akm_mobility_1`",
+          "0.41 (1.00)",
+          "0.110s",
+          "0.288s",
+          "0.114s",
+          "0.217s"
+        ],
+        [
+          "`akm_mobility_2`",
+          "0.0769 (1.00)",
+          "0.115s",
+          "0.257s",
+          "0.120s",
+          "0.239s"
+        ],
+        [
+          "`akm_mobility_3`",
+          "$3.67 times 10^(-3)$ (0.87)",
+          "0.040s",
+          "0.136s",
+          "0.040s",
+          "0.230s"
+        ],
+        [
+          "`akm_mobility_4`",
+          "$1.07 times 10^(-3)$ (0.61)",
+          "0.049s",
+          "0.120s",
+          "0.060s",
+          "0.223s"
+        ],
+        [
+          "`akm_mobility_5`",
+          "$1.10 times 10^(-4)$ (0.52)",
+          "0.061s",
+          "0.110s",
+          "0.063s",
+          "0.204s"
+        ],
+        [
+          "`akm_mobility_6`",
+          "$4.82 times 10^(-5)$ (0.29)",
+          "0.062s",
+          "0.051s",
+          "0.069s",
+          "0.161s"
+        ]
+      ]
+    },
     "akm_sorting": {
       "align": "(left, right, right, right, right, right)",
       "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
@@ -774,15 +836,16 @@
       ]
     },
     "ppml": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr)",
+      "align": "(left, right, right, right, right, right, right)",
+      "columns": "(1.18fr, 0.42fr, 0.68fr, 0.68fr, 0.75fr, 0.82fr, 0.82fr)",
       "header": [
         "Design",
         "FE",
         "`rust-map`",
         "`fixest`",
         "`GLFEM.jl`",
-        "`within`"
+        "`within-reuse`",
+        "`within-rebuild`"
       ],
       "rows": [
         [
@@ -791,7 +854,8 @@
           "7.86s",
           "4.72s",
           "5.76s",
-          "8.61s"
+          "9.25s",
+          "6.06s"
         ],
         [
           "difficult (near-nested)",
@@ -799,85 +863,121 @@
           "capped (0/3)",
           "439.4s",
           "129.8s",
-          "5.42s"
+          "5.43s",
+          "3.75s"
         ]
       ]
     },
     "ppml_inner_outer": {
-      "align": "(left, left, right, right, right, right)",
-      "columns": "(0.95fr, 0.85fr, 1.0fr, 0.82fr, 0.95fr, 0.82fr)",
+      "align": "(left, left, right, right, right, right, right)",
+      "columns": "(0.9fr, 0.72fr, 0.65fr, 0.72fr, 0.72fr, 0.82fr, 0.92fr)",
       "header": [
         "Design",
         "Treatment",
-        "Inner tol.",
-        "Inner cap",
         "Outer steps",
+        "FE setup",
+        "FE solve",
+        "LSMR iter.",
         "Total"
       ],
       "rows": [
         [
           "simple",
           "reuse",
-          "$1.0 times 10^(-8)$",
-          "1#h(0.18em)000",
-          "8",
-          "1.44s [1.43--1.48s]"
+          "9",
+          "0.338s",
+          "7.55s",
+          "566",
+          "9.25s [9.20--9.36s]"
         ],
         [
           "",
           "rebuild",
-          "$1.0 times 10^(-8)$",
-          "1#h(0.18em)000",
-          "8",
-          "0.799s [0.770--0.831s]"
-        ],
-        [
-          "",
-          "reuse",
-          "$1.0 times 10^(-12)$",
-          "10#h(0.18em)000",
-          "8",
-          "1.95s [1.93--2.01s]"
-        ],
-        [
-          "",
-          "rebuild",
-          "$1.0 times 10^(-12)$",
-          "10#h(0.18em)000",
-          "8",
-          "0.932s [0.918--0.941s]"
+          "9",
+          "3.27s",
+          "1.51s",
+          "127",
+          "6.06s [6.06--6.10s]"
         ],
         [
           "difficult",
           "reuse",
-          "$1.0 times 10^(-8)$",
-          "1#h(0.18em)000",
           "8",
-          "1.53s [1.43--1.56s]"
+          "0.076s",
+          "4.08s",
+          "510",
+          "5.43s [5.42--5.43s]"
         ],
         [
           "",
           "rebuild",
-          "$1.0 times 10^(-8)$",
-          "1#h(0.18em)000",
           "8",
-          "0.791s [0.757--0.817s]"
+          "0.845s",
+          "1.63s",
+          "141",
+          "3.75s [3.75--3.94s]"
+        ]
+      ]
+    },
+    "regression_reuse": {
+      "align": "(left, left, right, right, right, right)",
+      "columns": "(0.8fr, 1.25fr, 0.85fr, 0.85fr, 0.85fr, 0.7fr)",
+      "header": [
+        "Design",
+        "Policy",
+        "Setup",
+        "Solve",
+        "Total",
+        "Speedup"
+      ],
+      "rows": [
+        [
+          "simple",
+          "Diagonal",
+          "0.052s",
+          "0.640s",
+          "0.692s",
+          "1.0x"
         ],
         [
           "",
-          "reuse",
-          "$1.0 times 10^(-12)$",
-          "10#h(0.18em)000",
-          "8",
-          "1.84s [1.81--1.87s]"
+          "Additive, rebuilt",
+          "2.89s",
+          "1.56s",
+          "4.46s",
+          "0.2x"
         ],
         [
           "",
-          "rebuild",
-          "$1.0 times 10^(-12)$",
-          "10#h(0.18em)000",
-          "8",
-          "0.913s [0.818--1.03s]"
+          "Additive, cached",
+          "0.283s",
+          "1.55s",
+          "1.83s",
+          "0.4x"
+        ],
+        [
+          "difficult",
+          "Diagonal",
+          "0.050s",
+          "50.3s",
+          "50.3s",
+          "1.0x"
+        ],
+        [
+          "",
+          "Additive, rebuilt",
+          "0.434s",
+          "1.34s",
+          "1.77s",
+          "28.4x"
+        ],
+        [
+          "",
+          "Additive, cached",
+          "0.040s",
+          "1.19s",
+          "1.23s",
+          "41.1x"
         ]
       ]
     }

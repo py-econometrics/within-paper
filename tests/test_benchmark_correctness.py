@@ -25,7 +25,7 @@ from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ols.run import run_experiment
 from benchmarks.ppml import pyfixest as ppml_pyfixest
 from benchmarks.ppml.pyfixest import fit_ppml
-from benchmarks.within import ppml_inner_outer, scaling, setup_cost
+from benchmarks.within import amortization, ppml_inner_outer, scaling, setup_cost
 from benchmarks.within.map import map_demean_with_sweeps
 from scripts import analyze_gap_runtime, compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
@@ -382,6 +382,12 @@ class PythonFitTests(unittest.TestCase):
         self.assertEqual(reused["n_retained"], rebuilt["n_retained"])
         self.assertAlmostEqual(reused["beta_x1"], rebuilt["beta_x1"], places=8)
         self.assertAlmostEqual(reused["deviance"], rebuilt["deviance"], places=7)
+        self.assertEqual(
+            len(json.loads(reused["inner_iterations_by_step"])),
+            reused["outer_iterations"],
+        )
+        self.assertGreater(reused["setup_s"], 0)
+        self.assertGreater(reused["solve_s"], 0)
 
 
 class SetupCostTests(unittest.TestCase):
@@ -583,49 +589,158 @@ class PaperResultTests(unittest.TestCase):
         self.assertEqual(rendered[2], "1.000 (1/2)")
         self.assertEqual(rendered[3], "2.000 (1/2)")
 
-    def test_ppml_inner_outer_table_distinguishes_inner_regimes(self) -> None:
-        self.assertEqual(ppml_inner_outer.N_OBS, 100_000)
+    def test_akm_setup_table_separates_two_and_three_factors(self) -> None:
+        document = {
+            "tables": {
+                "akm_mobility": {
+                    "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
+                },
+                "akm_setup_cost": {"rows": []},
+            }
+        }
+        rows = []
+        for n_factors, setup, solve in ((2, 0.1, 0.2), (3, 0.3, 0.4)):
+            rows.extend(
+                {
+                    "design": "akm_mobility_1",
+                    "n_factors": str(n_factors),
+                    "setup_s": str(setup),
+                    "solve_s": str(solve),
+                    "converged": "true",
+                    "repetition": str(repetition),
+                    "n_planned": "5",
+                }
+                for repetition in range(5)
+            )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_akm_setup_cost(document)
+        self.assertEqual(
+            document["tables"]["akm_setup_cost"]["rows"][0],
+            [
+                "`akm_mobility_1`",
+                "0.41 (1.00)",
+                "0.100s",
+                "0.200s",
+                "0.300s",
+                "0.400s",
+            ],
+        )
+
+    def test_reuse_table_reports_speedup_against_diagonal(self) -> None:
+        document = {"tables": {"regression_reuse": {"rows": []}}}
+        rows = []
+        for design in ("simple", "difficult"):
+            for policy, setup, solve in (
+                ("diagonal", 1.0, 9.0),
+                ("additive_rebuilt", 2.0, 3.0),
+                ("additive_cached", 0.5, 2.0),
+            ):
+                rows.extend(
+                    {
+                        "design": design,
+                        "policy": policy,
+                        "setup_s": str(setup),
+                        "solve_s": str(solve),
+                        "total_s": str(setup + solve),
+                        "converged": "true",
+                        "repetition": str(repetition),
+                        "n_planned": "3",
+                    }
+                    for repetition in range(3)
+                )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_regression_reuse(document)
+        rendered = document["tables"]["regression_reuse"]["rows"]
+        self.assertEqual(rendered[0][-1], "1.0x")
+        self.assertEqual(rendered[1][-1], "2.0x")
+        self.assertEqual(rendered[2][-1], "4.0x")
+        self.assertEqual(rendered[3][-1], "1.0x")
+        self.assertEqual(rendered[4][-1], "2.0x")
+        self.assertEqual(rendered[5][-1], "4.0x")
+        self.assertEqual(rendered[0][0], "simple")
+        self.assertEqual(rendered[3][0], "difficult")
+
+    def test_reuse_benchmark_runs_both_ten_regression_designs(self) -> None:
+        self.assertEqual(amortization.N_REGRESSIONS, 10)
+        for design in ("simple", "difficult"):
+            with patch.object(amortization, "N_OBS", 1_000):
+                categories, regressions = amortization._regression_right_hand_sides(
+                    design
+                )
+            self.assertEqual(len(regressions), 10)
+            self.assertEqual(categories.shape[1], 3)
+            self.assertTrue(all(rhs.shape == (1_000, 2) for rhs in regressions))
+
+    def test_ppml_inner_outer_table_reports_full_benchmark_policy(self) -> None:
+        self.assertEqual(ppml_inner_outer.N_OBS, 1_000_000)
         self.assertEqual(ppml_inner_outer.REBUILD_OPTIONS, (False, True))
-        self.assertEqual(ppml_inner_outer.REPETITIONS, 7)
+        self.assertEqual(ppml_inner_outer.REPETITIONS, 3)
+        self.assertEqual(ppml_inner_outer.REGIMES, ((1e-8, 1_000),))
         document = {
             "tables": {
                 "ppml_inner_outer": {
                     "rows": [],
-                }
+                },
+                "ppml": {
+                    "header": [
+                        "Design",
+                        "FE",
+                        "`within-reuse`",
+                        "`within-rebuild`",
+                    ],
+                    "rows": [["simple (well-connected)", "3", "#miss", "#miss"]],
+                },
             }
         }
         rows = []
-        for rebuild, tolerance, cap in (
-            (False, "1e-8", "1000"),
-            (True, "1e-12", "10000"),
-        ):
+        for rebuild in (False, True):
             rows.extend(
                 {
                     "design": "simple",
                     "engine": "pyfixest",
-                    "n_obs": "100000",
+                    "backend": "within-rebuild" if rebuild else "within-reuse",
+                    "n_obs": "1000000",
                     "rebuild_each_step": str(rebuild).lower(),
-                    "inner_tol": tolerance,
-                    "inner_maxiter": cap,
                     "outer_converged": "true",
+                    "converged": "true",
                     "outer_iterations": "8",
+                    "setup_s": str((repetition + 1) / 10),
+                    "solve_s": str(repetition + 1),
+                    "inner_iterations_sum": str(10 * (repetition + 1)),
                     "runtime_s": str(repetition + 1),
                     "repetition": str(repetition),
-                    "n_planned": "7",
+                    "n_planned": "3",
                     "error": "",
                 }
-                for repetition in range(7)
+                for repetition in range(3)
             )
-        with patch.object(paper_results, "_latest_rows", return_value=rows):
+        step_rows = [
+            {
+                "design": "simple",
+                "backend": backend,
+                "outer_step": str(step),
+                "inner_iterations": "2.5",
+            }
+            for backend in ("within-reuse", "within-rebuild")
+            for step in range(1, 9)
+        ]
+
+        def latest(filename):
+            return step_rows if filename == "ppml_policy_steps.csv" else rows
+
+        with patch.object(paper_results, "_latest_rows", side_effect=latest):
             paper_results._synchronize_ppml_inner_outer(document)
 
         rendered = document["tables"]["ppml_inner_outer"]["rows"]
-        self.assertEqual(len(rendered[0]), 6)
+        self.assertEqual(len(rendered[0]), 7)
         self.assertEqual(rendered[0][1], "reuse")
-        self.assertEqual(rendered[0][2:4], ["$1.0 times 10^(-8)$", "1#h(0.18em)000"])
-        self.assertEqual(rendered[0][5], "4.00s [2.50--5.50s]")
+        self.assertEqual(rendered[0][2:6], ["8", "0.200s", "2.00s", "20"])
+        self.assertEqual(rendered[0][6], "2.00s [1.50--2.50s]")
         self.assertEqual(rendered[1][1], "rebuild")
-        self.assertEqual(rendered[1][2:4], ["$1.0 times 10^(-12)$", "10#h(0.18em)000"])
+        self.assertEqual(
+            document["tables"]["ppml"]["rows"][0][2:],
+            ["2.00s", "2.00s"],
+        )
 
 
 if __name__ == "__main__":

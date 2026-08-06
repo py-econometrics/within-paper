@@ -22,13 +22,14 @@ within-preconditioners = { cmd = "python -m benchmarks.within.preconditioners", 
 analyze-gap-runtime = { cmd = "python -m scripts.analyze_gap_runtime", depends-on = ["compute-hardness", "bench-main", "bench-fepois", "bench-akm-sweep", "bench-correia"], description = "Pool the benchmark results into the gap-versus-runtime diagnostic" }
 make-figures = { cmd = "python -m scripts.make_figures", depends-on = ["analyze-gap-runtime", "bench-tolerance"], description = "Generate paper figures from recorded benchmark results" }
 bench-accuracy-frontier = { cmd = "python -m benchmarks.tolerance.accuracy_frontier", depends-on = ["setup-julia-env"], description = "Sweep package tolerances on the base designs" }
-ppml-inner-outer = { cmd = "python -m benchmarks.within.ppml_inner_outer", description = "PPML inner LSMR versus outer IRLS diagnostics via standalone within" }
+ppml-inner-outer = { cmd = "python -m benchmarks.within.ppml_inner_outer", description = "Run the 1M-observation PPML reuse and rebuild policies with per-step LSMR diagnostics" }
 bench-scaling = { cmd = "python -m benchmarks.within.scaling", description = "Scaling in the number of absorbed factors, and amortization over right-hand sides" }
+bench-amortization = { cmd = "python -m benchmarks.within.amortization", description = "Measure additive setup across AKM connectivity and reuse across ten regressions" }
 bench-tolerance = { cmd = "python -m benchmarks.tolerance.akm_frontier", depends-on = ["setup-julia-env"], description = "Runtime against achieved precision on the AKM mobility designs" }
 bench-correia = { cmd = "python -m benchmarks.ols.correia", depends-on = ["setup-julia-env", "check-correia-data"], description = "Run the local Correia comparisons after checksum verification" }
 compute-hardness = { cmd = "python -m scripts.compute_hardness", depends-on = ["check-correia-data"], description = "Compute pairwise spectral gaps after singleton pruning" }
 collect-paper-results = { cmd = "python -m scripts.paper_results collect", description = "Fold existing benchmark CSVs into the paper tables without rerunning benchmarks" }
-reproduce-results = { cmd = "python -m scripts.paper_results collect", depends-on = ["check-external-runtimes", "agreement", "within-setup-cost", "bench-memory", "within-preconditioners", "bench-accuracy-frontier", "ppml-inner-outer", "bench-scaling", "bench-tolerance", "make-figures"], description = "Run the full benchmark suite, generate figures, and save result hashes and environment details" }
+reproduce-results = { cmd = "python -m scripts.paper_results collect", depends-on = ["check-external-runtimes", "agreement", "within-setup-cost", "bench-memory", "within-preconditioners", "bench-amortization", "bench-tolerance", "make-figures"], description = "Run the full benchmark suite, generate figures, and save result hashes and environment details" }
 render-paper-results = { cmd = "python -m scripts.paper_results render", description = "Write Typst tables from the paper result file" }
 reproduce-paper = { cmd = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf", depends-on = ["reproduce-results"], description = "Run benchmarks, render tables, and build the PDF" }
 

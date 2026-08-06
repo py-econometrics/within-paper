@@ -10,6 +10,7 @@ import pandas as pd
 from benchmarks.runtime import failure_fields
 
 OUTER_MAXITER = 100
+WITHIN_BACKENDS = {"within", "within-reuse", "within-rebuild"}
 
 def _demeaner(backend: str):
     import pyfixest as pf
@@ -44,6 +45,18 @@ def measure(
     repetitions: int,
     outer_maxiter: int = OUTER_MAXITER,
 ) -> list[dict]:
+    if backend in WITHIN_BACKENDS:
+        from benchmarks.within.ppml_inner_outer import measure_policy
+
+        rebuild = backend == "within-rebuild"
+        measure_policy(frame, rebuild, 1e-8, 1_000, outer_maxiter)
+        rows = []
+        for repetition in range(repetitions):
+            row = measure_policy(frame, rebuild, 1e-8, 1_000, outer_maxiter)
+            row.update(backend=backend, repetition=repetition)
+            rows.append(row)
+        return rows
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=r"\d+ singleton fixed effect\(s\) dropped")
         try:

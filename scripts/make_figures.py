@@ -387,14 +387,6 @@ def main() -> None:
         f"from {len(points)} points"
     )
 
-    crossover_results = _load_crossover_results()
-    crossover_target = FIGURES / "simple_difficult_runtime.svg"
-    crossover_figure(crossover_results, crossover_target)
-    print(
-        f"[figures] wrote {crossover_target.relative_to(ROOT)} "
-        "from recorded OLS and PPML trials"
-    )
-
     tolerance_source = RESULTS / "tolerance_frontier.csv"
     if not tolerance_source.exists():
         raise SystemExit(

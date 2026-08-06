@@ -25,7 +25,7 @@ metric is read. A claim with no row is not a claim the paper may make.
 | 6 | It reduces total runtime only when iteration savings exceed setup and application cost | Additive setup/solve split on the AKM mobility sweep and the 10M endpoints | `T_setup` vs `T_solve` vs `T_total` | Gate A |
 | 7 | Setup is most expensive on the dense graphs that need it least | Standalone additive diagnostics over the AKM mobility sweep | Factorization time against graph density | Gate A on the paired solve |
 | 8 | `within` runtime is close to invariant to connectivity, and mildly decreasing in it | AKM mobility sweep | Median and IQR of total time across the sweep | Gate A; repetition rule R1 |
-| 9 | Setup amortizes across right-hand sides, repeated fits, and IRLS steps; headline timings do not amortize it | Multi-RHS experiment, K in {1,2,5,10,25} | Total time against K, measured break-even | Gate A at each K |
+| 9 | Setup amortizes across repeated fits with unchanged weights; repeated solves also matter inside IRLS, where rebuilding may be faster as the weights change | Ten-regression experiment on the simple and difficult designs; PPML reuse/rebuild comparison | Setup time, solve time, and total time under each policy | Gate A for every reported policy |
 | 10 | Pairwise spectral gaps describe difficult designs but are not a solver-selection rule | Pooled gap-versus-runtime analysis over all collected designs | Slope of log runtime on log gap by backend, plus named counter-examples | Uses existing recorded runtimes |
 | 11 | The method loses on well-connected designs at scale | 10M simple design | Total time and setup share | Gate A |
 | 12 | Scaling in the number of absorbed factors Q | Q in {2,3,4,5} at fixed n | Setup, solve, iterations, accuracy | Gate A |
