@@ -18,7 +18,17 @@ from benchmarks.runtime import failed_trials, run_native
 
 ROOT = Path(__file__).absolute().parents[2]
 LATEST = ROOT / "results" / "runs" / "latest"
-PYTHON_BACKENDS = ("rust-map", "within")
+# These are the package-default OLS cells that belong in every package-runtime
+# comparison. Mechanism tables deliberately use their own matched-accuracy set.
+PACKAGE_RUNTIME_BACKENDS = (
+    "rust-map",
+    "within-off",
+    "within-diagonal",
+    "within",
+    "fixest",
+    "FEM.jl",
+)
+PYTHON_BACKENDS = ("rust-map", "within-off", "within-diagonal", "within")
 
 
 def repetitions_for_runtime(seconds: float) -> int:

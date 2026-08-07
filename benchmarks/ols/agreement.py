@@ -8,6 +8,11 @@ from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.ols.run import LATEST, run_experiment
 
 
+# This diagnostic stays a four-backend coefficient check. The runtime tables carry
+# the LSMR preconditioner ablation separately.
+AGREEMENT_BACKENDS = ("rust-map", "within", "fixest", "FEM.jl")
+
+
 def main() -> None:
     raw = run_experiment(
         experiment="agreement",
@@ -17,6 +22,7 @@ def main() -> None:
         ],
         output=None,
         repetitions=1,
+        backends=AGREEMENT_BACKENDS,
     )
     rows = []
     for design, group in raw.groupby("design"):

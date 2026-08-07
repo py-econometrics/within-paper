@@ -211,64 +211,78 @@
       ]
     },
     "akm_mobility": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Scenario",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`akm_mobility_1`",
           "0.41 (1.00)",
           "0.397s",
+          "#miss",
+          "#miss",
+          "0.557s",
           "0.485s",
-          "0.338s",
-          "0.557s"
+          "0.338s"
         ],
         [
           "`akm_mobility_2`",
           "0.0769 (1.00)",
           "1.12s",
+          "#miss",
+          "#miss",
+          "0.552s",
           "0.897s",
-          "0.601s",
-          "0.552s"
+          "0.601s"
         ],
         [
           "`akm_mobility_3`",
           "$3.67 times 10^(-3)$ (0.87)",
           "18.5s",
+          "#miss",
+          "#miss",
+          "0.425s",
           "2.59s",
-          "2.01s",
-          "0.425s"
+          "2.01s"
         ],
         [
           "`akm_mobility_4`",
           "$1.07 times 10^(-3)$ (0.61)",
           "54.5s",
+          "#miss",
+          "#miss",
+          "0.390s",
           "5.87s",
-          "2.94s",
-          "0.390s"
+          "2.94s"
         ],
         [
           "`akm_mobility_5`",
           "$1.10 times 10^(-4)$ (0.52)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.390s",
           "6.55s",
-          "3.37s",
-          "0.390s"
+          "3.37s"
         ],
         [
           "`akm_mobility_6`",
           "$4.82 times 10^(-5)$ (0.29)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.369s",
           "7.25s",
-          "4.30s",
-          "0.369s"
+          "4.30s"
         ]
       ]
     },
@@ -335,56 +349,68 @@
       ]
     },
     "akm_sorting": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.15fr, 0.95fr, 0.72fr, 0.72fr, 0.78fr, 0.82fr, 0.70fr, 0.70fr)",
       "header": [
         "Scenario",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`akm_sorting_1`",
           "0.0129 (0.97)",
           "5.35s",
+          "#miss",
+          "#miss",
+          "0.441s",
           "1.28s",
-          "1.31s",
-          "0.441s"
+          "1.31s"
         ],
         [
           "`akm_sorting_2`",
           "$5.76 times 10^(-3)$ (0.96)",
           "9.80s",
+          "#miss",
+          "#miss",
+          "0.450s",
           "1.75s",
-          "1.65s",
-          "0.450s"
+          "1.65s"
         ],
         [
           "`akm_sorting_3`",
           "$6.55 times 10^(-3)$ (0.96)",
           "9.74s",
+          "#miss",
+          "#miss",
+          "0.459s",
           "1.71s",
-          "1.60s",
-          "0.459s"
+          "1.60s"
         ],
         [
           "`akm_sorting_4`",
           "$4.21 times 10^(-3)$ (0.96)",
           "15.9s",
+          "#miss",
+          "#miss",
+          "0.457s",
           "2.26s",
-          "1.75s",
-          "0.457s"
+          "1.75s"
         ],
         [
           "`akm_sorting_5`",
           "$2.19 times 10^(-3)$ (0.96)",
           "28.7s",
+          "#miss",
+          "#miss",
+          "0.483s",
           "2.59s",
-          "1.74s",
-          "0.483s"
+          "1.74s"
         ]
       ]
     },
@@ -437,134 +463,164 @@
       ]
     },
     "correia_real": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.05fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`credit`",
           "0.402 (1.00)",
           "0.198s",
+          "#miss",
+          "#miss",
+          "0.213s",
           "0.155s",
-          "0.094s",
-          "0.213s"
+          "0.094s"
         ],
         [
           "`soccer`",
           "0.889 (1.00)",
           "0.034s",
+          "#miss",
+          "#miss",
+          "0.056s",
           "0.014s",
-          "0.010s",
-          "0.056s"
+          "0.010s"
         ],
         [
           "`enron`",
           "$7.04 times 10^(-3)$ (0.99)",
           "2.95s",
+          "#miss",
+          "#miss",
+          "0.398s",
           "0.537s",
-          "0.316s",
-          "0.398s"
+          "0.316s"
         ],
         [
           "`github`",
           "$6.30 times 10^(-4)$ (0.32)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.312s",
           "1.43s",
-          "1.44s",
-          "0.312s"
+          "1.44s"
         ],
         [
           "`patents`",
           "$5.18 times 10^(-4)$ (0.95)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.384s",
           "1.05s",
-          "0.582s",
-          "0.384s"
+          "0.582s"
         ],
         [
           "`workers`",
           "$2.74 times 10^(-4)$ (0.63)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.284s",
           "1.98s",
-          "1.45s",
-          "0.284s"
+          "1.45s"
         ],
         [
           "`schools`",
           "$2.21 times 10^(-3)$ (1.00)",
           "5.79s",
+          "#miss",
+          "#miss",
+          "0.238s",
           "0.825s",
-          "0.495s",
-          "0.238s"
+          "0.495s"
         ],
         [
           "`directors`",
           "$5.12 times 10^(-4)$ (0.30)",
           "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.339s",
           "0.280s",
-          "0.459s",
-          "0.339s"
+          "0.459s"
         ]
       ]
     },
     "correia_synthetic": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`synthetic-complete`",
           "1.00 (1.00)",
           "0.111s",
+          "#miss",
+          "#miss",
+          "0.227s",
           "0.088s",
-          "0.047s",
-          "0.227s"
+          "0.047s"
         ],
         [
           "`synthetic-uniform-easy`",
           "0.651 (1.00)",
           "0.170s",
+          "#miss",
+          "#miss",
+          "0.178s",
           "0.165s",
-          "0.068s",
-          "0.178s"
+          "0.068s"
         ],
         [
           "`synthetic-uniform-hard`",
           "0.184 (1.00)",
           "0.362s",
+          "#miss",
+          "#miss",
+          "0.951s",
           "0.359s",
-          "0.233s",
-          "0.951s"
+          "0.233s"
         ],
         [
           "`synthetic-uniform-harder`",
           "0.0249 (1.00)",
           "0.748s",
+          "#miss",
+          "#miss",
+          "0.560s",
           "1.18s",
-          "0.288s",
-          "0.560s"
+          "0.288s"
         ],
         [
           "`synthetic-assortative`",
           "$1.33 times 10^(-3)$ (0.70)",
           "13.0s",
+          "#miss",
+          "#miss",
+          "0.379s",
           "1.37s",
-          "1.19s",
-          "0.379s"
+          "1.19s"
         ]
       ]
     },
@@ -806,32 +862,38 @@
       ]
     },
     "ols": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.86fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Design",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "simple (well-connected)",
           "0.857 (1.00)",
           "2.30s",
+          "#miss",
+          "#miss",
+          "11.0s",
           "2.54s",
-          "2.09s",
-          "11.0s"
+          "2.09s"
         ],
         [
           "difficult (near-nested)",
           "$1.67 times 10^(-7)$ (1.00)",
           "306.2s",
+          "#miss",
+          "#miss",
+          "4.10s",
           "62.3s",
-          "26.9s",
-          "4.10s"
+          "26.9s"
         ]
       ]
     },

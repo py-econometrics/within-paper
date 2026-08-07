@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 import numpy as np
 import pandas as pd
@@ -20,9 +21,9 @@ from benchmarks import runtime
 from benchmarks.accuracy import external_normal_residuals, projection_errors
 from benchmarks.akm import AKMConfig, SCENARIOS, simulate_akm_panel
 from benchmarks.data import drop_singletons, make_base_data, solver_data
-from benchmarks.ols import pyfixest as ols_pyfixest, run as ols_runner
+from benchmarks.ols import agreement as ols_agreement, pyfixest as ols_pyfixest, run as ols_runner
 from benchmarks.ols.pyfixest import fit_ols
-from benchmarks.ols.run import run_experiment
+from benchmarks.ols.run import PACKAGE_RUNTIME_BACKENDS, run_experiment
 from benchmarks.ppml import pyfixest as ppml_pyfixest
 from benchmarks.ppml.pyfixest import fit_ppml
 from benchmarks.within import amortization, scaling, setup_cost
@@ -237,6 +238,37 @@ class PythonFitTests(unittest.TestCase):
         self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
         self.assertFalse(hasattr(fit, "_Y"))
 
+    def test_package_runtime_ols_methods_include_all_lsmr_preconditioners(self) -> None:
+        self.assertEqual(
+            PACKAGE_RUNTIME_BACKENDS,
+            (
+                "rust-map",
+                "within-off",
+                "within-diagonal",
+                "within",
+                "fixest",
+                "FEM.jl",
+            ),
+        )
+
+    def test_agreement_keeps_its_explicit_four_backend_scope(self) -> None:
+        self.assertEqual(
+            ols_agreement.AGREEMENT_BACKENDS,
+            ("rust-map", "within", "fixest", "FEM.jl"),
+        )
+
+    def test_lsmr_ablations_leave_tolerance_and_iteration_cap_at_defaults(self) -> None:
+        lsmr = Mock()
+        fake_pyfixest = SimpleNamespace(LsmrDemeaner=lsmr)
+        with patch.dict(sys.modules, {"pyfixest": fake_pyfixest}):
+            ols_pyfixest.demeaner("within-off")
+            ols_pyfixest.demeaner("within-diagonal")
+
+        self.assertEqual(
+            lsmr.call_args_list,
+            [call(preconditioner="off"), call(preconditioner="diagonal")],
+        )
+
     def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
         frame = make_base_data(2_000, "simple", 13)
         for backend in ("rust-map", "within"):
@@ -335,6 +367,49 @@ class PythonFitTests(unittest.TestCase):
             )
 
         self.assertEqual(result["n_retained"].tolist(), [100, 99])
+
+    def test_ols_runner_routes_lsmr_ablations_to_isolated_python_workers(self) -> None:
+        worker_backends = []
+
+        def fake_process(target, *args, **_kwargs) -> None:
+            if target is ols_runner._write_sample:
+                target(*args)
+                return None
+            self.assertIs(target, ols_runner._python_rows)
+            _, output, _, backend, repetitions = args
+            worker_backends.append(backend)
+            pd.DataFrame(
+                [
+                    {
+                        "backend": backend,
+                        "repetition": 0,
+                        "n_planned": repetitions,
+                        "runtime_s": 0.01,
+                        "n_retained": 100,
+                        "beta_x1": 1.0,
+                        "max_eta": None,
+                        "converged": True,
+                        "capped": False,
+                        "error": "",
+                    }
+                ]
+            ).to_csv(output, index=False)
+            return None
+
+        with (
+            patch.object(ols_runner, "_run_process", side_effect=fake_process),
+            patch.object(ols_runner, "_native_rows", side_effect=AssertionError),
+        ):
+            result = run_experiment(
+                experiment="test",
+                designs=[("simple", partial(make_base_data, 2_000, "simple", 18))],
+                output=None,
+                backends=("within-off", "within-diagonal"),
+                repetitions=1,
+            )
+
+        self.assertEqual(worker_backends, ["within-off", "within-diagonal"])
+        self.assertEqual(result["backend"].tolist(), worker_backends)
 
     def test_ols_runner_continues_after_an_isolated_backend_crash(self) -> None:
         def fake_process(target, *args, **_kwargs):
@@ -489,6 +564,69 @@ class PaperResultTests(unittest.TestCase):
             self.assertEqual(document["tables"]["mechanism_mobility"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["correia_synthetic"]["rows"][0][2], "2.00s")
 
+    def test_five_ols_runtime_tables_reserve_default_lsmr_ablation_columns(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        for table_name in (
+            "akm_mobility",
+            "akm_sorting",
+            "ols",
+            "correia_synthetic",
+            "correia_real",
+        ):
+            table = document["tables"][table_name]
+            self.assertEqual(
+                [header.strip("`") for header in table["header"][2:]],
+                [
+                    "rust-map",
+                    "within-off",
+                    "within-diagonal",
+                    "within",
+                    "fixest",
+                    "FEM.jl",
+                ],
+            )
+            self.assertTrue(
+                all(len(row) == len(table["header"]) for row in table["rows"])
+            )
+            self.assertEqual(table["rows"][0][3:5], ["#miss", "#miss"])
+
+    def test_runtime_collector_fills_lsmr_ablation_columns_in_all_five_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            latest = Path(directory)
+            fixtures = {
+                "ols.csv": [
+                    *self._rows("simple", "within-off", 10_000_000, 3, "default"),
+                    *self._rows("simple", "within-diagonal", 10_000_000, 3, "default"),
+                ],
+                "akm.csv": [
+                    *self._rows("akm_mobility_1", "within-off", 1_000_000, 3, "default"),
+                    *self._rows("akm_mobility_1", "within-diagonal", 1_000_000, 3, "default"),
+                    *self._rows("akm_sorting_1", "within-off", 1_000_000, 3, "default"),
+                    *self._rows("akm_sorting_1", "within-diagonal", 1_000_000, 3, "default"),
+                ],
+                "correia.csv": [
+                    *self._rows("synthetic-complete", "within-off", 1_000, 2, "default"),
+                    *self._rows("synthetic-complete", "within-diagonal", 1_000, 2, "default"),
+                    *self._rows("credit", "within-off", 1_000, 2, "default"),
+                    *self._rows("credit", "within-diagonal", 1_000, 2, "default"),
+                ],
+            }
+            for filename, rows in fixtures.items():
+                pd.DataFrame(rows).to_csv(latest / filename, index=False)
+            document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+            with patch.object(paper_results, "LATEST_RUN", latest):
+                paper_results._synchronize_canonical_tables(document, write=False)
+
+        for table_name in (
+            "akm_mobility",
+            "akm_sorting",
+            "ols",
+            "correia_synthetic",
+            "correia_real",
+        ):
+            table = document["tables"][table_name]
+            self.assertEqual(table["rows"][0][3:5], ["2.00s", "2.00s"])
+
     def test_missing_runtime_file_preserves_collected_cell(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
@@ -577,6 +715,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
+                    "header": ["Scenario", "Gap (share)"],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
                 },
                 "akm_setup_cost": {"rows": []},

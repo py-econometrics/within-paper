@@ -5,17 +5,17 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
+  columns: (1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
+  table.header(th[Dataset], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`synthetic-complete`], [1.00 (1.00)], [0.111s], [0.088s], [0.047s], [0.227s],
-  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.170s], [0.165s], [0.068s], [0.178s],
-  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.362s], [0.359s], [0.233s], [0.951s],
-  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.748s], [1.18s], [0.288s], [0.560s],
-  [`synthetic-assortative`], [$1.33 times 10^(-3)$ (0.70)], [13.0s], [1.37s], [1.19s], [0.379s],
+  [`synthetic-complete`], [1.00 (1.00)], [0.111s], [#miss], [#miss], [0.227s], [0.088s], [0.047s],
+  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.170s], [#miss], [#miss], [0.178s], [0.165s], [0.068s],
+  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.362s], [#miss], [#miss], [0.951s], [0.359s], [0.233s],
+  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.748s], [#miss], [#miss], [0.560s], [1.18s], [0.288s],
+  [`synthetic-assortative`], [$1.33 times 10^(-3)$ (0.70)], [13.0s], [#miss], [#miss], [0.379s], [1.37s], [1.19s],
   table.hline(stroke: 0.8pt + table-rule),
 )

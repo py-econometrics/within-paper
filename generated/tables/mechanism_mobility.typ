@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[LSMR, #linebreak() none], th[LSMR, #linebreak() diagonal], th[LSMR, #linebreak() factor-pair]),
+  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
   table.hline(stroke: 0.45pt + table-rule),
   [`akm_mobility_1`], [0.41 (1.00)], [0.500s], [4.26s], [0.400s], [0.637s],
   [`akm_mobility_2`], [0.0769 (1.00)], [1.87s], [7.60s], [0.591s], [0.644s],

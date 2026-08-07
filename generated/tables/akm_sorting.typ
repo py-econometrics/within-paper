@@ -5,17 +5,17 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
+  columns: (1.15fr, 0.95fr, 0.72fr, 0.72fr, 0.78fr, 0.82fr, 0.70fr, 0.70fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
+  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`akm_sorting_1`], [0.0129 (0.97)], [5.35s], [1.28s], [1.31s], [0.441s],
-  [`akm_sorting_2`], [$5.76 times 10^(-3)$ (0.96)], [9.80s], [1.75s], [1.65s], [0.450s],
-  [`akm_sorting_3`], [$6.55 times 10^(-3)$ (0.96)], [9.74s], [1.71s], [1.60s], [0.459s],
-  [`akm_sorting_4`], [$4.21 times 10^(-3)$ (0.96)], [15.9s], [2.26s], [1.75s], [0.457s],
-  [`akm_sorting_5`], [$2.19 times 10^(-3)$ (0.96)], [28.7s], [2.59s], [1.74s], [0.483s],
+  [`akm_sorting_1`], [0.0129 (0.97)], [5.35s], [#miss], [#miss], [0.441s], [1.28s], [1.31s],
+  [`akm_sorting_2`], [$5.76 times 10^(-3)$ (0.96)], [9.80s], [#miss], [#miss], [0.450s], [1.75s], [1.65s],
+  [`akm_sorting_3`], [$6.55 times 10^(-3)$ (0.96)], [9.74s], [#miss], [#miss], [0.459s], [1.71s], [1.60s],
+  [`akm_sorting_4`], [$4.21 times 10^(-3)$ (0.96)], [15.9s], [#miss], [#miss], [0.457s], [2.26s], [1.75s],
+  [`akm_sorting_5`], [$2.19 times 10^(-3)$ (0.96)], [28.7s], [#miss], [#miss], [0.483s], [2.59s], [1.74s],
   table.hline(stroke: 0.8pt + table-rule),
 )

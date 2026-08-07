@@ -5,7 +5,7 @@ from functools import partial
 import pandas as pd
 
 from benchmarks.data import CORREIA_NAMES
-from benchmarks.ols.run import LATEST, ROOT, run_experiment
+from benchmarks.ols.run import LATEST, PACKAGE_RUNTIME_BACKENDS, ROOT, run_experiment
 
 DATA = ROOT / "benchmarks" / "data" / "correia_data"
 
@@ -20,6 +20,7 @@ def main() -> None:
         output=LATEST / "correia.csv",
         fixed_effects=("id1", "id2"),
         repetitions=3,
+        backends=PACKAGE_RUNTIME_BACKENDS,
     )
 
 

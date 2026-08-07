@@ -5,14 +5,14 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.86fr),
+  columns: (1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
+  table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [0.857 (1.00)], [2.30s], [2.54s], [2.09s], [11.0s],
-  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [306.2s], [62.3s], [26.9s], [4.10s],
+  [simple (well-connected)], [0.857 (1.00)], [2.30s], [#miss], [#miss], [11.0s], [2.54s], [2.09s],
+  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [306.2s], [#miss], [#miss], [4.10s], [62.3s], [26.9s],
   table.hline(stroke: 0.8pt + table-rule),
 )

@@ -3,7 +3,7 @@
 from functools import partial
 
 from benchmarks.data import BASE_DESIGNS, make_base_data
-from benchmarks.ols.run import LATEST, run_experiment
+from benchmarks.ols.run import LATEST, PACKAGE_RUNTIME_BACKENDS, run_experiment
 
 N_OBS = 10_000_000
 
@@ -16,6 +16,7 @@ def main() -> None:
             for name, seed in BASE_DESIGNS
         ],
         output=LATEST / "ols.csv",
+        backends=PACKAGE_RUNTIME_BACKENDS,
     )
 
 

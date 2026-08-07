@@ -36,6 +36,17 @@ number of observations retained; failed rows record the convergence status and e
 Shared controls, such as the 100-step outer IRLS limit in the PPML benchmark, are stated
 explicitly rather than treated as package defaults.
 
+`bench-main`, `bench-akm-sweep`, and `bench-correia` each run the same six
+package-default OLS configurations: PyFixest MAP; PyFixest LSMR with no, diagonal, and
+factor-pair preconditioning; R `fixest`; and `FixedEffectModels.jl`. Every PyFixest
+configuration runs in an isolated Python worker. The LSMR configurations in these three
+commands retain their package defaults. The matched-accuracy AKM rows are separate
+controls with explicit tolerances and iteration caps.
+
+The OLS agreement check remains a four-backend coefficient diagnostic. PPML, memory,
+setup, scaling, reuse, and figures keep their narrower method sets; the PPML table uses
+only PyFixest's factor-pair preconditioner reuse policy.
+
 Every measured estimator attempt produces a result row. Iteration limits are marked
 `capped`; other estimator errors are marked `converged=false` with their messages kept.
 The task then continues with the remaining repetitions, backends, and designs. Ctrl-C

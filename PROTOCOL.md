@@ -77,8 +77,8 @@ low-dimensional regression.
 Outside the boundary: file reading and parsing, format conversion, interpreter or JIT
 startup, and package loading.
 
-Each subprocess backend warms up on a burn-in dataset that is discarded, so JIT
-compilation and lazy initialization are not charged to the first timed trial.
+Each backend makes one unreported warm-up fit on the same generated sample before its
+timed trials, so lazy initialization is not charged to the first recorded call.
 
 For every within configuration the total is decomposed as
 
@@ -96,17 +96,17 @@ turns on separating timings that differ by tens of milliseconds.
 
 | Rule | Cell runtime | Timed repetitions |
 |---|---|---|
-| R1 | Under 1 second | 20 to 30 |
-| R2 | 1 to 10 seconds | 7 to 10 |
-| R3 | Over 10 seconds | 3 to 5 |
+| R1 | Under 1 second | 20 |
+| R2 | 1 to 10 seconds | 7 |
+| R3 | Over 10 seconds | 3 |
 
 Additional rules, all mandatory:
 
 - One discarded burn-in trial precedes the timed ones, per backend per design.
 - Backends run sequentially in the fixed order shown by the experiment script. Production
   runs use an otherwise idle machine.
-- Report the median and the interquartile range. A median without a spread cannot
-  support an invariance claim.
+- The canonical paper tables report medians. Raw trial rows retain the distribution for
+  any claim that needs a spread.
 - Failed and capped trials stay in the record. They are never dropped before the median.
 - Every measured estimator call writes a row. An iteration limit sets `capped=true`;
   another estimator exception sets `converged=false`, keeps the error message, and does
@@ -116,6 +116,10 @@ Additional rules, all mandatory:
 
 "Median among converged trials" is a selected estimator and must be labelled as one
 wherever it is used.
+
+The 10M main OLS comparison uses the adaptive R1/R2/R3 rule. The AKM and Correia OLS
+comparisons use three planned calls per cell. The PPML comparison also uses three calls;
+memory and coefficient-agreement diagnostics use one isolated call per cell.
 
 ## 5. Accuracy metrics
 
@@ -236,10 +240,12 @@ No path silently reports a capped run as converged.
 
 Two views, kept separate.
 
-1. **Package defaults**, each annotated with its achieved `eta`, so a reader sees the
-   accuracy that each runtime bought.
+1. **Package defaults.** The five OLS package-runtime tables include PyFixest MAP,
+   PyFixest LSMR with no, diagonal, and factor-pair preconditioning, R `fixest`, and
+   `FixedEffectModels.jl`. The three PyFixest LSMR configurations keep their documented
+   default tolerance and iteration cap. PPML keeps only the factor-pair reuse path.
 2. **A time-versus-accuracy frontier** for one easy and one hard design: each package
-   swept over roughly four of its own tolerance settings, plotting wall time against
+   is tested at roughly four of its own tolerance settings, plotting wall time against
    achieved `eta`.
 
 A single matched-accuracy table is not used. `fixest` does not monitor `eta`, so forcing
@@ -247,9 +253,9 @@ it to a threshold built around the proposed method means driving an unrelated cr
 until an untargeted metric happens to clear a bar, and some packages will not clear it at
 any setting.
 
-Only the documented default within configuration appears in cross-package tables. The
-three preconditioner variants belong to the mechanism section; selecting the fastest one
-per cell after the fact would not be a package comparison.
+The package-runtime tables display all three default PyFixest LSMR configurations rather
+than selecting one after seeing the results. The matched-accuracy mechanism tables retain
+their separate tolerance and iteration-budget controls.
 
 Iteration counts are never placed on a shared axis. A MAP sweep, a `fixest` fixed-point
 iteration, and an LSMR iteration are different units and get separate panels.
@@ -268,15 +274,15 @@ accuracy on that exact sample.
 |---|---|---|---|
 | Correctness pilot | 100K simple/difficult | MAP + three within configurations | Validate metrics against a direct reference; freeze Gate A |
 | Standalone setup diagnostic | 1M AKM mobility designs; 10M base endpoints | `within-additive` | Setup/solve split, iterations, and external accuracy across connectivity |
-| AKM designs varying mobility | 1M | MAP + three within configurations | Main mechanism experiment |
-| AKM designs varying sorting | 1M | MAP + three within configurations | Corroborating connectivity experiment |
+| AKM designs varying mobility | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
+| AKM designs varying sorting | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
 | Accelerated-MAP check | 1M mobility designs | R `fixest` plus selected same-package results | Whether acceleration mitigates the MAP slowdown |
-| Large-scale simple/difficult | 10M | Same-package four-way plus external packages | Headline total-runtime comparison |
+| Large-scale simple/difficult | 10M | Six default OLS configurations | Headline total-runtime comparison |
 | Accuracy frontier | 10M simple and difficult | All external packages | Time versus achieved accuracy |
 | Factor scaling | 1M, Q in {2,3,4,5} | `within-additive`, plus MAP for reference | Structural weak point of the pair construction |
 | Amortization | 1M easy and hard | Primarily `diagonal` and `additive` | Setup reuse across right-hand sides and fits |
-| Selected Correia designs | Existing sizes | External packages plus `within-additive` | Robustness across graph families |
-| PPML simple/difficult | 1M | Three within configurations plus external packages | Inner solver versus outer IRLS convergence |
+| Selected Correia designs | Existing sizes | Six default OLS configurations | Robustness across graph families |
+| PPML simple/difficult | 1M | PyFixest MAP and factor-pair reuse, plus external packages | Inner solver versus outer IRLS convergence |
 | PPML reuse diagnostic | 100K | Exact PyFixest `fepois`, cache retained or cleared | Inner tolerance versus outer convergence |
 
 The mobility experiment carries the mechanism weight, because it varies the economic

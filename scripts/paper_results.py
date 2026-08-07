@@ -248,6 +248,17 @@ def _display_method_cell(cell: str) -> str:
 
 
 def _method_header(key: str) -> str:
+    lsmr_preconditioners = {
+        "within-off": "none",
+        "within-diagonal": "diagonal",
+        "within": "factor-pair",
+        "within-additive": "factor-pair",
+    }
+    if key in lsmr_preconditioners:
+        return (
+            "PyFixest #linebreak() LSMR #linebreak() "
+            f"{lsmr_preconditioners[key]}"
+        )
     label = METHODS[key][0]
     return label.replace(" ", " #linebreak() ", 1) if " " in label else label
 
@@ -272,7 +283,7 @@ def _table_fragment(name: str, table: dict) -> str:
         "  table.hline(stroke: 0.45pt + table-rule),",
     ]
     for row in table["rows"]:
-        marker = row[0]
+        marker = _row_label(table, row)
         if marker == "#memory-100k":
             lines.append("  table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],")
             continue
@@ -310,25 +321,23 @@ def render(_: argparse.Namespace) -> None:
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     values = ["// Generated result values; do not edit by hand."]
-    ppml_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["ppml"]["rows"]
-    }
+    ppml_table = tables["ppml"]
+    ppml_rows = _rows_by_label(ppml_table)
     ppml_simple = ppml_rows["simple (well-connected)"]
     ppml_difficult = ppml_rows["difficult (near-nested)"]
-    ols_difficult = tables["ols"]["rows"][1]
-    correia_real_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["correia_real"]["rows"]
-    }
+    ols_table = tables["ols"]
+    ols_difficult = _rows_by_label(ols_table)["difficult (near-nested)"]
+    correia_real_table = tables["correia_real"]
+    correia_real_rows = _rows_by_label(correia_real_table)
     enron = correia_real_rows["enron"]
-    agreement_rows = tables["agreement"]["rows"]
-    memory_rows = tables["memory"]["rows"]
+    agreement_table = tables["agreement"]
+    memory_table = tables["memory"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
         values = []
         for row in rows:
-            map_memory, within_memory = _numeric_cell(row[2]), _numeric_cell(row[3])
+            map_memory = _numeric_cell(_table_cell(memory_table, row, "rust-map"))
+            within_memory = _numeric_cell(_table_cell(memory_table, row, "within"))
             if map_memory is not None and within_memory is not None:
                 values.append(within_memory - map_memory)
         return values
@@ -336,11 +345,10 @@ def render(_: argparse.Namespace) -> None:
     def gap_without_share(value: str) -> str:
         return re.sub(r"\s+\([^)]*\)\s*$", "", value)
 
-    def seconds_range(row: list[str], columns: range) -> str:
+    def seconds_range(row: list[str], backends: tuple[str, ...]) -> str:
         candidates = [
-            value
-            for column in columns
-            if (value := _numeric_cell(row[column])) is not None
+            value for backend in backends
+            if (value := _numeric_cell(_table_cell(ppml_table, row, backend))) is not None
         ]
         if not candidates:
             return "--"
@@ -348,25 +356,60 @@ def render(_: argparse.Namespace) -> None:
         upper = _format_seconds(max(candidates))
         return f"{lower}--{upper}"
 
-    memory_100k = memory_overheads(memory_rows[1:3])
-    memory_1m = memory_overheads(memory_rows[4:6])
-    directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
+    memory_100k_rows = _rows_after_marker(memory_table, "#memory-100k")
+    memory_1m_rows = _rows_after_marker(memory_table, "#memory-1m")
+    memory_100k = memory_overheads(memory_100k_rows)
+    memory_1m = memory_overheads(memory_1m_rows)
+    memory_100k_by_label = {
+        _row_label(memory_table, row): row for row in memory_100k_rows
+    }
+    directors_share = _component_share(
+        _table_cell(correia_real_table, correia_real_rows["directors"], "Gap (share)")
+    )
+    agreement_simple_rows = _rows_after_marker(agreement_table, "#agreement-simple")
+    agreement_difficult_rows = _rows_after_marker(agreement_table, "#agreement-difficult")
     prose_values = {
-        "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
-        "result_ols_difficult_rust_map": ols_difficult[2],
-        "result_ols_difficult_fixest": ols_difficult[3],
-        "result_ols_difficult_fem": ols_difficult[4],
-        "result_ols_difficult_within": ols_difficult[5],
-        "result_correia_enron_fem": enron[4],
-        "result_correia_enron_within": enron[5],
-        "result_ppml_simple_range": seconds_range(ppml_simple, range(2, 6)),
-        "result_ppml_difficult_three_fixest": ppml_difficult[3],
-        "result_ppml_difficult_three_glfem": ppml_difficult[4],
-        "result_ppml_difficult_three_within": ppml_difficult[5],
-        "result_agreement_simple_gap": gap_without_share(memory_rows[1][1]),
-        "result_agreement_difficult_gap": gap_without_share(memory_rows[2][1]),
-        "result_agreement_simple_max": _largest_metric(agreement_rows[:4], 3),
-        "result_agreement_difficult_max": _largest_metric(agreement_rows[4:], 3),
+        "result_ols_difficult_gap": gap_without_share(
+            _table_cell(ols_table, ols_difficult, "Gap (share)")
+        ),
+        "result_ols_difficult_rust_map": _table_cell(ols_table, ols_difficult, "rust-map"),
+        "result_ols_difficult_fixest": _table_cell(ols_table, ols_difficult, "fixest"),
+        "result_ols_difficult_fem": _table_cell(ols_table, ols_difficult, "FEM.jl"),
+        "result_ols_difficult_within": _table_cell(ols_table, ols_difficult, "within"),
+        "result_correia_enron_fem": _table_cell(correia_real_table, enron, "FEM.jl"),
+        "result_correia_enron_within": _table_cell(correia_real_table, enron, "within"),
+        "result_ppml_simple_range": seconds_range(
+            ppml_simple, ("rust-map", "fixest", "GLFEM.jl", "within")
+        ),
+        "result_ppml_difficult_three_fixest": _table_cell(
+            ppml_table, ppml_difficult, "fixest"
+        ),
+        "result_ppml_difficult_three_glfem": _table_cell(
+            ppml_table, ppml_difficult, "GLFEM.jl"
+        ),
+        "result_ppml_difficult_three_within": _table_cell(
+            ppml_table, ppml_difficult, "within"
+        ),
+        "result_agreement_simple_gap": gap_without_share(
+            _table_cell(
+                memory_table,
+                memory_100k_by_label["simple (well-connected)"],
+                "Gap (share)",
+            )
+        ),
+        "result_agreement_difficult_gap": gap_without_share(
+            _table_cell(
+                memory_table,
+                memory_100k_by_label["difficult (near-nested)"],
+                "Gap (share)",
+            )
+        ),
+        "result_agreement_simple_max": _largest_metric(
+            agreement_table, agreement_simple_rows, "Absolute difference"
+        ),
+        "result_agreement_difficult_max": _largest_metric(
+            agreement_table, agreement_difficult_rows, "Absolute difference"
+        ),
         "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
         "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
         "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
@@ -376,12 +419,17 @@ def render(_: argparse.Namespace) -> None:
         # The abstract quotes a magnitude, so it has to move with the run
         # rather than be typed in once and go stale.
         "result_ols_difficult_within_vs_rust_map": _format_ratio(
-            _numeric_cell(ols_difficult[2]), _numeric_cell(ols_difficult[5])
+            _numeric_cell(_table_cell(ols_table, ols_difficult, "rust-map")),
+            _numeric_cell(_table_cell(ols_table, ols_difficult, "within")),
         ),
         "result_ols_difficult_within_vs_fixest": _format_ratio(
-            _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
+            _numeric_cell(_table_cell(ols_table, ols_difficult, "fixest")),
+            _numeric_cell(_table_cell(ols_table, ols_difficult, "within")),
         ),
-        "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
+        "result_ppml_within_vs_fixest": _format_ratio(
+            _numeric_cell(_table_cell(ppml_table, ppml_difficult, "fixest")),
+            _numeric_cell(_table_cell(ppml_table, ppml_difficult, "within")),
+        ),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
         "result_directors_component_share": (
@@ -523,10 +571,10 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
 
 
 def _paper_runtime_target(
-    table_name: str, row: list[str]
+    table_name: str, table: dict, row: list[str]
 ) -> tuple[str, dict[str, int], str]:
     """Return the exact run specification represented by a paper timing cell."""
-    dataset = _clean_cell(row[0]).split(" ")[0]
+    dataset = _row_label(table, row).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
     if table_name in {
@@ -540,7 +588,11 @@ def _paper_runtime_target(
     if table_name == "ols":
         return dataset, {"n_obs": 10_000_000, "n_fe": 3}, "ols.csv:default"
     if table_name == "ppml":
-        return dataset, {"n_obs": 1_000_000, "n_fe": int(row[1])}, "ppml.csv:default"
+        return (
+            dataset,
+            {"n_obs": 1_000_000, "n_fe": int(_table_cell(table, row, "FE"))},
+            "ppml.csv:default",
+        )
     return dataset, {"n_fe": 2}, "correia.csv:default"
 
 
@@ -580,7 +632,11 @@ def _numeric_cell(value: str) -> float | None:
 
 
 def _largest_metric(
-    rows: list[list[str]], column: int, *, backend: str | None = None
+    table: dict,
+    rows: list[list[str]],
+    column: str,
+    *,
+    backend: str | None = None,
 ) -> str:
     """The largest numeric cell in one column, optionally within one backend.
 
@@ -589,10 +645,10 @@ def _largest_metric(
     a measured worst case.
     """
     candidates = [
-        row[column]
+        _table_cell(table, row, column)
         for row in rows
-        if (backend is None or _clean_cell(row[1]) == backend)
-        and _numeric_cell(row[column]) is not None
+        if (backend is None or _clean_cell(_table_cell(table, row, "Backend")) == backend)
+        and _numeric_cell(_table_cell(table, row, column)) is not None
     ]
     if not candidates:
         return "--"
@@ -621,6 +677,61 @@ def _format_typst_scientific(value: float) -> str:
 
 def _clean_cell(value: str) -> str:
     return value.replace("`", "")
+
+
+def _header_index(table: dict, header: str) -> int:
+    """Return a table column by its stable semantic header, not its position."""
+    headers = [_clean_cell(value) for value in table["header"]]
+    try:
+        return headers.index(header)
+    except ValueError as error:
+        raise ValueError(f"Table does not have a {header!r} column") from error
+
+
+def _table_cell(table: dict, row: list[str], header: str) -> str:
+    return row[_header_index(table, header)]
+
+
+def _set_table_cell(table: dict, row: list[str], header: str, value: str) -> None:
+    row[_header_index(table, header)] = value
+
+
+def _row_label(table: dict, row: list[str]) -> str:
+    for header in ("Scenario", "Design", "Dataset"):
+        try:
+            return _clean_cell(_table_cell(table, row, header))
+        except ValueError:
+            continue
+    # Structural table markers always occupy the first cell. Tables such as the
+    # tolerance frontier use a different label column but still need rendering.
+    return _clean_cell(row[0])
+
+
+def _rows_by_label(table: dict) -> dict[str, list[str]]:
+    return {_row_label(table, row): row for row in table["rows"]}
+
+
+def _rows_after_marker(table: dict, marker: str) -> list[list[str]]:
+    """Return rows in the section immediately following a structural marker."""
+    rows = table["rows"]
+    for index, row in enumerate(rows):
+        if _row_label(table, row) != marker:
+            continue
+        section = []
+        for candidate in rows[index + 1 :]:
+            if _row_label(table, candidate).startswith("#"):
+                break
+            section.append(candidate)
+        return section
+    raise ValueError(f"Table marker {marker!r} was not found")
+
+
+def _backend_columns(table: dict) -> tuple[tuple[int, str], ...]:
+    return tuple(
+        (index, _clean_cell(header))
+        for index, header in enumerate(table["header"])
+        if _clean_cell(header) in METHODS
+    )
 
 
 def _prose_cell(value: str) -> str:
@@ -657,17 +768,17 @@ def _synchronize_hardness(document: dict) -> int:
     def update(source_id: str, target_row: list[str]) -> int:
         diagnostic = diagnostics.get(source_id)
         if diagnostic is None:
-            if target_row[1] != "#miss":
-                target_row[1] = "#miss"
+            if _table_cell(table, target_row, "Gap (share)") != "#miss":
+                _set_table_cell(table, target_row, "Gap (share)", "#miss")
                 return 1
             return 0
         rendered = _format_hardness(
             float(diagnostic["one_minus_rho"]),
             float(diagnostic["worst_component_obs_share"]),
         )
-        if target_row[1] == rendered:
+        if _table_cell(table, target_row, "Gap (share)") == rendered:
             return 0
-        target_row[1] = rendered
+        _set_table_cell(table, target_row, "Gap (share)", rendered)
         return 1
 
     changed = 0
@@ -677,19 +788,23 @@ def _synchronize_hardness(document: dict) -> int:
         "mechanism_mobility",
         "mechanism_sorting",
     ):
-        for row in document["tables"][table_name]["rows"]:
-            scenario = _clean_cell(row[0])
+        table = document["tables"][table_name]
+        for row in table["rows"]:
+            scenario = _row_label(table, row)
             changed += update(scenario, row)
-    for row in document["tables"]["ols"]["rows"]:
-        family = row[0].split()[0]
+    table = document["tables"]["ols"]
+    for row in table["rows"]:
+        family = _row_label(table, row).split()[0]
         changed += update(family, row)
     for table_name in ("correia_synthetic", "correia_real"):
-        for row in document["tables"][table_name]["rows"]:
-            changed += update(_clean_cell(row[0]), row)
-    for index, row in enumerate(document["tables"]["memory"]["rows"]):
-        if row[0].startswith("#"):
+        table = document["tables"][table_name]
+        for row in table["rows"]:
+            changed += update(_row_label(table, row), row)
+    table = document["tables"]["memory"]
+    for index, row in enumerate(table["rows"]):
+        if _row_label(table, row).startswith("#"):
             continue
-        family = row[0].split()[0]
+        family = _row_label(table, row).split()[0]
         size = "100k" if index < 4 else "1m"
         changed += update(f"memory_{family}_{size}", row)
     return changed
@@ -705,12 +820,14 @@ def _synchronize_agreement(document: dict) -> int:
     }
     changed = 0
     dgp = ""
-    for row in document["tables"]["agreement"]["rows"]:
-        if row[0] == "#agreement-simple":
+    table = document["tables"]["agreement"]
+    for row in table["rows"]:
+        marker = _row_label(table, row)
+        if marker == "#agreement-simple":
             dgp = "simple"
-        elif row[0] == "#agreement-difficult":
+        elif marker == "#agreement-difficult":
             dgp = "difficult"
-        backend = _clean_cell(row[1])
+        backend = _clean_cell(_table_cell(table, row, "Backend"))
         source = by_key.get((dgp, backend))
         if source is None:
             replacement = ["#miss", "#miss"]
@@ -722,9 +839,9 @@ def _synchronize_agreement(document: dict) -> int:
                 f"{float(source['x1']):.8f}",
                 "--" if backend == "rust-map" else _format_typst_scientific(float(source["max_abs_diff"])),
             ]
-        for index, value in enumerate(replacement, start=2):
-            if row[index] != value:
-                row[index] = value
+        for header, value in zip(("$hat(beta)_1$", "Absolute difference"), replacement):
+            if _table_cell(table, row, header) != value:
+                _set_table_cell(table, row, header, value)
                 changed += 1
     return changed
 
@@ -962,9 +1079,10 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
     if table is None or rows is None:
         return 0
 
+    mobility_table = document["tables"]["akm_mobility"]
     gap_by_design = {
-        _clean_cell(row[0]): row[1]
-        for row in document["tables"]["akm_mobility"]["rows"]
+        _row_label(mobility_table, row): _table_cell(mobility_table, row, "Gap (share)")
+        for row in mobility_table["rows"]
     }
 
     def cells(design: str, n_factors: int) -> list[str]:
@@ -988,8 +1106,8 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         ]
 
     rendered = []
-    for source in document["tables"]["akm_mobility"]["rows"]:
-        design = _clean_cell(source[0])
+    for source in mobility_table["rows"]:
+        design = _row_label(mobility_table, source)
         rendered.append(
             [
                 f"`{design}`",
@@ -1175,16 +1293,15 @@ def _synchronize_canonical_tables(
     for name, table in document["tables"].items():
         if name not in runtime_tables:
             continue
-        headers = [_clean_cell(cell) for cell in table["header"]]
         for row in table["rows"]:
-            dataset, requirements, source_marker = _paper_runtime_target(name, row)
+            dataset, requirements, source_marker = _paper_runtime_target(name, table, row)
             filename, _view = source_marker.split(":", 1)
             # An absent raw result means that this experiment was not part of
             # the current run. It is different from a present file with no
             # matching row, which should continue to show as missing.
             if not _latest(filename).exists():
                 continue
-            for column, backend in enumerate(headers[2:], start=2):
+            for column, backend in _backend_columns(table):
                 backend_source = source_marker
                 candidates = [
                     source
@@ -1200,12 +1317,17 @@ def _synchronize_canonical_tables(
     measurements = _latest_rows("memory.csv")
     if measurements is not None:
         table = document["tables"]["memory"]
-        for index, row in enumerate(table["rows"]):
-            if row[0].startswith("#"):
+        size = ""
+        for row in table["rows"]:
+            label = _row_label(table, row)
+            if label == "#memory-100k":
+                size = "100k"
                 continue
-            dgp = row[0].split()[0]
-            size = "100k" if index < 4 else "1m"
-            for column, backend in ((2, "rust-map"), (3, "within")):
+            if label == "#memory-1m":
+                size = "1m"
+                continue
+            dgp = label.split()[0]
+            for column, backend in _backend_columns(table):
                 candidates = [
                     item
                     for item in measurements

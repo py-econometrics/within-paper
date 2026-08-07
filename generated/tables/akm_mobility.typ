@@ -5,18 +5,18 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr),
+  columns: (1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() within]),
+  table.header(th[Scenario], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`akm_mobility_1`], [0.41 (1.00)], [0.397s], [0.485s], [0.338s], [0.557s],
-  [`akm_mobility_2`], [0.0769 (1.00)], [1.12s], [0.897s], [0.601s], [0.552s],
-  [`akm_mobility_3`], [$3.67 times 10^(-3)$ (0.87)], [18.5s], [2.59s], [2.01s], [0.425s],
-  [`akm_mobility_4`], [$1.07 times 10^(-3)$ (0.61)], [54.5s], [5.87s], [2.94s], [0.390s],
-  [`akm_mobility_5`], [$1.10 times 10^(-4)$ (0.52)], [capped (0/3)], [6.55s], [3.37s], [0.390s],
-  [`akm_mobility_6`], [$4.82 times 10^(-5)$ (0.29)], [capped (0/3)], [7.25s], [4.30s], [0.369s],
+  [`akm_mobility_1`], [0.41 (1.00)], [0.397s], [#miss], [#miss], [0.557s], [0.485s], [0.338s],
+  [`akm_mobility_2`], [0.0769 (1.00)], [1.12s], [#miss], [#miss], [0.552s], [0.897s], [0.601s],
+  [`akm_mobility_3`], [$3.67 times 10^(-3)$ (0.87)], [18.5s], [#miss], [#miss], [0.425s], [2.59s], [2.01s],
+  [`akm_mobility_4`], [$1.07 times 10^(-3)$ (0.61)], [54.5s], [#miss], [#miss], [0.390s], [5.87s], [2.94s],
+  [`akm_mobility_5`], [$1.10 times 10^(-4)$ (0.52)], [capped (0/3)], [#miss], [#miss], [0.390s], [6.55s], [3.37s],
+  [`akm_mobility_6`], [$4.82 times 10^(-5)$ (0.29)], [capped (0/3)], [#miss], [#miss], [0.369s], [7.25s], [4.30s],
   table.hline(stroke: 0.8pt + table-rule),
 )

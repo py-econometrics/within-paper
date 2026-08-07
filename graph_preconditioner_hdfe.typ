@@ -45,7 +45,7 @@
   #text(size: 10.5pt)[Alexander Fischer#footnote[trivago] and Kristof Schröder#footnote[appliedAI Institute for Europe gGmbH]]
 
   #v(0.4em)
-  #text(size: 9.5pt)[Draft: August 6, 2026]
+  #text(size: 9.5pt)[Draft: August 7, 2026]
 ]
 
 #v(0.9em)
@@ -770,8 +770,9 @@ factor pairs on which MAP tends to converge more slowly; with three or more fixe
 effects, the statistic remains a pairwise diagnostic rather than a full convergence
 bound.
 
-We benchmark four backends that separate MAP baselines from Krylov solvers with
-diagonal versus factor-pair preconditioning:
+The OLS package-runtime tables compare six configurations: PyFixest MAP, PyFixest LSMR
+with no, diagonal, or factor-pair preconditioning, R `fixest`, and
+`FixedEffectModels.jl`:
 
 #v(0.35em)
 
@@ -785,9 +786,11 @@ diagonal versus factor-pair preconditioning:
   table.header(th[Backend], th[Package], th[Algorithm]),
   table.hline(stroke: 0.45pt + table-rule),
   [`rust-map`], [PyFixest], [Vanilla Rust MAP, without acceleration.],
+  [`within-off`], [PyFixest], [LSMR without preconditioning.],
+  [`within-diagonal`], [PyFixest], [LSMR with diagonal preconditioning.],
+  [`within`], [PyFixest], [LSMR with factor-pair Schwarz preconditioning.],
   [`fixest`], [R `fixest`], [Accelerated MAP with Irons-Tuck and other optimizations @berge2026fixest.],
   [`FEM.jl`], [`FixedEffectModels.jl`], [Diagonally preconditioned LSMR @fong2011 @fixedeffectmodels.],
-  [`within`], [PyFixest], [LSMR with factor-pair Schwarz preconditioning.],
   table.hline(stroke: 0.8pt + table-rule),
 )
 ]
@@ -830,25 +833,21 @@ and should become relatively more competitive as mobility falls.
 #strong[Mobility benchmark ($n = 1$M).]
 #include "generated/tables/akm_mobility.typ"
 		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
-		and worker, firm, and year fixed effects. Lower rows reduce worker mobility
-		within a 10-period panel, thereby thinning the worker-firm graph. Lower mobility
-		makes the worker-firm pair harder for MAP and correspondingly more favorable
-		to the preconditioned method. A dash indicates that no completed run is available
-		for that cell. Gap is defined as $1-rho_(W F)$ for the worker-firm pair;
-		parentheses report the observation share of the component attaining the gap.]
+		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
+		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
+		successful calls when fewer than $n$ planned calls converge; `capped (0/n)` and
+		`failed (0/n)` distinguish iteration limits from other errors. The AKM-style panels
+		have 1M observations, one covariate, and worker, firm, and year fixed effects.
+		Lower rows reduce worker mobility within a 10-period panel. Gap is
+		$1-rho_(W F)$ for the worker-firm pair; parentheses give the observation share of
+		the component attaining the gap.]
 		]]
 
-When mobility is high, preconditioning yields little advantage: `fixest` is the fastest
-backend in `akm_mobility_1`, and `within` incurs setup costs that are not offset by
-improved convergence. As mobility declines, the worker-firm gap falls by more than two
-orders of magnitude, from $0.41$ to $4.82 times 10^(-5)$ (the decline is not
-strictly monotone, because the reported gap is attained on different connected
-components), and MAP runtimes rise sharply. `within`'s runtime stays nearly flat across
-all designs. In the lowest-mobility configurations, the
-preconditioned method is the fastest backend because it operates on the worker-firm graph
-directly rather than propagating information through many sweeps that update one
-fixed-effect dimension at a time.
+The expanded table reports the three PyFixest LSMR preconditioners under their package
+defaults. The worker-firm gap falls from $0.41$ to $4.82 times 10^(-5)$ as mobility
+declines, although the sequence is not strictly monotone because different connected
+components attain the reported gap. A new run is required before the wider table can
+support comparisons among the six configurations.
 
 #v(0.4em)
 
@@ -866,21 +865,19 @@ factor-pair solves use the worker-firm graph directly.
 #strong[Sorting benchmark ($n = 1$M).]
 #include "generated/tables/akm_sorting.typ"
 		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] AKM-style panel with 1M observations, one covariate,
-		and worker, firm, and year fixed effects. Lower rows raise the degree of
-		sorting among movers, pushing the worker-firm graph toward weakly connected blocks.
-		Stronger sorting weakens cross-block information flow and makes factor-pair
-		preconditioning more useful. Gap is $1-rho_(W F)$ for the worker-firm pair;
-		parentheses report the observation share of the component attaining the gap.]
+		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
+		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
+		successful calls when fewer than $n$ planned calls converge; `capped (0/n)` and
+		`failed (0/n)` distinguish iteration limits from other errors. The AKM-style panels
+		have 1M observations, one covariate, and worker, firm, and year fixed effects.
+		Lower rows raise sorting among movers. Gap is $1-rho_(W F)$ for the worker-firm
+		pair; parentheses give the observation share of the component attaining the gap.]
 		]]
 
-#block(breakable: false)[As movers sort more strongly across firms, the worker-firm gap falls by a factor of about
-six, from $0.0129$ to $0.00219$, and MAP-based runtimes rise.
-The gap does not fall
-monotonically, because different components attain the reported value in different rows,
-but its overall decline is clear. `within` remains nearly flat because its factor-pair
-preconditioner uses the worker-firm links directly, rather than relying on residual
-updates that cycle through one fixed-effect dimension at a time.]
+#block(breakable: false)[The gap ranges from $0.0129$ to $0.00219$ across these designs.
+Different components attain the reported gap in different rows, so its ordering is not
+monotone. The expanded package-default table will show how each LSMR preconditioner
+behaves on the same stored panels.]
 
 === When Preconditioner Setup Dominates
 
@@ -893,25 +890,20 @@ firm, and year fixed effects.
 #strong[Simple and difficult `fixest` designs (10M observations, 3 FE).]
 #include "generated/tables/ols.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three full regression calls. The gap is
-  $1-rho_(W F)$ for the worker-firm pair, measured on the generated 1M version of the
-  same DGP family; the runtime rows use the same graph construction at 10M observations.
-  The standalone `within` timings separate reusable solver construction from the batch
-  solve. On the simple design these take #result_setup_simple_setup and
-  #result_setup_simple_solve; on the difficult design they take
-  #result_setup_difficult_setup and #result_setup_difficult_solve.]
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
+  times in seconds at package-default settings. An unreported initial timing selects 20
+  measured calls below 1 second, 7 from 1 to 10 seconds, and 3 otherwise. A value $t (k/n)$
+  is the median among $k$ successful calls when fewer than $n$ planned calls converge;
+  `capped (0/n)` and `failed (0/n)` identify unsuccessful cells. Both designs have 10M
+  observations, one covariate, and worker, firm, and year fixed effects. Gap is
+  $1-rho_(W F)$ for the worker-firm pair, measured on the 1M-observation version of the
+  same DGP family; the 10M runs use the same simple/difficult graph construction.]
 ]]
 
-The simple design is easy for all of the iterative solvers. `within` is nevertheless
-slowest because building its factor-pair preconditioner takes
-#result_setup_simple_share of the standalone demeaning time. The preconditioner saves
-too little solve time to recover that cost in one regression.
-
-On the nearly nested design, unaccelerated MAP takes 306.2 seconds,
-`fixest` takes 62.3 seconds, and diagonally preconditioned LSMR takes 26.9 seconds.
-`within` finishes in 4.10 seconds. Its standalone setup share falls to
-#result_setup_difficult_share because the factor-pair approximation keeps the subsequent
-solve short. @sec-amortization measures setup time separately.
+The dense and near-nested designs separate a setting where preconditioner construction
+may dominate from one where it may be recovered during the solve. The standalone setup
+diagnostic remains separate from these complete-regression timings. The expanded
+package-default run is required before ranking the LSMR configurations in either design.
 
 === Iterations After Setup
 
@@ -1064,14 +1056,14 @@ IRLS limit.
 #strong[Poisson benchmarks (1M observations, one covariate).]
 #include "generated/tables/ppml.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three full IRLS regression calls at
-  $n = 1$M with one covariate and three fixed effects. `fixest` is R `fixest::fepois`;
-  `rust-map` and `within` use the PyFixest `fepois` routine; `GLFEM.jl` is
-  `GLFixedEffectModels.jl`. The `within` column uses PyFixest's current policy of reusing
-  the first preconditioner. Each package applies its default separation handling;
-  successful fits record the retained-observation count. "capped" means that all
-  three planned trials reached an iteration limit without converging; "failed" denotes
-  another error.]
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full `fepois` wall-clock times in
+  seconds over three calls at $n = 1$M with one covariate and three fixed effects.
+  `fixest` is R `fixest::fepois`; `rust-map` and `within` use PyFixest `fepois`; and
+  `GLFEM.jl` is `GLFixedEffectModels.jl`. The `within` column uses PyFixest's current
+  policy of reusing the first factor-pair preconditioner as the IRLS weights change.
+  Each package applies its default separation handling. A value $t (k/3)$ is the median
+  among $k$ successful calls; `capped (0/3)` identifies an iteration limit and
+  `failed (0/3)` another error.]
   ]
 
 #block(breakable: false)[On the simple design, all four paths finish in under ten seconds. `fixest` takes 4.72
@@ -1211,7 +1203,7 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 
 #pagebreak()
 
-= Appendix B: Supplementary Benchmark Results
+= Appendix B: Benchmarks and Diagnostics
 
 This appendix reports additional synthetic and real-data benchmarks, memory use, and
 numerical equivalence. Each table is generated from the recorded benchmark output by
@@ -1235,21 +1227,20 @@ reference set for comparing the same software backends outside the AKM generator
 #strong[Correia synthetic benchmarks.]
 #include "generated/tables/correia_synthetic.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three runs. Gap denotes $1-rho$ for the
-  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
-  share of the component attaining the gap. Smaller gaps correspond to slower two-way MAP
-  geometry. The `synthetic-zigzag` dataset is omitted because the default MAP backends
-  hit their 10,000-iteration demeaning caps. With 10,002 observations and 10,001 fixed-effect
-  levels in one connected component, only two dimensions remain after absorption, making
-  this a numerical stress case rather than a useful runtime comparison.]
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
+  times in seconds over three calls at package-default settings. Each package applies its
+  default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
+  singleton pruning used by the hardness diagnostic, and parentheses give the observation
+  share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
+  successful calls; `capped (0/3)` and `failed (0/3)` distinguish iteration limits from
+  other errors. `synthetic-zigzag` is omitted because the default MAP backends reach their
+  10,000-iteration demeaning caps.]
   ]
 
-All backends finish in less than one second on the complete and uniform designs except
-`fixest` on `synthetic-uniform-harder`, where it takes 1.18 seconds. On that design,
-`within` takes 0.560 seconds: faster than both MAP implementations but slower than
-diagonally preconditioned LSMR at 0.288 seconds. The assortative design has a much smaller
-gap of $1.33 times 10^(-3)$. There, `within` takes 0.379 seconds, compared with 1.19
-seconds for `FEM.jl`, 1.37 seconds for `fixest`, and 13.0 seconds for PyFixest MAP.
+The synthetic collection covers complete, uniform, assortative, and path-like matching
+patterns. The package-default table now retains all three PyFixest LSMR choices, so a
+fresh run can compare their behavior without mixing tolerances or iteration limits from
+the matched-accuracy experiment.
 
 #pagebreak()
 
@@ -1269,21 +1260,20 @@ controlled DGPs only approximate.
 #strong[Correia real-data benchmarks.]
 #include "generated/tables/correia_real.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three runs on singleton-dropped
-  samples, as produced by the PyFixest benchmark suite. The gap is $1-rho$ for the
-  `id1`-`id2` pair after the same singleton pruning; parentheses report the observation
-  share of the component attaining the gap. A small gap with a limited component share,
-  as in `directors`, indicates a hard subcomponent but not necessarily whole-sample MAP
-  difficulty.]
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
+  times in seconds over three calls at package-default settings. Each package applies its
+  default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
+  singleton pruning used by the hardness diagnostic, and parentheses give the observation
+  share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
+  successful calls; `capped (0/3)` and `failed (0/3)` distinguish iteration limits from
+  other errors. A small gap in a small component, as for `directors`, need not make the
+  full sample difficult for MAP.]
   ]
 
-On `credit` and `soccer`, all four backends finish in less than a quarter of a second and
-the low-overhead methods are fastest. The `directors` data have a gap of $5.12 times
-10^(-4)$, but the component attaining it contains only 30 percent of the observations;
-`fixest` finishes in 0.280 seconds, while PyFixest MAP reaches its iteration cap. `within`
-is fastest on `github`, `patents`, `workers`, and `schools`. On `enron`, however,
-diagonally preconditioned LSMR takes 0.316 seconds and `within` takes 0.398 seconds. These
-exceptions show why the pairwise gap is a diagnostic rather than a solver-selection rule.
+The real-data collection includes irregular components that are not captured by one
+pairwise statistic. The `directors` component attaining the smallest reported gap covers
+30 percent of the observations. The expanded table leaves solver rankings to the new
+package-default measurements; the gap remains a diagnostic rather than a selection rule.
 
 #pagebreak()
 
@@ -1311,11 +1301,13 @@ peak RSS through `ru_maxrss`.
 #strong[Memory footprint (3 FE, one covariate).]
 #include "generated/tables/memory.typ"
 		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] Peak RSS denotes peak resident set size, measured from
-		isolated Python processes. One covariate, three fixed effects. The two DGPs cover
-		well-connected and near-nested graphs; the experiment does not identify
-		design-specific memory effects. Gap denotes $1-rho_(W F)$ for the worker-firm pair in
-		the corresponding generated design.]
+		#text(size: 8.2pt)[#emph[Note:] Entries are peak resident-set sizes (MiB), measured
+		from isolated Python processes. The table compares PyFixest MAP with PyFixest
+		factor-pair LSMR in full OLS calls with one covariate and worker, firm, and year fixed
+		effects. The two DGPs are representative probes rather than a test of
+		design-specific memory behavior. Gap is $1-rho_(W F)$ for the worker-firm pair in the
+		corresponding generated design; parentheses give the observation share of the component
+		attaining the gap.]
 		]
 
 At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M
@@ -1345,9 +1337,11 @@ regression coefficient across the four backends.
 #strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
 #include "generated/tables/agreement.typ"
 #v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] $hat(beta)_1$ is the slope coefficient on `x1`.
-Differences are absolute slope-coefficient deviations from `rust-map`. `within` is the
-PyFixest preconditioned Rust backend.]
+#text(size: 8.2pt)[#emph[Note:] Each entry is one full OLS regression call at
+package-default settings. $hat(beta)_1$ is the slope coefficient on `x1`; the final
+column is $abs(hat(beta)_1-hat(beta)_(1, "rust-map"))$. The dash in the `rust-map` row
+marks the reference estimate. `within` is PyFixest LSMR with factor-pair
+preconditioning.]
 ]
 
 On the simple design, the largest coefficient difference is

@@ -3,7 +3,7 @@
 from functools import partial
 
 from benchmarks.akm import SCENARIOS, make_akm_data
-from benchmarks.ols.run import LATEST, run_experiment
+from benchmarks.ols.run import LATEST, PACKAGE_RUNTIME_BACKENDS, run_experiment
 
 REPETITIONS = 3
 MATCHED_MAP_TOLERANCE = 1e-10
@@ -17,6 +17,7 @@ def main() -> None:
         designs=[(name, partial(make_akm_data, name)) for name in SCENARIOS],
         output=LATEST / "akm.csv",
         repetitions=REPETITIONS,
+        backends=PACKAGE_RUNTIME_BACKENDS,
         extra_python_cells=(
             ("rust-map", "matched", MATCHED_MAP_TOLERANCE, MATCHED_MAXITER),
             ("within-off", "matched", MATCHED_LSMR_TOLERANCE, MATCHED_MAXITER),
