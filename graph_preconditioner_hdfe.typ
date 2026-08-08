@@ -158,7 +158,7 @@ achieved accuracy while varying the demeaning solver and the LSMR preconditioner
   caption: [Median full-regression runtime against the worker-firm spectral gap, on
   log-log axes. Smaller gaps mean weaker connectivity, so the horizontal scale decreases
   from left to right. All four panels use the same horizontal scale. The top row varies
-  worker mobility and the bottom row varies sorting among movers in simulated
+  worker mobility; the bottom row holds move probability at one and varies sorting in simulated
   worker-firm-year panels with 1 million observations. The left column uses package
   defaults; the right column fixes the PyFixest code path and uses tolerances selected for
   comparable achieved accuracy. Packages apply their own default singleton treatment in
@@ -478,25 +478,9 @@ narrow regions of the graph, each further iteration carries little fresh informa
 still converges, but it may need many sweeps; each sweep is cheap because the diagonal
 block solves reduce to one-pass group means.
 
-The same graph perspective gives a simple diagnostic for MAP difficulty in a
-fixed-effect structure. For any pair of fixed effects $(q,r)$, we form the normalized
-cross-tabulation $H_(q r) = G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2)$ and let
-$rho_(q r) = sigma_2(H_(q r))^2$ be the square of its largest nontrivial singular value,
-equivalently the largest nontrivial eigenvalue of $H_(q r)' H_(q r)$. The largest
-singular value of $H_(q r)$ equals one on every connected component and carries no
-information about connectivity, so we discard it. We report the
-spectral gap $1 - rho_(q r)$ in the benchmarks below. This gap measures how well
-connected the factor-pair graph is.#footnote[When the graph has
-more than one connected component, we compute the gap on each component and report
-the smallest, together with its observation share.]
-Gaps near zero signal sparse mobility or near-nesting, the settings in which MAP
-converges slowly; larger gaps indicate better connected factor-pair graphs.
-For the worker-firm example of Section 4, the gap is $1/3$.#footnote[In that example, $G_(W W) = "diag"(2,2,2)$,
-$G_(F F) = "diag"(3,3)$, and $C_(W F) = mat(1, 1; 2, 0; 0, 2)$, so
-$H_(W F) = G_(W W)^(-1/2) C_(W F) G_(F F)^(-1/2) = 1 / sqrt(6) mat(1, 1; 2, 0; 0, 2)$.
-The graph is connected, and
-$H_(W F)' H_(W F) = 1 / 6 mat(5, 1; 1, 5)$ has eigenvalues $1$ and $2/3$.
-After dropping the unit eigenvalue, $rho_(W F) = 2/3$ and the gap is $1/3$.]
+We use the pairwise spectral gap $1-rho_(q r)$ as a diagnostic for MAP difficulty.
+Smaller values indicate weaker pairwise connectivity. Appendix B defines the statistic
+and describes how we treat disconnected components.
 
 = The Factor-Pair Schwarz Preconditioner
 
@@ -767,11 +751,8 @@ Any shared control is stated with the relevant table. The comparisons are not co
 to a common estimation sample. The single-package mechanism experiments later in the
 paper do use a common prepared sample, because their purpose is to isolate the preconditioner.
 
-The runtime tables also report the pairwise hardness statistic for the relevant factor
-pair and the observation share of the component attaining it. Smaller gaps indicate
-factor pairs on which MAP tends to converge more slowly; with three or more fixed
-effects, the statistic remains a pairwise diagnostic rather than a full convergence
-bound.
+The runtime tables report the spectral-gap diagnostic $1-rho$ for the relevant factor
+pair. Its definition and limitations are given in Appendix B.
 
 The OLS package-runtime tables compare six configurations: PyFixest MAP, PyFixest LSMR
 with no, diagonal, or factor-pair preconditioning, R `fixest`, and
@@ -819,8 +800,8 @@ The main OLS benchmarks use synthetic AKM-style panels with one million observat
 one covariate, ten periods, and worker, firm, and year fixed effects. They vary the
 worker-firm graph in two ways while holding the rest of the data-generating process
 fixed. The mobility designs progressively reduce the number of workers who change firms.
-The sorting designs instead concentrate moves within groups of firms, creating weakly
-connected blocks even though workers continue to move. Appendix B reports further
+The sorting designs hold the move probability at one and increasingly concentrate moves
+within groups of firms. Appendix B reports further
 synthetic designs, the empirical HDFE benchmarks assembled by Sergio Correia, and the
 exact package-default AKM timings behind @fig-gap-runtime.
 
@@ -838,17 +819,15 @@ its cap, and LSMR without preconditioning reaches its cap. Factor-pair LSMR fall
 
 === Sorting Among Movers
 
-Stronger worker-firm sorting produces weakly connected blocks: movers increasingly connect
-firms within the same group rather than linking different groups. MAP should therefore
-slow down again, because information about firm effects crosses groups only through a
-small number of movers. The preconditioned method should be less sensitive, since its
-factor-pair solves use the worker-firm graph directly. The bottom row of
-@fig-gap-runtime reports this comparison. The gap ranges from $0.0129$ to $0.00219$,
-but it is not monotone in sorting because different components attain the reported gap.
-MAP slows from 5.63 to 28.6 seconds as sorting increases. LSMR without preconditioning
-reaches its default cap in every design. Diagonal LSMR takes 0.704 to 1.15 seconds,
-whereas factor-pair LSMR takes 0.441 to 0.501 seconds and is the fastest PyFixest LSMR
-configuration in every sorting design.
+Every worker changes firms between adjacent periods in these designs. The sorting
+parameter $rho$ controls how strongly workers are matched to similar firms; larger values
+concentrate moves within groups and weaken the links between them. The bottom row of
+@fig-gap-runtime reports this comparison. The gap falls from $0.395$ at $rho=0$ to
+$8.24 times 10^(-4)$ at $rho=10,000$. MAP slows from 0.368 to 60.1 seconds, while LSMR
+without preconditioning reaches its default cap in the last three designs. Diagonal LSMR
+rises from 0.367 to 1.42 seconds. Factor-pair LSMR takes 0.574 seconds at $rho=0$ and
+0.841 seconds at $rho=10,000$, and is faster than diagonal LSMR in the two
+least-connected designs.
 
 === When Preconditioner Setup Dominates
 
@@ -867,9 +846,9 @@ firm, and year fixed effects.
   is the median among $k$ successful calls when fewer than $n$ planned calls converge;
   a dash means that no complete result is recorded. `capped (0/n)` and `failed (0/n)`
   identify unsuccessful cells. Both designs have 10M
-  observations, one covariate, and worker, firm, and year fixed effects. Gap is
-  $1-rho_(W F)$ for the worker-firm pair, measured on the 1M-observation version of the
-  same DGP family; the 10M runs use the same simple/difficult graph construction.]
+  observations, one covariate, and worker, firm, and year fixed effects. The Gap (share)
+  column uses the diagnostic defined in Appendix B, measured on the 1M-observation version
+  of the same DGP family; the 10M runs use the same simple/difficult graph construction.]
 ]]
 
 On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
@@ -956,12 +935,11 @@ million observations, with the same outcome and covariate used in both specifica
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Times are seconds. Each cell is the median of five runs
   at tolerance $10^(-12)$. The two-factor specification absorbs worker and firm effects;
-  the three-factor specification adds year effects. The worker-firm gap and component
-  share are the same diagnostics used in the mobility benchmark.]
+  the three-factor specification adds year effects. Gap (share) is defined in Appendix B.]
 ]]
 
 Setup is cheaper in the low-mobility designs. With two fixed effects, median setup declines
-from 0.119 seconds in `akm_mobility_1` to 0.067 seconds in `akm_mobility_6`; with three
+from 0.119 seconds at $delta=1$ to 0.067 seconds at $delta=0.001$; with three
 fixed effects, it falls from 0.123 to 0.073 seconds. Solve time falls as well, from 0.323
 to 0.057 seconds with two effects and from 0.239 to 0.176 seconds with three. The
 low-mobility worker-firm graph has fewer cross-firm links to store and factorize. This is
@@ -1179,17 +1157,48 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 
 = Appendix B: Benchmarks and Diagnostics
 
-This appendix reports additional synthetic and real-data benchmarks, memory use, and
-numerical equivalence. Each table is generated from the recorded benchmark output by
+This appendix defines the connectivity diagnostic used in the runtime figures and
+reports additional synthetic and real-data benchmarks, memory use, and numerical
+equivalence. Each table is generated from the recorded benchmark output by
 `scripts/paper_results.py`; none of the numbers are entered by hand.
+
+== Spectral-Gap Diagnostic
+
+For a pair of fixed effects $(q,r)$, define the normalized cross-tabulation
+
+$ H_(q r) = G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2). $
+
+Let $rho_(q r) = sigma_2(H_(q r))^2$, where $sigma_2$ is the largest nontrivial
+singular value. Equivalently, $rho_(q r)$ is the largest nontrivial eigenvalue of
+$H_(q r)' H_(q r)$. Each connected component has a singular value equal to one; that
+value reflects the component constant rather than the strength of its internal
+connections, so it is discarded. We report $1-rho_(q r)$. Values near zero indicate
+weak connectivity, including sparse mobility and near nesting.
+
+We compute the diagnostic after iterative singleton pruning for the fixed effects in the
+design. If the factor-pair graph has several connected components, we compute the gap
+within each component and report the smallest one. The parenthetical value in the tables
+is the share of retained observations in the component attaining that gap. For models
+with three or more fixed effects, the statistic describes one factor pair and is not a
+bound on convergence of the full model.
+
+In the worker-firm example of Section 4, $G_(W W) = "diag"(2,2,2)$,
+$G_(F F) = "diag"(3,3)$, and $C_(W F) = mat(1, 1; 2, 0; 0, 2)$. Therefore,
+
+$ H_(W F) = G_(W W)^(-1/2) C_(W F) G_(F F)^(-1/2)
+  = 1 / sqrt(6) mat(1, 1; 2, 0; 0, 2), $
+
+and $H_(W F)' H_(W F) = 1 / 6 mat(5, 1; 1, 5)$ has eigenvalues $1$ and
+$2/3$. After discarding the unit eigenvalue, $rho_(W F)=2/3$ and the gap is $1/3$.
+
+#pagebreak()
 
 == Controlled AKM Benchmark Results
 
 Panel A contains the exact package-default timings underlying the left column of
 @fig-gap-runtime. Panel B adds the other package-default PyFixest LSMR configurations;
 its factor-pair column is therefore identical to Panel A's PyFixest factor-pair result.
-The tables report the worker-firm gap $1-rho_(W F)$ and, in parentheses, the observation
-share of the component attaining that gap.
+Gap (share) is defined in the preceding subsection.
 
 === Worker Mobility
 
@@ -1204,8 +1213,9 @@ share of the component attaining that gap.
   and worker, firm, and year fixed effects. Move probability is the probability of a
   worker changing firms between adjacent periods. A value $t (k/n)$ is the median among
   $k$ successful calls when fewer than $n$ planned calls converge; a dash means that no
-  complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
-  limits from other errors.]
+  complete result is recorded. `capped (0/n)` identifies fits that did not converge before
+  the 10,000-iteration limit; @fig-gap-runtime plots their median elapsed times as
+  unconnected lower bounds. `failed (0/n)` identifies other errors.]
 ]
 
 #v(0.35em)
@@ -1230,10 +1240,13 @@ share of the component attaining that gap.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
   in seconds at package-default settings. The panel has 1M observations, one covariate,
-  and worker, firm, and year fixed effects. Sorting strength is the generator's $rho$
-  parameter. A value $t (k/n)$ is the median among $k$ successful calls when fewer than
+  and worker, firm, and year fixed effects. Every worker changes firms between adjacent
+  periods; sorting strength is the generator's $rho$ parameter. A value $t (k/n)$ is the
+  median among $k$ successful calls when fewer than
   $n$ planned calls converge; a dash means that no complete result is recorded.
-  `capped (0/n)` and `failed (0/n)` distinguish iteration limits from other errors.]
+  `capped (0/n)` identifies fits that did not converge before the 10,000-iteration limit;
+  @fig-gap-runtime plots their median elapsed times as unconnected lower bounds.
+  `failed (0/n)` identifies other errors.]
 ]
 
 #v(0.35em)
@@ -1268,9 +1281,8 @@ reference set for comparing the same software backends outside the AKM generator
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
   times in seconds over three calls at package-default settings. Each package applies its
-  default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
-  singleton pruning used by the hardness diagnostic, and parentheses give the observation
-  share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
+  default singleton treatment. Gap (share) uses the `id1`-`id2` diagnostic defined
+  above. A value $t (k/3)$ is the median among $k$
   successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
   `failed (0/3)` distinguish iteration limits from other errors. `synthetic-zigzag` is
   omitted because the default MAP backends reach their
@@ -1301,9 +1313,8 @@ controlled DGPs only approximate.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
   times in seconds over three calls at package-default settings. Each package applies its
-  default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
-  singleton pruning used by the hardness diagnostic, and parentheses give the observation
-  share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
+  default singleton treatment. Gap (share) uses the `id1`-`id2` diagnostic defined
+  above. A value $t (k/3)$ is the median among $k$
   successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
   `failed (0/3)` distinguish iteration limits from other errors. A small gap in a small
   component, as for `directors`, need not make the
@@ -1346,9 +1357,7 @@ peak RSS through `ru_maxrss`.
 		from isolated Python processes. The table compares PyFixest MAP with PyFixest
 		factor-pair LSMR in full OLS calls with one covariate and worker, firm, and year fixed
 		effects. The two DGPs are representative probes rather than a test of
-		design-specific memory behavior. Gap is $1-rho_(W F)$ for the worker-firm pair in the
-		corresponding generated design; parentheses give the observation share of the component
-		attaining the gap.]
+		design-specific memory behavior. Gap (share) is defined above.]
 		]
 
 At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M

@@ -31,11 +31,11 @@ class AKMConfig:
 
 
 SCENARIOS = {
-    "akm_sorting_1": {"rho": 0.0},
-    "akm_sorting_2": {"rho": 5.0},
-    "akm_sorting_3": {"rho": 20.0},
-    "akm_sorting_4": {"rho": 50.0},
-    "akm_sorting_5": {"rho": 100.0},
+    "akm_sorting_1": {"delta": 1.0, "rho": 0.0},
+    "akm_sorting_2": {"delta": 1.0, "rho": 20.0},
+    "akm_sorting_3": {"delta": 1.0, "rho": 500.0},
+    "akm_sorting_4": {"delta": 1.0, "rho": 2_000.0},
+    "akm_sorting_5": {"delta": 1.0, "rho": 10_000.0},
     "akm_mobility_1": {"delta": 1.0},
     "akm_mobility_2": {"delta": 0.5},
     "akm_mobility_3": {"delta": 0.05},
@@ -117,7 +117,16 @@ def _assignment_cdfs(
                 * firm_weights
                 * industry_weights[industry]
             )
-            cdf = np.cumsum(scores / scores.sum(), dtype=np.float64)
+            total = scores.sum()
+            if not np.isfinite(total) or total <= 0:
+                log_scores = (
+                    -0.5 * config.rho * (alpha - psi) ** 2 / tau2
+                    + np.log(firm_weights)
+                    + np.log(industry_weights[industry])
+                )
+                scores = np.exp(log_scores - log_scores.max())
+                total = scores.sum()
+            cdf = np.cumsum(scores / total, dtype=np.float64)
             cdf[-1] = 1.0
             cdfs[industry, bin_id] = cdf
     return cdfs

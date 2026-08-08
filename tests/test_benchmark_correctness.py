@@ -44,6 +44,15 @@ class DataTests(unittest.TestCase):
 
     def test_akm_designs_and_small_draw_are_deterministic(self) -> None:
         self.assertEqual(len(SCENARIOS), 11)
+        sorting = [
+            SCENARIOS[f"akm_sorting_{index}"]
+            for index in range(1, 6)
+        ]
+        self.assertEqual([item["delta"] for item in sorting], [1.0] * 5)
+        self.assertEqual(
+            [item["rho"] for item in sorting],
+            [0.0, 20.0, 500.0, 2_000.0, 10_000.0],
+        )
         config = AKMConfig(
             n_workers=8, n_firms=4, n_time=3, n_industries=2, n_match_bins=4
         )
@@ -52,6 +61,19 @@ class DataTests(unittest.TestCase):
         pd.testing.assert_frame_equal(first, second)
         self.assertEqual(first.shape, (24, 5))
         self.assertAlmostEqual(first.iloc[0]["x1"], -1.9924197841744944)
+
+    def test_extreme_sorting_has_valid_firm_assignments(self) -> None:
+        config = AKMConfig(
+            n_workers=20,
+            n_firms=8,
+            n_time=3,
+            n_industries=2,
+            n_match_bins=8,
+            delta=1.0,
+            rho=10_000.0,
+        )
+        frame = simulate_akm_panel(config, seed=7)
+        self.assertTrue(frame["firm_id"].between(1, config.n_firms).all())
 
     def test_solver_data_factorizes_every_fixed_effect(self) -> None:
         categories, rhs = solver_data(make_base_data(1_000, "difficult", 43))
@@ -633,6 +655,23 @@ class PaperResultTests(unittest.TestCase):
             with patch.object(paper_results, "LATEST_RUN", Path(directory)):
                 paper_results._synchronize_canonical_tables(document, write=False)
             self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
+
+    def test_partial_hardness_file_preserves_other_collected_gaps(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        mobility_gap = document["tables"]["akm_mobility"]["rows"][0][1]
+        rows = [
+            {
+                "dataset_id": "akm_sorting_1",
+                "fe_a": "indiv_id",
+                "fe_b": "firm_id",
+                "one_minus_rho": "0.25",
+                "worst_component_obs_share": "1.0",
+            }
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_hardness(document)
+        self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][1], mobility_gap)
+        self.assertEqual(document["tables"]["akm_sorting"]["rows"][0][1], "0.25 (1.00)")
 
     def test_render_does_not_collect_raw_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

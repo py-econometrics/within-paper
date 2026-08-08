@@ -361,7 +361,7 @@ class TwoFactorContractionTests(unittest.TestCase):
                 )
 
     def test_paper_example_gap_is_one_third(self) -> None:
-        """The worked footnote in Section 5 reports a gap of 1/3."""
+        """The appendix's worked spectral-gap example reports 1/3."""
         design = TWO_FACTOR_DESIGNS["connected"]
         self.assertAlmostEqual(1.0 - self._rho(design), 1.0 / 3.0, places=12)
 

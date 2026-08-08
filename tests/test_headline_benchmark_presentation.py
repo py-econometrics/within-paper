@@ -120,7 +120,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         defaults = paper_results._akm_appendix_panel(table, panel="defaults")
         lsmr = paper_results._akm_appendix_panel(table, panel="lsmr")
 
-        self.assertEqual(defaults["header"][:2], ["Move probability", "Gap (share)"])
+        self.assertEqual(defaults["header"][:2], ["Move probability $delta$", "Gap (share)"])
         self.assertEqual(lsmr["header"][2:], ["within-off", "within-diagonal", "within"])
         self.assertEqual(defaults["rows"][0][0], "1")
         self.assertEqual(defaults["rows"][-1][0], "0.001")
@@ -135,10 +135,30 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
             default_panel = (generated / "akm_mobility_defaults.typ").read_text(encoding="utf-8")
             lsmr_panel = (generated / "akm_sorting_lsmr.typ").read_text(encoding="utf-8")
 
-        self.assertIn("Move probability", default_panel)
-        self.assertIn("Sorting strength", lsmr_panel)
+        self.assertIn("Move probability $delta$", default_panel)
+        self.assertIn("Sorting strength $rho$", lsmr_panel)
         self.assertNotIn("akm_mobility_1", default_panel)
         self.assertIn("0.543s", default_panel)
+
+    def test_all_akm_tables_render_varied_parameters_instead_of_scenario_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory) / "tables"
+            with patch.object(paper_results, "GENERATED_DIR", generated):
+                paper_results.render(None)
+            fragments = {
+                name: (generated / f"{name}.typ").read_text(encoding="utf-8")
+                for name in paper_results.AKM_PARAMETER_TABLES
+            }
+
+        for name, fragment in fragments.items():
+            self.assertNotIn("akm_mobility_", fragment)
+            self.assertNotIn("akm_sorting_", fragment)
+            if "sorting" in name:
+                self.assertIn("Sorting strength $rho$", fragment)
+                self.assertIn("[10000]", fragment)
+            else:
+                self.assertIn("Move probability $delta$", fragment)
+                self.assertIn("[0.001]", fragment)
 
 
 class HeadlineFigurePlotTests(unittest.TestCase):
