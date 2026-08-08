@@ -819,6 +819,54 @@
       },
       {
         "backend": "rust-map",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 62.52905383403413,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 0.6506802079966292,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 6.232,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 2.30733425,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
         "design": "akm_sorting_1",
         "family": "sorting",
         "gap": 0.395,
@@ -1051,6 +1099,54 @@
         "family": "sorting",
         "gap": 0.0008240000000000001,
         "median_time": 1.0201399159850553,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 66.93676429206971,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 23.611666916054673,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 2.9855181669117883,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 0.7579520420404151,
         "n_capped": 0,
         "n_success": 3,
         "n_trials": 3,
@@ -1472,6 +1568,16 @@
           "0.841s",
           "5.93s",
           "1.92s"
+        ],
+        [
+          "`akm_sorting_6`",
+          "$4.25 times 10^(-4)$ (1.00)",
+          "capped (0/3)",
+          "capped (0/3)",
+          "1.73s",
+          "0.651s",
+          "6.23s",
+          "2.31s"
         ]
       ]
     },
@@ -1871,6 +1977,14 @@
           "20.5s",
           "2.66s",
           "1.02s"
+        ],
+        [
+          "`akm_sorting_6`",
+          "$4.25 times 10^(-4)$ (1.00)",
+          "capped (0/3)",
+          "23.6s",
+          "2.99s",
+          "0.758s"
         ]
       ]
     },

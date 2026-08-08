@@ -173,6 +173,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
             if "sorting" in name:
                 self.assertIn("Sorting strength $rho$", fragment)
                 self.assertIn("[10000]", fragment)
+                self.assertIn("[150000]", fragment)
             else:
                 self.assertIn("Move probability $delta$", fragment)
                 self.assertIn("[0.001]", fragment)
