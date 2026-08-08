@@ -1,4 +1,4 @@
-"""OLS comparison across the eleven AKM designs."""
+"""OLS comparison across the twelve AKM designs."""
 
 from functools import partial
 

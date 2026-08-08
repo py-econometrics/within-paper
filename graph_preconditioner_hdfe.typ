@@ -823,10 +823,11 @@ Every worker changes firms between adjacent periods in these designs. The sortin
 parameter $rho$ controls how strongly workers are matched to similar firms; larger values
 concentrate moves within groups and weaken the links between them. The bottom row of
 @fig-gap-runtime reports this comparison. The gap falls from $0.395$ at $rho=0$ to
-$8.24 times 10^(-4)$ at $rho=10,000$. MAP slows from 0.368 to 60.1 seconds, while LSMR
-without preconditioning reaches its default cap in the last three designs. Diagonal LSMR
-rises from 0.367 to 1.42 seconds. Factor-pair LSMR takes 0.574 seconds at $rho=0$ and
-0.841 seconds at $rho=10,000$, and is faster than diagonal LSMR in the two
+$4.25 times 10^(-4)$ at $rho=150,000$. MAP rises from 0.368 seconds at $rho=0$ to
+60.1 seconds at $rho=10,000$, then reaches its default cap at $rho=150,000$. LSMR
+without preconditioning reaches its default cap in the last four designs. Diagonal LSMR
+rises from 0.367 to 1.73 seconds. Factor-pair LSMR remains below 1.1 seconds and takes
+0.651 seconds at $rho=150,000$; it is faster than diagonal LSMR in the three
 least-connected designs.
 
 === When Preconditioner Setup Dominates

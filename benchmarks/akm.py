@@ -1,6 +1,6 @@
 # Adapted from bipartitepandas by Thibaut Lamadon, under the MIT License.
 
-"""AKM data-generating process and the paper's eleven designs."""
+"""AKM data-generating process and the paper's twelve designs."""
 
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ SCENARIOS = {
     "akm_sorting_3": {"delta": 1.0, "rho": 500.0},
     "akm_sorting_4": {"delta": 1.0, "rho": 2_000.0},
     "akm_sorting_5": {"delta": 1.0, "rho": 10_000.0},
+    "akm_sorting_6": {"delta": 1.0, "rho": 150_000.0},
     "akm_mobility_1": {"delta": 1.0},
     "akm_mobility_2": {"delta": 0.5},
     "akm_mobility_3": {"delta": 0.05},

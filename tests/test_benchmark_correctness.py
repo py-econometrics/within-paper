@@ -43,15 +43,15 @@ class DataTests(unittest.TestCase):
         self.assertAlmostEqual(first.iloc[0]["y"], 3.3482659592032387)
 
     def test_akm_designs_and_small_draw_are_deterministic(self) -> None:
-        self.assertEqual(len(SCENARIOS), 11)
+        self.assertEqual(len(SCENARIOS), 12)
         sorting = [
             SCENARIOS[f"akm_sorting_{index}"]
-            for index in range(1, 6)
+            for index in range(1, 7)
         ]
-        self.assertEqual([item["delta"] for item in sorting], [1.0] * 5)
+        self.assertEqual([item["delta"] for item in sorting], [1.0] * 6)
         self.assertEqual(
             [item["rho"] for item in sorting],
-            [0.0, 20.0, 500.0, 2_000.0, 10_000.0],
+            [0.0, 20.0, 500.0, 2_000.0, 10_000.0, 150_000.0],
         )
         config = AKMConfig(
             n_workers=8, n_firms=4, n_time=3, n_industries=2, n_match_bins=4
@@ -70,7 +70,7 @@ class DataTests(unittest.TestCase):
             n_industries=2,
             n_match_bins=8,
             delta=1.0,
-            rho=10_000.0,
+            rho=150_000.0,
         )
         frame = simulate_akm_panel(config, seed=7)
         self.assertTrue(frame["firm_id"].between(1, config.n_firms).all())
