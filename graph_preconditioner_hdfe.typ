@@ -150,8 +150,9 @@ contribution is the preconditioner, not the use of LSMR for the outer iteration.
 @fig-gap-runtime shows full-regression runtime as worker-firm connectivity varies.
 The top row changes worker mobility; the bottom row changes sorting among movers. In
 each row, the left panel compares package defaults, while the right panel holds the
-PyFixest code path fixed and uses solver-specific tolerances chosen for comparable
-achieved accuracy while varying the demeaning solver and the LSMR preconditioner.
+PyFixest code path fixed and uses solver-specific tolerances chosen to target comparable
+accuracy while varying the demeaning solver and the LSMR preconditioner. Section 7's
+tolerance frontier reports the achieved-accuracy comparison directly.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
@@ -160,8 +161,8 @@ achieved accuracy while varying the demeaning solver and the LSMR preconditioner
   from left to right. All four panels use the same horizontal scale. The top row varies
   worker mobility; the bottom row holds move probability at one and varies sorting in simulated
   worker-firm-year panels with 1 million observations. The left column uses package
-  defaults; the right column fixes the PyFixest code path and uses tolerances selected for
-  comparable achieved accuracy. Packages apply their own default singleton treatment in
+  defaults; the right column fixes the PyFixest code path and uses solver-specific
+  tolerances chosen to target comparable accuracy. Packages apply their own default singleton treatment in
   the left column. Filled markers report the median from a complete three-fit cell; hollow
   markers report a returned median from fewer than three fits.
   Lines join returned medians for each configuration in spectral-gap order; they are not
@@ -848,8 +849,8 @@ firm, and year fixed effects.
   a dash means that no complete result is recorded. `capped (0/n)` and `failed (0/n)`
   identify unsuccessful cells. Both designs have 10M
   observations, one covariate, and worker, firm, and year fixed effects. The Gap (share)
-  column uses the diagnostic defined in Appendix B, measured on the 1M-observation version
-  of the same DGP family; the 10M runs use the same simple/difficult graph construction.]
+  column uses the diagnostic defined in Appendix B, measured on the same 10M design as the
+  reported timings.]
 ]]
 
 On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
