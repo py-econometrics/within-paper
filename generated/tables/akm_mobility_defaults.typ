@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Move probability], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Move probability $delta$], th[Gap (share)], th[PyFixest #linebreak() MAP], th[fixest], th[FEM.jl], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
   table.hline(stroke: 0.45pt + table-rule),
   [1], [0.41 (1.00)], [0.388s], [0.483s], [0.330s], [0.543s],
   [0.5], [0.0769 (1.00)], [1.13s], [0.894s], [0.585s], [0.551s],
