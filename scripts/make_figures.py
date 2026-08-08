@@ -156,7 +156,7 @@ def _runtime_panel(
 ) -> None:
     """Draw one observed-median panel without fitting a trend line."""
     for raw_name in backends:
-        display, colour, marker, _line = METHODS[raw_name]
+        display, colour, marker, line = METHODS[raw_name]
         usable = [
             row
             for row in points
@@ -170,6 +170,20 @@ def _runtime_panel(
             row for row in usable if row["status"] in {"partial", "incomplete"}
         ]
         capped = [row for row in usable if row["status"] == "capped"]
+        returned = sorted(complete + partial, key=lambda row: row["gap"], reverse=True)
+
+        # Join observed medians within a configuration. Capped cells are lower
+        # bounds rather than returned fits, so their markers remain unconnected.
+        if len(returned) >= 2:
+            ax.plot(
+                [row["gap"] for row in returned],
+                [row["median_time"] for row in returned],
+                color=colour,
+                linewidth=1.15,
+                linestyle=line,
+                alpha=0.55,
+                zorder=2,
+            )
 
         if complete:
             ax.scatter(
@@ -283,7 +297,8 @@ def headline_figure(points: list[dict], out: Path) -> None:
     fig.text(
         0.535,
         0.073,
-        "Hollow markers: fewer than all fits returned; arrows: capped lower-bound time",
+        "Lines join returned medians; hollow: fewer than all fits returned; "
+        "arrows: capped lower-bound time",
         ha="center",
         fontsize=6.4,
         color="#555555",

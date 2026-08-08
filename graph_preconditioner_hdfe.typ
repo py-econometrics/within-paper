@@ -163,8 +163,9 @@ achieved accuracy while varying the demeaning solver and the LSMR preconditioner
   tolerances selected for comparable achieved accuracy. Packages apply their own default
   singleton treatment in the left column. Filled markers report the median from a complete
   three-fit cell; hollow markers report a returned median from fewer than three fits.
-  Arrows show the median elapsed time of capped fits as a lower bound. Non-cap failures are
-  omitted.]
+  Lines join returned medians for each configuration in spectral-gap order; they are not
+  fitted trends. Arrows show the median elapsed time of capped fits as a lower bound and
+  are not connected. Non-cap failures are omitted.]
 ) <fig-gap-runtime>
 
 At high connectivity, all implementations finish quickly. As the spectral gap narrows,

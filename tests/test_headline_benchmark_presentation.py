@@ -197,16 +197,61 @@ class HeadlineFigurePlotTests(unittest.TestCase):
         self.assertGreater(sorting_limits[0][0], sorting_limits[0][1])
         self.assertEqual(legend_panels, [True, True, False, False])
 
-    def test_runtime_panel_has_no_fitted_line_path(self) -> None:
+    def test_runtime_panel_connects_returned_points_without_fitting(self) -> None:
         source = inspect.getsource(make_figures._runtime_panel)
         self.assertNotIn("polyfit", source)
-        self.assertNotIn("ax.plot", source)
+        self.assertIn("ax.plot", source)
         self.assertIn("if show_legend", source)
         self.assertIn('loc="upper left"', source)
         self.assertIn(
-            "Hollow markers: fewer than all fits returned",
+            "Lines join returned medians",
             inspect.getsource(make_figures.headline_figure),
         )
+
+    def test_runtime_lines_exclude_capped_lower_bounds(self) -> None:
+        points = [
+            {
+                "family": "mobility",
+                "view": "default",
+                "backend": "rust-map",
+                "gap": 0.4,
+                "median_time": 1.0,
+                "status": "complete",
+            },
+            {
+                "family": "mobility",
+                "view": "default",
+                "backend": "rust-map",
+                "gap": 0.1,
+                "median_time": 2.0,
+                "status": "partial",
+            },
+            {
+                "family": "mobility",
+                "view": "default",
+                "backend": "rust-map",
+                "gap": 0.01,
+                "median_time": 5.0,
+                "status": "capped",
+            },
+        ]
+        figure, ax = make_figures.plt.subplots()
+        try:
+            make_figures._runtime_panel(
+                ax,
+                points,
+                ("rust-map",),
+                family="mobility",
+                view="default",
+                title="test",
+                x_limits=(0.5, 0.005),
+                show_legend=False,
+            )
+            self.assertEqual(len(ax.lines), 1)
+            self.assertEqual(ax.lines[0].get_xdata().tolist(), [0.4, 0.1])
+            self.assertEqual(ax.lines[0].get_ydata().tolist(), [1.0, 2.0])
+        finally:
+            make_figures.plt.close(figure)
 
 
 if __name__ == "__main__":
