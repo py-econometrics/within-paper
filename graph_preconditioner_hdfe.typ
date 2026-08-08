@@ -147,27 +147,29 @@ Krylov solver as we do - LSMR @fong2011 - but only with diagonal
 preconditioning, which ignores the off-diagonal co-occurrence structure entirely; our
 contribution is the preconditioner, not the use of LSMR for the outer iteration.]
 
-@fig-gap-runtime plots full-regression runtime as worker-firm connectivity varies, with
-well-connected graphs on the left and weakly connected graphs on the right. The left
-panel compares package defaults; the right panel holds the PyFixest code path and
-accuracy target fixed while varying the preconditioner.
+@fig-gap-runtime shows full-regression runtime as worker-firm connectivity varies.
+The top row changes worker mobility; the bottom row changes sorting among movers. In
+each row, the left panel compares package defaults, while the right panel holds the
+PyFixest code path fixed and uses solver-specific tolerances chosen for comparable
+achieved accuracy while varying the demeaning solver and the LSMR preconditioner.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
-  caption: [Median runtime against the worker-firm spectral gap, on log-log axes. Smaller
-  gaps mean weaker connectivity, so the horizontal scale decreases from left to right.
-  Both panels report simulated worker-firm-year panels with 1 million observations,
-  in which worker mobility and sorting vary. Each point is the median of three fits on
-  one stored sample; packages apply their own default singleton treatment. Panel (a)
-  compares package defaults. Panel (b) fixes the PyFixest code path and achieved
-  accuracy, separating preconditioner effects from language and package differences.
-  Solid lines are log-log fits to the medians. Failed cells are omitted; hollow markers
-  indicate partial convergence.]
+  caption: [Median full-regression runtime against the worker-firm spectral gap, on
+  log-log axes. Smaller gaps mean weaker connectivity, so the horizontal scale decreases
+  from left to right. The top row varies worker mobility and the bottom row varies sorting
+  among movers in simulated worker-firm-year panels with 1 million observations. The left
+  column uses package defaults; the right column fixes the PyFixest code path and uses
+  tolerances selected for comparable achieved accuracy. Packages apply their own default
+  singleton treatment in the left column. Filled markers report the median from a complete
+  three-fit cell; hollow markers report a returned median from fewer than three fits.
+  Arrows show the median elapsed time of capped fits as a lower bound. Non-cap failures are
+  omitted.]
 ) <fig-gap-runtime>
 
 At high connectivity, all implementations finish quickly. As the spectral gap narrows,
 MAP and LSMR without factor-pair preconditioning slow down. Factor-pair LSMR remains
-fast and becomes faster in the least connected mobility designs because the worker-firm
+fast and becomes faster in the least-connected mobility designs because the worker-firm
 subproblems are cheaper to construct.
 
 The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
@@ -817,41 +819,20 @@ worker-firm graph in two ways while holding the rest of the data-generating proc
 fixed. The mobility designs progressively reduce the number of workers who change firms.
 The sorting designs instead concentrate moves within groups of firms, creating weakly
 connected blocks even though workers continue to move. Appendix B reports further
-synthetic designs and the empirical HDFE benchmarks assembled by Sergio Correia.
+synthetic designs, the empirical HDFE benchmarks assembled by Sergio Correia, and the
+exact package-default AKM timings behind @fig-gap-runtime.
 
 === Worker Mobility
 
 Lower worker mobility leaves fewer workers connecting multiple firms. MAP still updates
 one fixed-effect dimension at a time, so information about firm effects moves more slowly
 through the iteration. The factor-pair preconditioner uses the worker-firm links directly
-and should become relatively more competitive as mobility falls.
-
-#v(0.4em)
-
-#block(breakable: false)[#text(size: 8.9pt)[
-#strong[Mobility benchmark ($n = 1$M).]
-#include "generated/tables/akm_mobility.typ"
-		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
-		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
-		successful calls when fewer than $n$ planned calls converge; a dash means that no
-		complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
-		limits from other errors. The AKM-style panels
-		have 1M observations, one covariate, and worker, firm, and year fixed effects.
-		Lower rows reduce worker mobility within a 10-period panel. Gap is
-		$1-rho_(W F)$ for the worker-firm pair; parentheses give the observation share of
-		the component attaining the gap.]
-		]]
-
-The worker-firm gap falls from $0.41$ to $4.82 times 10^(-5)$ as mobility declines,
-although different connected components attain the reported gap. In the first two
-designs, all six configurations finish in at most 3.60 seconds. From the third design
-onward, PyFixest MAP slows sharply or reaches its cap, and LSMR without preconditioning
-reaches its cap. Factor-pair LSMR falls from 0.543 seconds in the first design to 0.365
-seconds in the last and is the fastest PyFixest LSMR configuration in the four
-lowest-mobility designs.
-
-#v(0.4em)
+and becomes relatively more competitive as mobility falls. The top row of
+@fig-gap-runtime shows the worker-firm gap falling from $0.41$ to
+$4.82 times 10^(-5)$. Under package defaults, all configurations in the first two designs
+complete within 3.60 seconds. In the remaining designs, PyFixest MAP slows sharply or reaches
+its cap, and LSMR without preconditioning reaches its cap. Factor-pair LSMR falls from
+0.543 seconds in the first design to 0.365 seconds in the last.
 
 === Sorting Among Movers
 
@@ -859,30 +840,13 @@ Stronger worker-firm sorting produces weakly connected blocks: movers increasing
 firms within the same group rather than linking different groups. MAP should therefore
 slow down again, because information about firm effects crosses groups only through a
 small number of movers. The preconditioned method should be less sensitive, since its
-factor-pair solves use the worker-firm graph directly.
-
-#v(0.4em)
-
-#block(breakable: false)[#text(size: 8.9pt)[
-#strong[Sorting benchmark ($n = 1$M).]
-#include "generated/tables/akm_sorting.typ"
-		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
-		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
-		successful calls when fewer than $n$ planned calls converge; a dash means that no
-		complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
-		limits from other errors. The AKM-style panels
-		have 1M observations, one covariate, and worker, firm, and year fixed effects.
-		Lower rows raise sorting among movers. Gap is $1-rho_(W F)$ for the worker-firm
-		pair; parentheses give the observation share of the component attaining the gap.]
-		]]
-
-#block(breakable: false)[The gap ranges from $0.0129$ to $0.00219$ across these designs.
-Different components attain the reported gap in different rows, so its ordering is not
-monotone. MAP slows from 5.63 to 28.6 seconds as sorting increases. LSMR without
-preconditioning reaches its default cap in every row. Diagonal LSMR takes 0.704 to 1.15
-seconds, whereas factor-pair LSMR takes 0.441 to 0.501 seconds and is the fastest method
-in every sorting design.]
+factor-pair solves use the worker-firm graph directly. The bottom row of
+@fig-gap-runtime reports this comparison. The gap ranges from $0.0129$ to $0.00219$,
+but it is not monotone in sorting because different components attain the reported gap.
+MAP slows from 5.63 to 28.6 seconds as sorting increases. LSMR without preconditioning
+reaches its default cap in every design. Diagonal LSMR takes 0.704 to 1.15 seconds,
+whereas factor-pair LSMR takes 0.441 to 0.501 seconds and is the fastest PyFixest LSMR
+configuration in every sorting design.
 
 === When Preconditioner Setup Dominates
 
@@ -1216,6 +1180,71 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 This appendix reports additional synthetic and real-data benchmarks, memory use, and
 numerical equivalence. Each table is generated from the recorded benchmark output by
 `scripts/paper_results.py`; none of the numbers are entered by hand.
+
+== Controlled AKM Benchmark Results
+
+Panel A contains the exact package-default timings underlying the left column of
+@fig-gap-runtime. Panel B adds the other package-default PyFixest LSMR configurations;
+its factor-pair column is therefore identical to Panel A's PyFixest factor-pair result.
+The tables report the worker-firm gap $1-rho_(W F)$ and, in parentheses, the observation
+share of the component attaining that gap.
+
+=== Worker Mobility
+
+#v(0.3em)
+
+#text(size: 8.9pt)[
+#strong[Mobility benchmark: package defaults (Panel A).]
+#include "generated/tables/akm_mobility_defaults.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
+  in seconds at package-default settings. The panel has 1M observations, one covariate,
+  and worker, firm, and year fixed effects. Move probability is the probability of a
+  worker changing firms between adjacent periods. A value $t (k/n)$ is the median among
+  $k$ successful calls when fewer than $n$ planned calls converge; a dash means that no
+  complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
+  limits from other errors.]
+]
+
+#v(0.35em)
+
+#text(size: 8.9pt)[
+#strong[Mobility benchmark: PyFixest LSMR configurations (Panel B).]
+#include "generated/tables/akm_mobility_lsmr.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] This panel uses the same package-default timing cells
+  as Panel A and isolates the three PyFixest LSMR preconditioners.]
+]
+
+#pagebreak()
+
+=== Sorting Among Movers
+
+#v(0.3em)
+
+#text(size: 8.9pt)[
+#strong[Sorting benchmark: package defaults (Panel A).]
+#include "generated/tables/akm_sorting_defaults.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
+  in seconds at package-default settings. The panel has 1M observations, one covariate,
+  and worker, firm, and year fixed effects. Sorting strength is the generator's $rho$
+  parameter. A value $t (k/n)$ is the median among $k$ successful calls when fewer than
+  $n$ planned calls converge; a dash means that no complete result is recorded.
+  `capped (0/n)` and `failed (0/n)` distinguish iteration limits from other errors.]
+]
+
+#v(0.35em)
+
+#text(size: 8.9pt)[
+#strong[Sorting benchmark: PyFixest LSMR configurations (Panel B).]
+#include "generated/tables/akm_sorting_lsmr.typ"
+  #v(0.25em)
+  #text(size: 8.2pt)[#emph[Note:] This panel uses the same package-default timing cells
+  as Panel A and isolates the three PyFixest LSMR preconditioners.]
+]
+
+#pagebreak()
 
 == More Benchmarks
 

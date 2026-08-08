@@ -1,13 +1,15 @@
 """Generate the paper's result figures from recorded benchmark output.
 
-Figures are drawn from the recorded CSV and JSON results, never by hand, so a
-figure cannot drift from the table it replaces. Run after `analyze-gap-runtime`:
-
-    pixi run make-figures
+The headline AKM figure reads the tracked canonical paper result file.  It can
+therefore be regenerated while compiling the paper, even when the local raw
+benchmark directory is absent.  The precision frontier still reads its raw
+benchmark file because it reports every tolerance setting rather than a paper
+table projection.
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 from pathlib import Path
@@ -30,6 +32,7 @@ ROOT = Path(__file__).absolute().parents[1]
 
 RESULTS = ROOT / "results" / "runs" / "latest"
 FIGURES = ROOT / "figures" / "results"
+PAPER_RESULTS = ROOT / "results" / "paper" / "benchmark_tables.json"
 
 # The left panel compares package defaults. The right panel holds package and
 # accuracy fixed, so it isolates the solver and preconditioner. These are the
@@ -55,12 +58,20 @@ CROSSOVER_LABEL = {"FEM.jl": "FEM.jl / GLFEM.jl — LSMR (diagonal)"}
 
 
 def _load_points() -> list[dict]:
-    path = RESULTS / "gap_runtime_analysis.json"
+    """Return the collected, tracked records for the headline figure."""
+    path = PAPER_RESULTS
     if not path.exists():
         raise SystemExit(
-            f"{path} is missing. Run `pixi run analyze-gap-runtime` first."
+            f"{path} is missing. Run `pixi run collect-paper-results` first."
         )
-    return json.loads(path.read_text())["points"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    records = document.get("headline_figure", {}).get("points", [])
+    if not records:
+        raise SystemExit(
+            "The canonical paper results have no headline-figure records. "
+            "Run `pixi run collect-paper-results` after the AKM benchmark."
+        )
+    return records
 
 
 def _load_crossover_results() -> dict[str, dict[str, dict[str, object]]]:
@@ -109,150 +120,177 @@ def _load_crossover_results() -> dict[str, dict[str, dict[str, object]]]:
     return results
 
 
+def _visible_point(row: dict) -> bool:
+    """Whether a record has a comparable runtime for the headline plot."""
+    return (
+        row.get("status") in {"complete", "partial", "incomplete", "capped"}
+        and isinstance(row.get("gap"), (int, float))
+        and isinstance(row.get("median_time"), (int, float))
+        and row["gap"] > 0
+        and row["median_time"] > 0
+    )
+
+
+def _family_x_limits(points: list[dict], family: str) -> tuple[float, float]:
+    """A padded, reversed log scale shared by both views of one AKM family."""
+    gaps = [
+        row["gap"]
+        for row in points
+        if row.get("family") == family and _visible_point(row)
+    ]
+    if not gaps:
+        raise ValueError(f"No plottable {family} headline-figure records")
+    return max(gaps) * 1.45, min(gaps) / 1.45
+
+
 def _runtime_panel(
     ax,
     points: list[dict],
     backends: tuple[str, ...],
     *,
+    family: str,
     view: str,
     title: str,
-    note: str,
+    x_limits: tuple[float, float],
+    show_legend: bool,
 ) -> None:
-    """Draw one runtime-gap panel and fit slopes on the controlled AKM designs."""
-
+    """Draw one observed-median panel without fitting a trend line."""
     for raw_name in backends:
-        display, colour, marker, line = METHODS[raw_name]
+        display, colour, marker, _line = METHODS[raw_name]
         usable = [
             row
             for row in points
-            if row["backend"] == raw_name
+            if row.get("family") == family
             and row.get("view") == view
-            and row.get("gap")
-            and row.get("median_time")
-            and row["gap"] > 0
-            and row["median_time"] > 0
-            and row["kind"] == "akm"
+            and row.get("backend") == raw_name
+            and _visible_point(row)
         ]
-        if not usable:
-            continue
+        complete = [row for row in usable if row["status"] == "complete"]
+        partial = [
+            row for row in usable if row["status"] in {"partial", "incomplete"}
+        ]
+        capped = [row for row in usable if row["status"] == "capped"]
 
-        gaps = np.array([row["gap"] for row in usable])
-        times = np.array([row["median_time"] for row in usable])
-        # A cell that did not converge in every trial is drawn hollow, so a
-        # censored point is visible rather than silently averaged in.
-        complete = np.array(
-            [row.get("n_success", 0) == row.get("n_trials", 0) for row in usable]
-        )
-
-        fit = None
-        if gaps.size >= 3:
-            fit = np.polyfit(np.log(gaps), np.log(times), 1)
-        ax.scatter(
-            gaps[complete],
-            times[complete],
-            s=34,
-            c=colour,
-            marker=marker,
-            label=display,
-            edgecolors="white",
-            linewidths=0.6,
-            zorder=3,
-        )
-        if (~complete).any():
+        if complete:
             ax.scatter(
-                gaps[~complete],
-                times[~complete],
-                s=40,
+                [row["gap"] for row in complete],
+                [row["median_time"] for row in complete],
+                s=34,
+                c=colour,
+                marker=marker,
+                label=display,
+                edgecolors="white",
+                linewidths=0.6,
+                zorder=3,
+            )
+        if partial:
+            ax.scatter(
+                [row["gap"] for row in partial],
+                [row["median_time"] for row in partial],
+                s=41,
                 facecolors="none",
                 edgecolors=colour,
                 marker=marker,
-                linewidths=1.1,
+                linewidths=1.15,
+                label=display if not complete else None,
                 zorder=3,
             )
-
-        if fit is not None:
-            slope, intercept = fit
-            grid = np.linspace(np.log(gaps.min()), np.log(gaps.max()), 64)
-            ax.plot(
-                np.exp(grid),
-                np.exp(intercept + slope * grid),
-                color=colour,
-                linewidth=1.4,
-                linestyle=line,
-                alpha=0.55,
-                zorder=2,
+        for row in capped:
+            ax.scatter(
+                row["gap"],
+                row["median_time"],
+                s=43,
+                facecolors="none",
+                edgecolors=colour,
+                marker=marker,
+                linewidths=1.15,
+                label=display if not complete and not partial else None,
+                zorder=3,
+            )
+            # The marker is the elapsed time when the iteration cap was hit;
+            # the upward arrow marks it as a lower bound, not a returned fit.
+            ax.annotate(
+                "",
+                xy=(row["gap"], row["median_time"] * 1.38),
+                xytext=(row["gap"], row["median_time"] * 1.03),
+                arrowprops={"arrowstyle": "-|>", "color": colour, "lw": 0.85},
+                zorder=3,
             )
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_title(title, loc="left", fontsize=9.2, fontweight="bold")
+    ax.set_xlim(*x_limits)
+    ax.set_title(title, loc="left", fontsize=8.8, fontweight="bold")
     ax.grid(True, which="major", linewidth=0.4, alpha=0.35)
     ax.grid(True, which="minor", linewidth=0.25, alpha=0.18)
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
-    legend = ax.legend(
-        frameon=False,
-        fontsize=6.2,
-        loc="upper right",
-        ncols=1,
-        title="configuration",
-        title_fontsize=6.3,
-        labelspacing=0.38,
-    )
-    legend._legend_box.align = "left"
-    ax.annotate(
-        note,
-        xy=(0.01, 0.03),
-        xycoords="axes fraction",
-        fontsize=6.4,
-        color="#555555",
-        linespacing=1.4,
-    )
+    if show_legend:
+        legend = ax.legend(
+            frameon=False,
+            fontsize=5.8,
+            loc="upper left",
+            ncols=1,
+            title="configuration",
+            title_fontsize=5.9,
+            labelspacing=0.28,
+        )
+        if legend is not None:
+            legend._legend_box.align = "left"
 
 
 def headline_figure(points: list[dict], out: Path) -> None:
-    """Runtime against the worker-firm gap, shown as performance and mechanism."""
+    """Show mobility and sorting separately under the two comparison views."""
 
     fig, axes = plt.subplots(
-        1,
         2,
-        figsize=(10.6, 4.35),
-        sharex=True,
+        2,
+        figsize=(10.6, 7.0),
         sharey=True,
-        gridspec_kw={"wspace": 0.12},
+        gridspec_kw={"wspace": 0.12, "hspace": 0.22},
     )
 
-    _runtime_panel(
-        axes[0],
-        points,
-        CROSS_PACKAGE_BACKENDS,
-        view="default",
-        title="(a) Cross-package defaults",
-        note=(
-            "solid: log-log fit to AKM medians\n"
-            "hollow: not all trials converged"
-        ),
+    panel_specs = (
+        ("mobility", "default", CROSS_PACKAGE_BACKENDS, "(a) Mobility: package defaults"),
+        ("mobility", "matched", MECHANISM_BACKENDS, "(b) Mobility: matched accuracy"),
+        ("sorting", "default", CROSS_PACKAGE_BACKENDS, "(c) Sorting: package defaults"),
+        ("sorting", "matched", MECHANISM_BACKENDS, "(d) Sorting: matched accuracy"),
     )
-    _runtime_panel(
-        axes[1],
-        points,
-        MECHANISM_BACKENDS,
-        view="matched",
-        title="(b) Same code path, matched accuracy",
-        note=(
-            "same samples at 1M; log-log fits\n"
-            "failed cells omitted; hollow: partial convergence"
-        ),
-    )
+    for ax, (family, view, backends, title) in zip(
+        axes.flat, panel_specs, strict=True
+    ):
+        _runtime_panel(
+            ax,
+            points,
+            backends,
+            family=family,
+            view=view,
+            title=title,
+            x_limits=_family_x_limits(points, family),
+            show_legend=family == "mobility",
+        )
 
-    # A smaller gap means weaker connectivity. Running the scale from large
-    # to small makes the figure read from the easy designs to the hard ones.
-    axes[0].invert_xaxis()
-    axes[0].set_ylabel("Median runtime (s)")
-    fig.subplots_adjust(left=0.08, right=0.99, top=0.91, bottom=0.20)
+    visible_times = [row["median_time"] for row in points if _visible_point(row)]
+    if not visible_times:
+        raise ValueError("No plottable headline-figure records")
+    lower = min(visible_times) / 1.75
+    upper = max(visible_times) * 2.15
+    for ax in axes.flat:
+        ax.set_ylim(lower, upper)
+    axes[0, 0].set_ylabel("Median runtime (s)")
+    axes[1, 0].set_ylabel("Median runtime (s)")
+    fig.subplots_adjust(left=0.085, right=0.99, top=0.94, bottom=0.12)
     fig.text(
         0.535,
-        0.05,
+        0.073,
+        "Hollow markers: fewer than all fits returned; arrows: capped lower-bound time",
+        ha="center",
+        fontsize=6.4,
+        color="#555555",
+    )
+    fig.text(
+        0.535,
+        0.035,
         "Worker-firm spectral gap  $1-\\rho_{WF}$  "
         "(weaker connectivity to the right)",
         ha="center",
@@ -261,6 +299,17 @@ def headline_figure(points: list[dict], out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, format="svg", bbox_inches="tight", metadata={"Date": None})
     plt.close(fig)
+
+
+def headline_main() -> None:
+    """Render only the canonical-data headline figure used by paper compilation."""
+    points = _load_points()
+    headline_target = FIGURES / "gap_runtime.svg"
+    headline_figure(points, headline_target)
+    print(
+        f"[figures] wrote {headline_target.relative_to(ROOT)} "
+        f"from {len(points)} canonical AKM records"
+    )
 
 
 def crossover_figure(
@@ -379,13 +428,7 @@ def crossover_figure(
 
 
 def main() -> None:
-    points = _load_points()
-    headline_target = FIGURES / "gap_runtime.svg"
-    headline_figure(points, headline_target)
-    print(
-        f"[figures] wrote {headline_target.relative_to(ROOT)} "
-        f"from {len(points)} points"
-    )
+    headline_main()
 
     tolerance_source = RESULTS / "tolerance_frontier.csv"
     if not tolerance_source.exists():
@@ -398,4 +441,16 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "target",
+        nargs="?",
+        choices=("all", "headline"),
+        default="all",
+        help="render all result figures (default) or only the canonical headline figure",
+    )
+    arguments = parser.parse_args()
+    if arguments.target == "headline":
+        headline_main()
+    else:
+        main()

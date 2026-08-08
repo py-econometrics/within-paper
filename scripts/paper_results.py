@@ -34,6 +34,20 @@ GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXPECTED_TRIALS = 3
 
+# The headline figure is a presentation of the two controlled AKM benchmark
+# families.  The tables remain the canonical source of the gap calculation;
+# this registry only fixes which package/runtime cells belong in each panel.
+HEADLINE_FIGURE_BACKENDS = {
+    "default": ("rust-map", "within", "fixest", "FEM.jl"),
+    "matched": ("rust-map", "within-off", "within-diagonal", "within-additive"),
+}
+HEADLINE_FIGURE_TABLES = {
+    ("mobility", "default"): "akm_mobility",
+    ("mobility", "matched"): "mechanism_mobility",
+    ("sorting", "default"): "akm_sorting",
+    ("sorting", "matched"): "mechanism_sorting",
+}
+
 
 def _read_json(path: Path) -> dict:
     with path.open(encoding="utf-8") as handle:
@@ -312,6 +326,60 @@ def _table_fragment(name: str, table: dict) -> str:
     return "\n".join(lines)
 
 
+def _akm_parameter_label(design: str) -> str:
+    """The controlled variable printed in the appendix AKM tables.
+
+    Import the generator configuration only when rendering.  Keeping the
+    standard-library collector importable without the benchmark environment is
+    useful for preflight checks and keeps the canonical table as the source of
+    the measured values.
+    """
+    from benchmarks.akm import SCENARIOS
+
+    config = SCENARIOS[design]
+    value = config["delta"] if design.startswith("akm_mobility_") else config["rho"]
+    return f"{value:g}"
+
+
+def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
+    """Project one wide AKM table into a compact appendix panel.
+
+    The source table deliberately remains unchanged: it is the one
+    machine-readable location for the recorded package-default cells.  The
+    two rendered panels merely group those cells by the comparison they answer.
+    """
+    source_name = _row_label(table, table["rows"][0])
+    mobility = source_name.startswith("akm_mobility_")
+    parameter = "Move probability" if mobility else "Sorting strength"
+    if panel == "defaults":
+        backends = ("rust-map", "fixest", "FEM.jl", "within")
+        columns = "(1.15fr, 0.95fr, 0.82fr, 0.70fr, 0.70fr, 0.95fr)"
+    elif panel == "lsmr":
+        backends = ("within-off", "within-diagonal", "within")
+        columns = "(1.20fr, 1.00fr, 0.90fr, 0.96fr, 1.00fr)"
+    else:
+        raise ValueError(f"Unknown AKM appendix panel {panel!r}")
+
+    rows = []
+    for source in table["rows"]:
+        design = _row_label(table, source)
+        rows.append(
+            [
+                _akm_parameter_label(design),
+                _table_cell(table, source, "Gap (share)"),
+                *(_table_cell(table, source, backend) for backend in backends),
+            ]
+        )
+    return {
+        "columns": columns,
+        "align": "(right, right, right, right, right, right)"
+        if panel == "defaults"
+        else "(right, right, right, right, right)",
+        "header": [parameter, "Gap (share)", *backends],
+        "rows": rows,
+    }
+
+
 def render(_: argparse.Namespace) -> None:
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
@@ -320,6 +388,14 @@ def render(_: argparse.Namespace) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     for name, table in tables.items():
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
+    for family in ("mobility", "sorting"):
+        table = tables[f"akm_{family}"]
+        for panel in ("defaults", "lsmr"):
+            target = destination / f"akm_{family}_{panel}.typ"
+            target.write_text(
+                _table_fragment(target.stem, _akm_appendix_panel(table, panel=panel)),
+                encoding="utf-8",
+            )
     values = ["// Generated result values; do not edit by hand."]
     ppml_table = tables["ppml"]
     ppml_rows = _rows_by_label(ppml_table)
@@ -545,6 +621,126 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
     if successful < total:
         return f"{rendered} ({successful}/{total})"
     return rendered
+
+
+def _headline_point(
+    candidates: list[dict[str, str]],
+    *,
+    design: str,
+    family: str,
+    view: str,
+    backend: str,
+    gap: float | None,
+) -> dict[str, object]:
+    """One structured record for the 2-by-2 headline figure.
+
+    The plot must distinguish a returned median from an iteration cap.  A
+    capped run has no successful fit, but its elapsed wall time is informative:
+    it is a lower bound on the time required to finish the requested solve.
+    Non-cap failures have no comparable timing and are left out of the plot.
+    """
+    if not candidates:
+        return {
+            "design": design,
+            "family": family,
+            "view": view,
+            "backend": backend,
+            "gap": gap,
+            "median_time": None,
+            "n_trials": 0,
+            "n_success": 0,
+            "n_capped": 0,
+            "status": "missing",
+        }
+
+    successful = [row for row in candidates if _row_success(row)]
+    capped = [row for row in candidates if _row_capped(row)]
+
+    def median_time(rows: list[dict[str, str]]) -> float | None:
+        values = []
+        for row in rows:
+            try:
+                value = float(_row_time(row))
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                values.append(value)
+        return float(median(values)) if values else None
+
+    complete = _cell_is_complete(candidates)
+    if successful:
+        status = "complete" if complete and len(successful) == len(candidates) else "partial"
+        elapsed = median_time(successful)
+    elif complete and len(capped) == len(candidates):
+        status = "capped"
+        elapsed = median_time(capped)
+    elif complete:
+        status = "failed"
+        elapsed = None
+    else:
+        status = "incomplete"
+        elapsed = median_time(successful)
+
+    return {
+        "design": design,
+        "family": family,
+        "view": view,
+        "backend": backend,
+        "gap": gap,
+        "median_time": elapsed,
+        "n_trials": len(candidates),
+        "n_success": len(successful),
+        "n_capped": len(capped),
+        "status": status,
+    }
+
+
+def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> int:
+    """Record the AKM headline-figure projection in the tracked result file.
+
+    An absent raw AKM file means that the current benchmark command did not run
+    this experiment.  In that case keep the last collected figure records;
+    treating absence as a new set of failures would erase a valid paper figure.
+    """
+    if not _latest("akm.csv").exists():
+        return 0
+
+    points: list[dict[str, object]] = []
+    for family in ("mobility", "sorting"):
+        for view in ("default", "matched"):
+            table_name = HEADLINE_FIGURE_TABLES[(family, view)]
+            table = document["tables"][table_name]
+            for source in table["rows"]:
+                design = _row_label(table, source)
+                gap = _numeric_cell(_table_cell(table, source, "Gap (share)"))
+                for backend in HEADLINE_FIGURE_BACKENDS[view]:
+                    candidates = [
+                        row
+                        for row in raw
+                        if _matches_runtime_target(
+                            row,
+                            design,
+                            backend,
+                            {"n_obs": 1_000_000, "n_fe": 3},
+                            f"akm.csv:{view}",
+                        )
+                    ]
+                    points.append(
+                        _headline_point(
+                            candidates,
+                            design=design,
+                            family=family,
+                            view=view,
+                            backend=backend,
+                            gap=gap,
+                        )
+                    )
+
+    figure = {"schema_version": 1, "points": points}
+    if document.get("headline_figure") == figure:
+        return 0
+    document["headline_figure"] = figure
+    return len(points)
 
 
 def _integer_field(row: dict[str, str], name: str) -> int | None:
@@ -1357,6 +1553,7 @@ def _synchronize_canonical_tables(
                     row[column] = rendered
                     changed += 1
     changed += _synchronize_hardness(document)
+    changed += _synchronize_headline_figure(document, raw)
     changed += _synchronize_agreement(document)
     changed += _synchronize_setup_cost(document)
     changed += _synchronize_accuracy_frontier(document)
