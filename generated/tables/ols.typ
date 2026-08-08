@@ -12,7 +12,7 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [0.857 (1.00)], [2.30s], [#miss], [#miss], [11.0s], [2.54s], [2.09s],
-  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [306.2s], [#miss], [#miss], [4.10s], [62.3s], [26.9s],
+  [simple (well-connected)], [0.857 (1.00)], [2.58s], [2.69s], [2.64s], [11.5s], [2.64s], [2.16s],
+  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [337.2s], [11.0s], [capped (0/3)], [4.45s], [63.5s], [27.8s],
   table.hline(stroke: 0.8pt + table-rule),
 )

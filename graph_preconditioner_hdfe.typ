@@ -45,7 +45,7 @@
   #text(size: 10.5pt)[Alexander Fischer#footnote[trivago] and Kristof Schröder#footnote[appliedAI Institute for Europe gGmbH]]
 
   #v(0.4em)
-  #text(size: 9.5pt)[Draft: August 7, 2026]
+  #text(size: 9.5pt)[Draft: August 8, 2026]
 ]
 
 #v(0.9em)
@@ -147,29 +147,28 @@ Krylov solver as we do - LSMR @fong2011 - but only with diagonal
 preconditioning, which ignores the off-diagonal co-occurrence structure entirely; our
 contribution is the preconditioner, not the use of LSMR for the outer iteration.]
 
-We benchmark MAP and diagonally preconditioned LSMR implementations in PyFixest, R's
-`fixest`, and Julia's `FixedEffectModels.jl` against our additive factor-pair
-preconditioner. @fig-gap-runtime plots their runtimes as worker-firm connectivity
-varies, with well-connected graphs on the left and weakly connected graphs on the right.
+@fig-gap-runtime plots full-regression runtime as worker-firm connectivity varies, with
+well-connected graphs on the left and weakly connected graphs on the right. The left
+panel compares package defaults; the right panel holds the PyFixest code path and
+accuracy target fixed while varying the preconditioner.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
   caption: [Median runtime against the worker-firm spectral gap, on log-log axes. Smaller
   gaps mean weaker connectivity, so the horizontal scale decreases from left to right.
   Both panels report simulated worker-firm-year panels with 1 million observations,
-  in which worker mobility and sorting vary. Within each design, every implementation
-  receives the same stored sample. Panel (a) compares package defaults. Panel (b) holds
-  the PyFixest code path and achieved accuracy fixed, isolating the comparison from
-  language and implementation differences across packages. Solid lines are log-log fits
-  to the median runtimes. Failed cells are omitted; hollow markers indicate that some
-  trials did not converge.]
+  in which worker mobility and sorting vary. Each point is the median of three fits on
+  one stored sample; packages apply their own default singleton treatment. Panel (a)
+  compares package defaults. Panel (b) fixes the PyFixest code path and achieved
+  accuracy, separating preconditioner effects from language and package differences.
+  Solid lines are log-log fits to the medians. Failed cells are omitted; hollow markers
+  indicate partial convergence.]
 ) <fig-gap-runtime>
 
 At high connectivity, all implementations finish quickly. As the spectral gap narrows,
-MAP and the unpreconditioned or diagonally preconditioned LSMR configurations slow down.
-Runtime with the additive factor-pair preconditioner remains low and even falls across
-the hardest designs. Their worker-firm subproblems are sparser, which lowers the cost of
-constructing the preconditioner.
+MAP and LSMR without factor-pair preconditioning slow down. Factor-pair LSMR remains
+fast and becomes faster in the least connected mobility designs because the worker-firm
+subproblems are cheaper to construct.
 
 The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
 absorption problem, and Section 3 introduces the AKM model as our running example.
@@ -835,19 +834,22 @@ and should become relatively more competitive as mobility falls.
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
 		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
-		successful calls when fewer than $n$ planned calls converge; `capped (0/n)` and
-		`failed (0/n)` distinguish iteration limits from other errors. The AKM-style panels
+		successful calls when fewer than $n$ planned calls converge; a dash means that no
+		complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
+		limits from other errors. The AKM-style panels
 		have 1M observations, one covariate, and worker, firm, and year fixed effects.
 		Lower rows reduce worker mobility within a 10-period panel. Gap is
 		$1-rho_(W F)$ for the worker-firm pair; parentheses give the observation share of
 		the component attaining the gap.]
 		]]
 
-The expanded table reports the three PyFixest LSMR preconditioners under their package
-defaults. The worker-firm gap falls from $0.41$ to $4.82 times 10^(-5)$ as mobility
-declines, although the sequence is not strictly monotone because different connected
-components attain the reported gap. A new run is required before the wider table can
-support comparisons among the six configurations.
+The worker-firm gap falls from $0.41$ to $4.82 times 10^(-5)$ as mobility declines,
+although different connected components attain the reported gap. In the first two
+designs, all six configurations finish in at most 3.60 seconds. From the third design
+onward, PyFixest MAP slows sharply or reaches its cap, and LSMR without preconditioning
+reaches its cap. Factor-pair LSMR falls from 0.543 seconds in the first design to 0.365
+seconds in the last and is the fastest PyFixest LSMR configuration in the four
+lowest-mobility designs.
 
 #v(0.4em)
 
@@ -867,8 +869,9 @@ factor-pair solves use the worker-firm graph directly.
 		#v(0.25em)
 		#text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
 		in seconds at package-default settings. A value $t (k/n)$ is the median among $k$
-		successful calls when fewer than $n$ planned calls converge; `capped (0/n)` and
-		`failed (0/n)` distinguish iteration limits from other errors. The AKM-style panels
+		successful calls when fewer than $n$ planned calls converge; a dash means that no
+		complete result is recorded. `capped (0/n)` and `failed (0/n)` distinguish iteration
+		limits from other errors. The AKM-style panels
 		have 1M observations, one covariate, and worker, firm, and year fixed effects.
 		Lower rows raise sorting among movers. Gap is $1-rho_(W F)$ for the worker-firm
 		pair; parentheses give the observation share of the component attaining the gap.]
@@ -876,8 +879,10 @@ factor-pair solves use the worker-firm graph directly.
 
 #block(breakable: false)[The gap ranges from $0.0129$ to $0.00219$ across these designs.
 Different components attain the reported gap in different rows, so its ordering is not
-monotone. The expanded package-default table will show how each LSMR preconditioner
-behaves on the same stored panels.]
+monotone. MAP slows from 5.63 to 28.6 seconds as sorting increases. LSMR without
+preconditioning reaches its default cap in every row. Diagonal LSMR takes 0.704 to 1.15
+seconds, whereas factor-pair LSMR takes 0.441 to 0.501 seconds and is the fastest method
+in every sorting design.]
 
 === When Preconditioner Setup Dominates
 
@@ -894,16 +899,19 @@ firm, and year fixed effects.
   times in seconds at package-default settings. An unreported initial timing selects 20
   measured calls below 1 second, 7 from 1 to 10 seconds, and 3 otherwise. A value $t (k/n)$
   is the median among $k$ successful calls when fewer than $n$ planned calls converge;
-  `capped (0/n)` and `failed (0/n)` identify unsuccessful cells. Both designs have 10M
+  a dash means that no complete result is recorded. `capped (0/n)` and `failed (0/n)`
+  identify unsuccessful cells. Both designs have 10M
   observations, one covariate, and worker, firm, and year fixed effects. Gap is
   $1-rho_(W F)$ for the worker-firm pair, measured on the 1M-observation version of the
   same DGP family; the 10M runs use the same simple/difficult graph construction.]
 ]]
 
-The dense and near-nested designs separate a setting where preconditioner construction
-may dominate from one where it may be recovered during the solve. The standalone setup
-diagnostic remains separate from these complete-regression timings. The expanded
-package-default run is required before ranking the LSMR configurations in either design.
+On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
+factor-pair LSMR takes 11.5 seconds because its setup cost is not recovered in one fit.
+On the near-nested design, factor-pair LSMR takes 4.45 seconds, compared with 11.0
+seconds without preconditioning, 27.8 seconds for FEM.jl, 63.5 seconds for `fixest`, and
+337.2 seconds for PyFixest MAP. PyFixest diagonal LSMR reaches its default cap on that
+design. The standalone setup diagnostic separates construction from the subsequent solve.
 
 === Iterations After Setup
 
@@ -1232,15 +1240,15 @@ reference set for comparing the same software backends outside the AKM generator
   default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
   singleton pruning used by the hardness diagnostic, and parentheses give the observation
   share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
-  successful calls; `capped (0/3)` and `failed (0/3)` distinguish iteration limits from
-  other errors. `synthetic-zigzag` is omitted because the default MAP backends reach their
+  successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
+  `failed (0/3)` distinguish iteration limits from other errors. `synthetic-zigzag` is
+  omitted because the default MAP backends reach their
   10,000-iteration demeaning caps.]
   ]
 
 The synthetic collection covers complete, uniform, assortative, and path-like matching
-patterns. The package-default table now retains all three PyFixest LSMR choices, so a
-fresh run can compare their behavior without mixing tolerances or iteration limits from
-the matched-accuracy experiment.
+patterns. The no-preconditioner and diagonal LSMR results will be added once the
+package-default Correia run is complete; the unfilled cells are not used for rankings.
 
 #pagebreak()
 
@@ -1265,15 +1273,17 @@ controlled DGPs only approximate.
   default singleton treatment; the gap is $1-rho$ for the `id1`-`id2` pair after the
   singleton pruning used by the hardness diagnostic, and parentheses give the observation
   share of the component attaining the gap. A value $t (k/3)$ is the median among $k$
-  successful calls; `capped (0/3)` and `failed (0/3)` distinguish iteration limits from
-  other errors. A small gap in a small component, as for `directors`, need not make the
+  successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
+  `failed (0/3)` distinguish iteration limits from other errors. A small gap in a small
+  component, as for `directors`, need not make the
   full sample difficult for MAP.]
   ]
 
 The real-data collection includes irregular components that are not captured by one
 pairwise statistic. The `directors` component attaining the smallest reported gap covers
-30 percent of the observations. The expanded table leaves solver rankings to the new
-package-default measurements; the gap remains a diagnostic rather than a selection rule.
+30 percent of the observations. The no-preconditioner and diagonal LSMR columns await
+the package-default Correia run; the gap remains a diagnostic rather than a selection
+rule.
 
 #pagebreak()
 

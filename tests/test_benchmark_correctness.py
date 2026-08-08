@@ -588,7 +588,6 @@ class PaperResultTests(unittest.TestCase):
             self.assertTrue(
                 all(len(row) == len(table["header"]) for row in table["rows"])
             )
-            self.assertEqual(table["rows"][0][3:5], ["#miss", "#miss"])
 
     def test_runtime_collector_fills_lsmr_ablation_columns_in_all_five_tables(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

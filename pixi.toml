@@ -6,7 +6,7 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
-compile = "typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
+compile = "python -m scripts.paper_results render && typst compile graph_preconditioner_hdfe.typ graph_preconditioner_hdfe.pdf"
 check-external-runtimes ={ cmd = "python -m scripts.paper_results check-external-runtimes", description = "Check installed R and Julia versions, packages, and thread counts" }
 setup-julia-env = { cmd = "python -m scripts.paper_results setup-julia-env", description = "Install Julia packages from the tracked project" }
 fetch-correia = { cmd = "python -m scripts.paper_results fetch-correia", description = "Download the Correia HDFE CSVs and verify their checksums" }
