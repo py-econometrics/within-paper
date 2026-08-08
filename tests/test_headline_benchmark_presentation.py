@@ -169,7 +169,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                         )
         return points
 
-    def test_layout_has_four_family_view_panels_and_reversed_row_scales(self) -> None:
+    def test_layout_has_four_panels_and_one_reversed_x_scale(self) -> None:
         points = self._points()
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "headline.svg"
@@ -188,13 +188,10 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 ("sorting", "matched"),
             ],
         )
-        mobility_limits = [call.kwargs["x_limits"] for call in panel.call_args_list[:2]]
-        sorting_limits = [call.kwargs["x_limits"] for call in panel.call_args_list[2:]]
+        x_limits = [call.kwargs["x_limits"] for call in panel.call_args_list]
         legend_panels = [call.kwargs["show_legend"] for call in panel.call_args_list]
-        self.assertEqual(mobility_limits[0], mobility_limits[1])
-        self.assertEqual(sorting_limits[0], sorting_limits[1])
-        self.assertGreater(mobility_limits[0][0], mobility_limits[0][1])
-        self.assertGreater(sorting_limits[0][0], sorting_limits[0][1])
+        self.assertTrue(all(limits == x_limits[0] for limits in x_limits[1:]))
+        self.assertGreater(x_limits[0][0], x_limits[0][1])
         self.assertEqual(legend_panels, [True, True, False, False])
 
     def test_runtime_panel_connects_returned_points_without_fitting(self) -> None:

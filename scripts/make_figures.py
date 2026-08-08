@@ -131,15 +131,15 @@ def _visible_point(row: dict) -> bool:
     )
 
 
-def _family_x_limits(points: list[dict], family: str) -> tuple[float, float]:
-    """A padded, reversed log scale shared by both views of one AKM family."""
+def _headline_x_limits(points: list[dict]) -> tuple[float, float]:
+    """One padded, reversed log scale shared by all headline panels."""
     gaps = [
         row["gap"]
         for row in points
-        if row.get("family") == family and _visible_point(row)
+        if _visible_point(row)
     ]
     if not gaps:
-        raise ValueError(f"No plottable {family} headline-figure records")
+        raise ValueError("No plottable headline-figure records")
     return max(gaps) * 1.45, min(gaps) / 1.45
 
 
@@ -260,6 +260,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
         2,
         2,
         figsize=(10.6, 7.0),
+        sharex=True,
         sharey=True,
         gridspec_kw={"wspace": 0.12, "hspace": 0.22},
     )
@@ -270,6 +271,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
         ("sorting", "default", CROSS_PACKAGE_BACKENDS, "(c) Sorting: package defaults"),
         ("sorting", "matched", MECHANISM_BACKENDS, "(d) Sorting: matched accuracy"),
     )
+    x_limits = _headline_x_limits(points)
     for ax, (family, view, backends, title) in zip(
         axes.flat, panel_specs, strict=True
     ):
@@ -280,7 +282,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
             family=family,
             view=view,
             title=title,
-            x_limits=_family_x_limits(points, family),
+            x_limits=x_limits,
             show_legend=family == "mobility",
         )
 

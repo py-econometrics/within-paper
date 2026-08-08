@@ -157,12 +157,13 @@ achieved accuracy while varying the demeaning solver and the LSMR preconditioner
   image(result-img("gap_runtime.svg"), width: 100%),
   caption: [Median full-regression runtime against the worker-firm spectral gap, on
   log-log axes. Smaller gaps mean weaker connectivity, so the horizontal scale decreases
-  from left to right. The top row varies worker mobility and the bottom row varies sorting
-  among movers in simulated worker-firm-year panels with 1 million observations. The left
-  column uses package defaults; the right column fixes the PyFixest code path and uses
-  tolerances selected for comparable achieved accuracy. Packages apply their own default
-  singleton treatment in the left column. Filled markers report the median from a complete
-  three-fit cell; hollow markers report a returned median from fewer than three fits.
+  from left to right. All four panels use the same horizontal scale. The top row varies
+  worker mobility and the bottom row varies sorting among movers in simulated
+  worker-firm-year panels with 1 million observations. The left column uses package
+  defaults; the right column fixes the PyFixest code path and uses tolerances selected for
+  comparable achieved accuracy. Packages apply their own default singleton treatment in
+  the left column. Filled markers report the median from a complete three-fit cell; hollow
+  markers report a returned median from fewer than three fits.
   Lines join returned medians for each configuration in spectral-gap order; they are not
   fitted trends. Arrows show the median elapsed time of capped fits as a lower bound and
   are not connected. Non-cap failures are omitted.]
