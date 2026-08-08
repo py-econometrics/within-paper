@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from benchmarks.akm import SCENARIOS, make_akm_data
-from benchmarks.data import make_base_data, solver_data
+from benchmarks.data import BASE_DESIGNS, make_base_data, solver_data
 from benchmarks.runtime import failure_fields
 from within import LsmrOptions, PreconditionerConfig, Solver, solve_batch
 
@@ -122,7 +122,7 @@ def _regression_right_hand_sides(
     design: str,
 ) -> tuple[np.ndarray, list[np.ndarray]]:
     """Return one fixed-effect design and ten two-column regression problems."""
-    seed = 42 if design == "simple" else 43
+    seed = dict(BASE_DESIGNS)[design]
     frame = make_base_data(N_OBS, design, seed)
     categories, base_rhs = solver_data(frame)
     rng = np.random.default_rng(20_260_805)

@@ -14,7 +14,15 @@ from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import svds
 
 from benchmarks.akm import SCENARIOS, make_akm_data
-from benchmarks.data import BASE_DESIGNS, CORREIA_NAMES, drop_singletons, make_base_data
+from benchmarks.data import (
+    BASE_DESIGNS,
+    CORREIA_NAMES,
+    FE_COLUMNS,
+    drop_singletons,
+    make_base_data,
+)
+from benchmarks.memory import CELLS as MEMORY_CELLS
+from benchmarks.ols.main import N_OBS as BASE_N_OBS
 
 ROOT = Path(__file__).absolute().parents[1]
 CORREIA = ROOT / "benchmarks" / "data" / "correia_data"
@@ -98,11 +106,16 @@ def _datasets():
     for name in CORREIA_NAMES:
         yield name, "correia", pd.read_csv(CORREIA / f"{name}.csv"), ("id1", "id2")
     for name in SCENARIOS:
-        yield name, "akm", make_akm_data(name), ("indiv_id", "firm_id", "year")
+        yield name, "akm", make_akm_data(name), FE_COLUMNS
+    # The gap is a property of the exact sample each experiment times, so the
+    # observation counts come from the runners themselves: BASE_N_OBS is the
+    # headline OLS size and MEMORY_CELLS is the memory benchmark's sizes. Keeping
+    # one authority for each n stops the reported gap from drifting to a design
+    # that was never timed.
     for name, seed in BASE_DESIGNS:
-        yield name, "base", make_base_data(10_000_000, name, seed), ("indiv_id", "firm_id", "year")
-        for label, n_obs in (("100k", 100_000), ("1m", 1_000_000)):
-            yield f"memory_{name}_{label}", "memory", make_base_data(n_obs, name, seed), ("indiv_id", "firm_id", "year")
+        yield name, "base", make_base_data(BASE_N_OBS, name, seed), FE_COLUMNS
+        for label, n_obs in MEMORY_CELLS:
+            yield f"memory_{name}_{label}", "memory", make_base_data(n_obs, name, seed), FE_COLUMNS
 
 
 def main() -> None:
