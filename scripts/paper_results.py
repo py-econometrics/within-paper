@@ -955,6 +955,28 @@ def _backend_columns(table: dict) -> tuple[tuple[int, str], ...]:
     )
 
 
+def _ensure_akm_runtime_rows(document: dict) -> int:
+    """Add rows for registered AKM designs before collecting their measurements."""
+    from benchmarks.akm import SCENARIOS
+
+    changed = 0
+    for family in ("mobility", "sorting"):
+        prefix = f"akm_{family}_"
+        expected = [name for name in SCENARIOS if name.startswith(prefix)]
+        for table_name in (f"akm_{family}", f"mechanism_{family}"):
+            table = document["tables"][table_name]
+            present = {_row_label(table, row) for row in table["rows"]}
+            for design in expected:
+                if design in present:
+                    continue
+                table["rows"].append(
+                    [f"`{design}`", *("#miss" for _ in table["header"][1:])]
+                )
+                present.add(design)
+                changed += 1
+    return changed
+
+
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
     if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
@@ -1502,7 +1524,7 @@ def _synchronize_canonical_tables(
     _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
-    changed = 0
+    changed = _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
         "mechanism_mobility", "mechanism_sorting",
