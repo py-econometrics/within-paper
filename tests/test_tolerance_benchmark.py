@@ -12,7 +12,12 @@ from benchmarks.tolerance.measure import TOLERANCES, coefficient_error_se, resid
 from scripts import make_figures
 from scripts.benchmark_methods import METHODS
 from scripts.make_figures import CROSS_PACKAGE_BACKENDS, CROSSOVER_FILES, MECHANISM_BACKENDS
-from scripts.plot_tolerance import METHOD_ORDER, aggregate_results, tolerance_figure
+from scripts.plot_tolerance import (
+    METHOD_ORDER,
+    _axis_limits,
+    aggregate_results,
+    tolerance_figure,
+)
 
 
 class ToleranceMetricTests(unittest.TestCase):
@@ -61,6 +66,12 @@ class TolerancePlotTests(unittest.TestCase):
         points = aggregate_results(self._raw_results())
         self.assertEqual(len(points), 3 * 2 * len(TOLERANCES))
         self.assertTrue((points["n_success"] == 3).all())
+
+    def test_error_axes_put_greater_precision_on_the_right(self) -> None:
+        points = aggregate_results(self._raw_results())
+        for metric in ("coefficient_error_se", "residual_error"):
+            limits, _floor = _axis_limits(points, metric)
+            self.assertGreater(limits[0], limits[1])
 
     def test_figure_writes_svg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

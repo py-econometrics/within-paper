@@ -24,8 +24,14 @@ METHOD_ORDER = (
 )
 
 METRICS = (
-    ("coefficient_error_se", "Slope error (reference SE)"),
-    ("residual_error", r"Residual error (relative $\ell_2$ norm)"),
+    (
+        "coefficient_error_se",
+        r"Slope error (reference SE; greater precision $\rightarrow$)",
+    ),
+    (
+        "residual_error",
+        r"Residual error (relative $\ell_2$ norm; greater precision $\rightarrow$)",
+    ),
 )
 
 
@@ -112,7 +118,9 @@ def _axis_limits(
     floor = max(float(values.min()) / 5, np.finfo(np.float64).eps)
     lower = min(floor, float(values.min()) / 2)
     upper = float(values.max()) * 2
-    return (lower, upper), floor
+    # The figure is organized by achieved precision, so smaller errors appear to
+    # the right even though the plotted quantity is an error measure.
+    return (upper, lower), floor
 
 
 def _runtime_limits(points: pd.DataFrame) -> tuple[float, float]:
@@ -307,7 +315,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
         0.025,
         "Each point is the median of repeated fits on one fixed sample. "
         f"Lines vary the method's native tolerance; all methods use {cap_text}. "
-        "Smaller errors indicate greater precision.",
+        "Error decreases and precision increases from left to right.",
         ha="center",
         fontsize=7.3,
         color="#444444",
