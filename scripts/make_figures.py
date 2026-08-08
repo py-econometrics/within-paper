@@ -10,7 +10,6 @@ table projection.
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 from pathlib import Path
 
@@ -22,7 +21,6 @@ matplotlib.use("Agg")
 # regeneration rewrites the whole tracked file.
 matplotlib.rcParams["svg.hashsalt"] = "within-paper-figures"
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 from scripts.benchmark_methods import METHODS
@@ -47,16 +45,6 @@ MECHANISM_BACKENDS = (
     "within-additive",
 )
 
-CROSSOVER_FILES = {
-    "OLS": ("ols.csv", {"rust-map": "rust-map", "fixest": "fixest", "FEM.jl": "FEM.jl", "within": "within"}),
-    "PPML": ("ppml.csv", {"rust-map": "rust-map", "fixest": "fixest", "FEM.jl": "GLFEM.jl", "within": "within"}),
-}
-
-# The crossover figure draws one series for both Julia packages, so its label
-# names both. Every other series takes the registry's inline label.
-CROSSOVER_LABEL = {"FEM.jl": "FEM.jl / GLFEM.jl — LSMR (diagonal)"}
-
-
 def _load_points() -> list[dict]:
     """Return the collected, tracked records for the headline figure."""
     path = PAPER_RESULTS
@@ -72,52 +60,6 @@ def _load_points() -> list[dict]:
             "Run `pixi run collect-paper-results` after the AKM benchmark."
         )
     return records
-
-
-def _load_crossover_results() -> dict[str, dict[str, dict[str, object]]]:
-    """Median runtime and convergence counts for the simple/difficult DGPs."""
-
-    target_n = {"OLS": 10_000_000, "PPML": 1_000_000}
-    results: dict[str, dict[str, dict[str, object]]] = {}
-    for model, (filename, backends) in CROSSOVER_FILES.items():
-        path = RESULTS / filename
-        if not path.exists():
-            raise SystemExit(f"{path} is missing")
-        with path.open(newline="") as stream:
-            rows = list(csv.DictReader(stream))
-        model_results: dict[str, dict[str, object]] = {}
-        for backend, raw_backend in backends.items():
-            grouped = {
-                "simple": {"times": [], "n_trials": 0, "n_success": 0},
-                "difficult": {"times": [], "n_trials": 0, "n_success": 0},
-            }
-            for row in rows:
-                design = row["design"]
-                if design not in grouped:
-                    continue
-                if (
-                    row["backend"] != raw_backend
-                    or int(row["n_obs"]) != target_n[model]
-                    or int(row["n_fe"]) != 3
-                ):
-                    continue
-                record = grouped[design]
-                record["n_trials"] += 1
-                success = row["converged"].lower() in {"true", "1"}
-                runtime = row["runtime_s"]
-                if success and runtime:
-                    record["times"].append(float(runtime))
-                    record["n_success"] += 1
-            backend_results: dict[str, object] = {}
-            for design, record in grouped.items():
-                times = record.pop("times")
-                backend_results[design] = {
-                    "median_time": float(np.median(times)) if times else None,
-                    **record,
-                }
-            model_results[backend] = backend_results
-        results[model] = model_results
-    return results
 
 
 def _visible_point(row: dict) -> bool:
@@ -327,121 +269,6 @@ def headline_main() -> None:
         f"[figures] wrote {headline_target.relative_to(ROOT)} "
         f"from {len(points)} canonical AKM records"
     )
-
-
-def crossover_figure(
-    results: dict[str, dict[str, dict[str, object]]], out: Path
-) -> None:
-    """Show the reversal between well-connected and near-nested designs."""
-
-    fig, axes = plt.subplots(
-        1,
-        2,
-        figsize=(8.8, 3.9),
-        sharey=True,
-        gridspec_kw={"wspace": 0.10},
-    )
-    offsets = {
-        "rust-map": -0.075,
-        "fixest": -0.025,
-        "FEM.jl": 0.025,
-        "within": 0.075,
-    }
-    designs = ("simple", "difficult")
-    x_base = np.array([0.0, 1.0])
-    legend_handles = []
-    legend_labels = []
-
-    all_times = [
-        cell["median_time"]
-        for model_results in results.values()
-        for backend_results in model_results.values()
-        for cell in backend_results.values()
-        if cell["median_time"] is not None
-    ]
-    y_min = min(all_times) * 0.65
-    y_max = max(all_times) * 1.65
-
-    titles = {
-        "OLS": "(a) OLS, 10M observations",
-        "PPML": "(b) PPML, 1M observations",
-    }
-    for ax, model in zip(axes, ("OLS", "PPML"), strict=True):
-        for backend, backend_results in results[model].items():
-            label, colour, marker, line = METHODS[backend]
-            display = CROSSOVER_LABEL.get(backend) or label
-            x = x_base + offsets[backend]
-            y = np.array(
-                [
-                    backend_results[design]["median_time"]
-                    if backend_results[design]["median_time"] is not None
-                    else np.nan
-                    for design in designs
-                ],
-                dtype=float,
-            )
-            (handle,) = ax.plot(
-                x,
-                y,
-                color=colour,
-                marker=marker,
-                markersize=5.2,
-                linewidth=1.35,
-                linestyle=line,
-                alpha=0.82,
-                markeredgecolor="white",
-                markeredgewidth=0.55,
-                zorder=3,
-            )
-            if model == "OLS":
-                legend_handles.append(handle)
-                legend_labels.append(display)
-            for index, design in enumerate(designs):
-                cell = backend_results[design]
-                if cell["median_time"] is None:
-                    ax.text(
-                        x[index],
-                        0.94,
-                        "failed",
-                        color=colour,
-                        fontsize=7,
-                        rotation=90,
-                        ha="center",
-                        va="top",
-                        transform=ax.get_xaxis_transform(),
-                    )
-
-        ax.set_title(titles[model], loc="left", fontsize=9.4, fontweight="bold")
-        ax.set_xticks(x_base, ["Well-connected", "Near-nested"])
-        ax.set_xlim(-0.18, 1.18)
-        ax.set_yscale("log")
-        ax.set_ylim(y_min, y_max)
-        ax.grid(True, axis="y", which="major", linewidth=0.4, alpha=0.35)
-        ax.grid(True, axis="y", which="minor", linewidth=0.25, alpha=0.16)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        ax.annotate(
-            "median of three full regression calls",
-            xy=(0.02, 0.03),
-            xycoords="axes fraction",
-            fontsize=6.6,
-            color="#555555",
-        )
-
-    axes[0].set_ylabel("Median runtime (s)")
-    fig.legend(
-        legend_handles,
-        legend_labels,
-        loc="upper center",
-        bbox_to_anchor=(0.53, 1.01),
-        ncols=2,
-        frameon=False,
-        fontsize=7.1,
-    )
-    fig.subplots_adjust(left=0.09, right=0.99, top=0.76, bottom=0.15)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, format="svg", bbox_inches="tight", metadata={"Date": None})
-    plt.close(fig)
 
 
 def main() -> None:

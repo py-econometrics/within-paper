@@ -14,15 +14,12 @@ Pixi is the public interface. Benchmark scripts do not accept user options.
 ```sh
 pixi run bench-main
 pixi run bench-fepois
-pixi run bench-akm-sweep
+pixi run bench-akm
 pixi run bench-correia
 pixi run agreement
 pixi run bench-memory
-pixi run within-setup-cost
 pixi run within-preconditioners
-pixi run bench-scaling
-pixi run ppml-inner-outer
-pixi run bench-accuracy-frontier
+pixi run bench-amortization
 pixi run bench-tolerance
 pixi run compute-hardness
 ```
@@ -36,16 +33,16 @@ number of observations retained; failed rows record the convergence status and e
 Shared controls, such as the 100-step outer IRLS limit in the PPML benchmark, are stated
 explicitly rather than treated as package defaults.
 
-`bench-main`, `bench-akm-sweep`, and `bench-correia` each run the same six
+`bench-main`, `bench-akm`, and `bench-correia` each run the same six
 package-default OLS configurations: PyFixest MAP; PyFixest LSMR with no, diagonal, and
 factor-pair preconditioning; R `fixest`; and `FixedEffectModels.jl`. Every PyFixest
 configuration runs in an isolated Python worker. The LSMR configurations in these three
 commands retain their package defaults. The matched-accuracy AKM rows are separate
 controls with explicit tolerances and iteration caps.
 
-The OLS agreement check remains a four-backend coefficient diagnostic. PPML, memory,
-setup, scaling, reuse, and figures keep their narrower method sets; the PPML table uses
-only PyFixest's factor-pair preconditioner reuse policy.
+The OLS agreement check uses four backends. PPML, memory, iteration, setup-cost, and
+preconditioner-reuse benchmarks use the methods needed for their individual comparisons.
+The PPML table reports PyFixest's factor-pair preconditioner reuse policy.
 
 Every measured estimator attempt produces a result row. Iteration limits are marked
 `capped`; other estimator errors are marked `converged=false` with their messages kept.
@@ -55,10 +52,10 @@ still stops the command normally.
 Raw results live under `results/runs/latest/`. Each experiment writes its complete CSV
 once; medians and table labels belong to `scripts/paper_results.py`.
 
-`within-setup-cost` retains the 10M simple and difficult endpoint cases and adds the six
-1M AKM mobility designs. It times the additive factor-pair solver's construction and
-batch solve separately, at the matched-accuracy LSMR settings used in the mechanism
-benchmark.
+`bench-amortization` writes two result files. The setup-cost experiment times construction
+and solution separately for two and three fixed effects across the six 1M AKM mobility
+designs. The reuse experiment times ten regressions on the 1M simple and difficult
+designs with diagonal, rebuilt factor-pair, and cached factor-pair preconditioners.
 
 The source tree is organized by model or experiment:
 

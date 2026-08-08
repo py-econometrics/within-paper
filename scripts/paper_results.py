@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Manage reproducible benchmark results for the paper.
 
-This script uses only the Python standard library, so runtime checks can run before the
-Pixi environment is available. Paper table data is stored in
-``results/paper/benchmark_tables.json``; ``render`` writes the Typst includes, and
-``collect`` folds the raw benchmark output into them.
+Runtime preflight has no third-party imports, so it can run before the Pixi environment
+is available. Rendering loads the AKM configuration only when it needs parameter labels.
+Paper table data is stored in ``results/paper/benchmark_tables.json``; ``render`` writes
+the Typst includes, and ``collect`` folds the raw benchmark output into them.
 """
 
 from __future__ import annotations
@@ -41,12 +41,17 @@ HEADLINE_FIGURE_BACKENDS = {
     "default": ("rust-map", "within", "fixest", "FEM.jl"),
     "matched": ("rust-map", "within-off", "within-diagonal", "within-additive"),
 }
-HEADLINE_FIGURE_TABLES = {
-    ("mobility", "default"): "akm_mobility",
-    ("mobility", "matched"): "mechanism_mobility",
-    ("sorting", "default"): "akm_sorting",
-    ("sorting", "matched"): "mechanism_sorting",
-}
+RENDERED_TABLES = (
+    "agreement",
+    "akm_setup_cost",
+    "correia_real",
+    "correia_synthetic",
+    "iterations",
+    "memory",
+    "ols",
+    "ppml",
+    "regression_reuse",
+)
 
 
 def _read_json(path: Path) -> dict:
@@ -278,11 +283,7 @@ def _method_header(key: str) -> str:
 
 
 AKM_PARAMETER_TABLES = {
-    "akm_mobility": ("Move probability $delta$", "akm_mobility_"),
-    "mechanism_mobility": ("Move probability $delta$", "akm_mobility_"),
     "akm_setup_cost": ("Move probability $delta$", "akm_mobility_"),
-    "akm_sorting": ("Sorting strength $rho$", "akm_sorting_"),
-    "mechanism_sorting": ("Sorting strength $rho$", "akm_sorting_"),
 }
 
 
@@ -408,10 +409,17 @@ def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
 def render(_: argparse.Namespace) -> None:
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
-    prose = document.get("prose", {})
     destination = GENERATED_DIR
     destination.mkdir(parents=True, exist_ok=True)
-    for name, table in tables.items():
+    targets = {destination / f"{name}.typ" for name in RENDERED_TABLES}
+    for family in ("mobility", "sorting"):
+        for panel in ("defaults", "lsmr"):
+            targets.add(destination / f"akm_{family}_{panel}.typ")
+    for path in destination.glob("*.typ"):
+        if path not in targets:
+            path.unlink()
+    for name in RENDERED_TABLES:
+        table = tables[name]
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     for family in ("mobility", "sorting"):
         table = tables[f"akm_{family}"]
@@ -422,15 +430,6 @@ def render(_: argparse.Namespace) -> None:
                 encoding="utf-8",
             )
     values = ["// Generated result values; do not edit by hand."]
-    ppml_table = tables["ppml"]
-    ppml_rows = _rows_by_label(ppml_table)
-    ppml_simple = ppml_rows["simple (well-connected)"]
-    ppml_difficult = ppml_rows["difficult (near-nested)"]
-    ols_table = tables["ols"]
-    ols_difficult = _rows_by_label(ols_table)["difficult (near-nested)"]
-    correia_real_table = tables["correia_real"]
-    correia_real_rows = _rows_by_label(correia_real_table)
-    enron = correia_real_rows["enron"]
     agreement_table = tables["agreement"]
     memory_table = tables["memory"]
 
@@ -443,110 +442,25 @@ def render(_: argparse.Namespace) -> None:
                 values.append(within_memory - map_memory)
         return values
 
-    def gap_without_share(value: str) -> str:
-        return re.sub(r"\s+\([^)]*\)\s*$", "", value)
-
-    def seconds_range(row: list[str], backends: tuple[str, ...]) -> str:
-        candidates = [
-            value for backend in backends
-            if (value := _numeric_cell(_table_cell(ppml_table, row, backend))) is not None
-        ]
-        if not candidates:
-            return "--"
-        lower = _format_seconds(min(candidates)).removesuffix("s")
-        upper = _format_seconds(max(candidates))
-        return f"{lower}--{upper}"
-
     memory_100k_rows = _rows_after_marker(memory_table, "#memory-100k")
     memory_1m_rows = _rows_after_marker(memory_table, "#memory-1m")
     memory_100k = memory_overheads(memory_100k_rows)
     memory_1m = memory_overheads(memory_1m_rows)
-    memory_100k_by_label = {
-        _row_label(memory_table, row): row for row in memory_100k_rows
-    }
-    directors_share = _component_share(
-        _table_cell(correia_real_table, correia_real_rows["directors"], "Gap (share)")
-    )
     agreement_simple_rows = _rows_after_marker(agreement_table, "#agreement-simple")
     agreement_difficult_rows = _rows_after_marker(agreement_table, "#agreement-difficult")
     prose_values = {
-        "result_ols_difficult_gap": gap_without_share(
-            _table_cell(ols_table, ols_difficult, "Gap (share)")
-        ),
-        "result_ols_difficult_rust_map": _table_cell(ols_table, ols_difficult, "rust-map"),
-        "result_ols_difficult_fixest": _table_cell(ols_table, ols_difficult, "fixest"),
-        "result_ols_difficult_fem": _table_cell(ols_table, ols_difficult, "FEM.jl"),
-        "result_ols_difficult_within": _table_cell(ols_table, ols_difficult, "within"),
-        "result_correia_enron_fem": _table_cell(correia_real_table, enron, "FEM.jl"),
-        "result_correia_enron_within": _table_cell(correia_real_table, enron, "within"),
-        "result_ppml_simple_range": seconds_range(
-            ppml_simple, ("rust-map", "fixest", "GLFEM.jl", "within")
-        ),
-        "result_ppml_difficult_three_fixest": _table_cell(
-            ppml_table, ppml_difficult, "fixest"
-        ),
-        "result_ppml_difficult_three_glfem": _table_cell(
-            ppml_table, ppml_difficult, "GLFEM.jl"
-        ),
-        "result_ppml_difficult_three_within": _table_cell(
-            ppml_table, ppml_difficult, "within"
-        ),
-        "result_agreement_simple_gap": gap_without_share(
-            _table_cell(
-                memory_table,
-                memory_100k_by_label["simple (well-connected)"],
-                "Gap (share)",
-            )
-        ),
-        "result_agreement_difficult_gap": gap_without_share(
-            _table_cell(
-                memory_table,
-                memory_100k_by_label["difficult (near-nested)"],
-                "Gap (share)",
-            )
-        ),
         "result_agreement_simple_max": _largest_metric(
             agreement_table, agreement_simple_rows, "Absolute difference"
         ),
         "result_agreement_difficult_max": _largest_metric(
             agreement_table, agreement_difficult_rows, "Absolute difference"
         ),
-        "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
-        "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
-        "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
-        "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
-        "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
-        "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
-        # The abstract quotes a magnitude, so it has to move with the run
-        # rather than be typed in once and go stale.
-        "result_ols_difficult_within_vs_rust_map": _format_ratio(
-            _numeric_cell(_table_cell(ols_table, ols_difficult, "rust-map")),
-            _numeric_cell(_table_cell(ols_table, ols_difficult, "within")),
-        ),
-        "result_ols_difficult_within_vs_fixest": _format_ratio(
-            _numeric_cell(_table_cell(ols_table, ols_difficult, "fixest")),
-            _numeric_cell(_table_cell(ols_table, ols_difficult, "within")),
-        ),
-        "result_ppml_within_vs_fixest": _format_ratio(
-            _numeric_cell(_table_cell(ppml_table, ppml_difficult, "fixest")),
-            _numeric_cell(_table_cell(ppml_table, ppml_difficult, "within")),
-        ),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
-        "result_directors_component_share": (
-            f"{directors_share:.0%}" if directors_share is not None else "--"
-        ),
-        "result_zigzag_within": _format_seconds(float(prose["zigzag_within_s"])),
-        "result_zigzag_fem": _format_seconds(float(prose["zigzag_fem_s"])),
     }
-    # Values synchronized straight into the result file, such as the legacy CUDA
-    # timings of Appendix C, are published without further formatting.
-    prose_values.update(
-        {name: value for name, value in prose.items() if name.startswith("result_")}
-    )
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
-    print(f"[render] wrote {len(tables)} table fragments to {destination}")
+    print(f"[render] wrote {len(targets)} table fragments to {destination}")
 
 
 def collect(_: argparse.Namespace) -> None:
@@ -732,9 +646,8 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
 
     points: list[dict[str, object]] = []
     for family in ("mobility", "sorting"):
+        table = document["tables"][f"akm_{family}"]
         for view in ("default", "matched"):
-            table_name = HEADLINE_FIGURE_TABLES[(family, view)]
-            table = document["tables"][table_name]
             for source in table["rows"]:
                 design = _row_label(table, source)
                 gap = _numeric_cell(_table_cell(table, source, "Gap (share)"))
@@ -798,14 +711,8 @@ def _paper_runtime_target(
     dataset = _row_label(table, row).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
-    if table_name in {
-        "akm_mobility",
-        "akm_sorting",
-        "mechanism_mobility",
-        "mechanism_sorting",
-    }:
-        view = "matched" if table_name.startswith("mechanism_") else "default"
-        return dataset, {"n_obs": 1_000_000, "n_fe": 3}, f"akm.csv:{view}"
+    if table_name in {"akm_mobility", "akm_sorting"}:
+        return dataset, {"n_obs": 1_000_000, "n_fe": 3}, "akm.csv:default"
     if table_name == "ols":
         return dataset, {"n_obs": 10_000_000, "n_fe": 3}, "ols.csv:default"
     if table_name == "ppml":
@@ -876,18 +783,6 @@ def _largest_metric(
     return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
 
 
-def _component_share(value: str) -> float | None:
-    match = re.search(r"\((0(?:\.\d+)?|1(?:\.0+)?)\)\s*$", value)
-    return float(match.group(1)) if match else None
-
-
-def _format_ratio(numerator: float | None, denominator: float | None) -> str:
-    if numerator is None or denominator is None or denominator == 0:
-        return "--"
-    ratio = numerator / denominator
-    return f"{ratio:.0f} times" if ratio >= 10 else f"{ratio:.1f} times"
-
-
 def _format_typst_scientific(value: float) -> str:
     if value == 0:
         return "0"
@@ -928,10 +823,6 @@ def _row_label(table: dict, row: list[str]) -> str:
     return _clean_cell(row[0])
 
 
-def _rows_by_label(table: dict) -> dict[str, list[str]]:
-    return {_row_label(table, row): row for row in table["rows"]}
-
-
 def _rows_after_marker(table: dict, marker: str) -> list[list[str]]:
     """Return rows in the section immediately following a structural marker."""
     rows = table["rows"]
@@ -956,24 +847,26 @@ def _backend_columns(table: dict) -> tuple[tuple[int, str], ...]:
 
 
 def _ensure_akm_runtime_rows(document: dict) -> int:
-    """Add rows for registered AKM designs before collecting their measurements."""
+    """Match the canonical AKM rows to the registered designs."""
     from benchmarks.akm import SCENARIOS
 
     changed = 0
     for family in ("mobility", "sorting"):
         prefix = f"akm_{family}_"
         expected = [name for name in SCENARIOS if name.startswith(prefix)]
-        for table_name in (f"akm_{family}", f"mechanism_{family}"):
-            table = document["tables"][table_name]
-            present = {_row_label(table, row) for row in table["rows"]}
-            for design in expected:
-                if design in present:
-                    continue
-                table["rows"].append(
-                    [f"`{design}`", *("#miss" for _ in table["header"][1:])]
-                )
-                present.add(design)
-                changed += 1
+        table = document["tables"][f"akm_{family}"]
+        rows_by_design = {_row_label(table, row): row for row in table["rows"]}
+        synchronized = [
+            rows_by_design.get(
+                design,
+                [f"`{design}`", *("#miss" for _ in table["header"][1:])],
+            )
+            for design in expected
+        ]
+        if synchronized != table["rows"]:
+            old_designs = set(rows_by_design)
+            changed += max(1, len(old_designs ^ set(expected)))
+            table["rows"] = synchronized
     return changed
 
 
@@ -1022,12 +915,7 @@ def _synchronize_hardness(document: dict) -> int:
         return 1
 
     changed = 0
-    for table_name in (
-        "akm_mobility",
-        "akm_sorting",
-        "mechanism_mobility",
-        "mechanism_sorting",
-    ):
+    for table_name in ("akm_mobility", "akm_sorting"):
         table = document["tables"][table_name]
         for row in table["rows"]:
             scenario = _row_label(table, row)
@@ -1084,232 +972,6 @@ def _synchronize_agreement(document: dict) -> int:
                 _set_table_cell(table, row, header, value)
                 changed += 1
     return changed
-
-
-def _synchronize_setup_cost(document: dict) -> int:
-    rows = _latest_rows("within_setup_cost.csv")
-    if rows is None:
-        return 0
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for dgp in ("simple", "difficult"):
-        group = [row for row in rows if row["design"] == dgp]
-        if len(group) != EXPECTED_TRIALS:
-            raise ValueError(f"Setup results for {dgp} do not contain {EXPECTED_TRIALS} runs")
-        overrides = {
-            f"result_setup_{dgp}_setup",
-            f"result_setup_{dgp}_solve",
-            f"result_setup_{dgp}_share",
-        }
-        if not all(_row_success(row) for row in group):
-            status = "capped" if all(_row_capped(row) for row in group) else "failed"
-            for key in overrides:
-                if prose.get(key) != status:
-                    prose[key] = status
-                    changed += 1
-            continue
-        for key in overrides:
-            if key in prose:
-                del prose[key]
-                changed += 1
-        setup = median(float(row["setup_s"]) for row in group)
-        solve = median(float(row["solve_s"]) for row in group)
-        fields = {
-            f"setup_{dgp}_setup_s": setup,
-            f"setup_{dgp}_solve_s": solve,
-            f"setup_{dgp}_share": setup / (setup + solve),
-        }
-        for key, value in fields.items():
-            if prose.get(key) != value:
-                prose[key] = value
-                changed += 1
-    return changed
-
-
-def _synchronize_accuracy_frontier(document: dict) -> int:
-    """Fill the frontier table from the tolerance comparison.
-
-    Each package is swept over its own tolerance settings and the achieved
-    external residual is recorded beside the wall time, so the reader sees the
-    accuracy each runtime bought instead of a single matched point that some
-    packages cannot reach.
-    """
-    measured = _latest_rows("accuracy_frontier.csv")
-    table = document["tables"].get("accuracy_frontier")
-    if table is None or measured is None:
-        return 0
-    labels = {"rust-map": "`rust-map`", "within-additive": "`within-additive`"}
-    grouped: dict[tuple[str, str, str], list[dict[str, str]]] = {}
-    for row in measured:
-        if row.get("backend") not in labels:
-            continue
-        key = (row.get("design", ""), row.get("backend", ""), row["tolerance"])
-        grouped.setdefault(key, []).append(row)
-
-    rendered: list[list[str]] = []
-    for design in ("simple", "difficult"):
-        for backend, label in labels.items():
-            matching = [
-                (tolerance, measurements)
-                for (row_design, row_backend, tolerance), measurements in grouped.items()
-                if row_design == design and row_backend == backend
-            ]
-            for index, (tolerance, measurements) in enumerate(
-                sorted(
-                    matching,
-                    key=lambda item: float(item[0]),
-                    reverse=True,
-                )
-            ):
-                successful = [row for row in measurements if _row_success(row)]
-                if successful:
-                    eta = _format_typst_scientific(
-                        median(float(row["max_eta"]) for row in successful)
-                    )
-                    runtime = _format_seconds(
-                        median(float(row["runtime_s"]) for row in successful)
-                    )
-                    if len(successful) < len(measurements):
-                        runtime += f" ({len(successful)}/{len(measurements)})"
-                else:
-                    runtime = (
-                        f"capped (0/{len(measurements)})"
-                        if all(_row_capped(row) for row in measurements)
-                        else f"failed (0/{len(measurements)})"
-                    )
-                    eta = "--"
-                rendered.append(
-                    [
-                        f"{design}" if index == 0 and label == list(labels.values())[0] else "",
-                        label if index == 0 else "",
-                        tolerance,
-                        runtime,
-                        eta,
-                    ]
-                )
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
-
-
-def _synchronize_factor_scaling(document: dict) -> int:
-    """Fill the table of setup and solve cost as the factor count grows.
-
-    Q enters the construction through the Q(Q-1)/2 pair enumeration, so this is
-    the axis on which the Schwarz preconditioner is most exposed, and every
-    other experiment in the paper holds it at three.
-    """
-    rows = _latest_rows("factor_scaling.csv")
-    table = document["tables"].get("factor_scaling")
-    if table is None or rows is None:
-        return 0
-
-    by_q: dict[int, list[dict]] = {}
-    for row in rows:
-        by_q.setdefault(int(row["n_factors"]), []).append(row)
-
-    rendered = []
-    for n_factors in sorted(by_q):
-        group = by_q[n_factors]
-        successful = [item for item in group if _row_success(item)]
-
-        if not successful:
-            status = "capped" if all(_row_capped(item) for item in group) else "failed"
-            rendered.append(
-                [
-                    str(n_factors),
-                    str(n_factors * (n_factors - 1) // 2),
-                    status,
-                    status,
-                    status,
-                    status,
-                ]
-            )
-            continue
-
-        def med(field: str) -> float:
-            return float(median(float(item[field]) for item in successful))
-
-        suffix = (
-            f" ({len(successful)}/{len(group)})"
-            if len(successful) < len(group)
-            else ""
-        )
-
-        rendered.append(
-            [
-                str(n_factors),
-                str(n_factors * (n_factors - 1) // 2),
-                f"{med('setup_s'):.3f}{suffix}",
-                f"{med('solve_s'):.3f}{suffix}",
-                f"{med('setup_share'):.0%}{suffix}",
-                f"{med('iterations_max'):.0f}{suffix}",
-            ]
-        )
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
-
-
-def _synchronize_amortization(document: dict) -> int:
-    """Fill the table of total time against the number of right-hand sides.
-
-    The break-even is read off the measurements rather than from a closed form,
-    because marginal solve cost is not exactly linear in K.
-    """
-    rows = _latest_rows("amortization.csv")
-    table = document["tables"].get("amortization")
-    if table is None or rows is None:
-        return 0
-
-    def med(k: int, name: str, field: str) -> float | None:
-        picked = [
-            float(item[field])
-            for item in rows
-            if int(item["k_rhs"]) == k and item["preconditioner"] == name
-            and _row_success(item)
-        ]
-        return float(median(picked)) if picked else None
-
-    def failure(k: int, name: str) -> str:
-        picked = [
-            item
-            for item in rows
-            if int(item["k_rhs"]) == k and item["preconditioner"] == name
-        ]
-        if not picked:
-            return "#miss"
-        return "capped" if all(_row_capped(item) for item in picked) else "failed"
-
-    rendered = []
-    for k in sorted({int(item["k_rhs"]) for item in rows}):
-        diagonal, additive = med(k, "diagonal", "total_s"), med(k, "additive", "total_s")
-        if diagonal is None or additive is None:
-            rendered.append(
-                [
-                    str(k),
-                    f"{diagonal:.2f}" if diagonal is not None else failure(k, "diagonal"),
-                    f"{additive:.2f}" if additive is not None else failure(k, "additive"),
-                    "--",
-                    f"{additive / k:.3f}" if additive is not None else "--",
-                ]
-            )
-            continue
-        rendered.append(
-            [
-                str(k),
-                f"{diagonal:.2f}",
-                f"{additive:.2f}",
-                f"{diagonal / additive:.1f}x",
-                f"{additive / k:.3f}",
-            ]
-        )
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
 
 
 def _synchronize_akm_setup_cost(document: dict) -> int:
@@ -1485,33 +1147,6 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
     return rendered
 
 
-def _synchronize_zigzag(document: dict) -> int:
-    """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
-
-    Read both times directly from the raw benchmark output.
-    """
-    rows = _latest_rows("correia.csv")
-    if rows is None:
-        return 0
-    rows = [row for row in rows if row.get("design") == "synthetic-zigzag"]
-    times: dict[str, float] = {}
-    for row in rows:
-        backend = row.get("backend", "")
-        if backend in {"within", "FEM.jl"} and _row_success(row):
-            try:
-                times[backend] = float(_row_time(row))
-            except (KeyError, TypeError, ValueError):
-                continue
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for backend, key in (("within", "zigzag_within_s"), ("FEM.jl", "zigzag_fem_s")):
-        value = times.get(backend)
-        if value is not None and prose.get(key) != value:
-            prose[key] = value
-            changed += 1
-    return changed
-
-
 def _synchronize_canonical_tables(
     document: dict | None = None, *, write: bool = True
 ) -> int:
@@ -1527,7 +1162,6 @@ def _synchronize_canonical_tables(
     changed = _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
-        "mechanism_mobility", "mechanism_sorting",
         "correia_synthetic", "correia_real",
     }
     for name, table in document["tables"].items():
@@ -1599,14 +1233,9 @@ def _synchronize_canonical_tables(
     changed += _synchronize_hardness(document)
     changed += _synchronize_headline_figure(document, raw)
     changed += _synchronize_agreement(document)
-    changed += _synchronize_setup_cost(document)
-    changed += _synchronize_accuracy_frontier(document)
     changed += _synchronize_iterations(document)
-    changed += _synchronize_factor_scaling(document)
-    changed += _synchronize_amortization(document)
     changed += _synchronize_akm_setup_cost(document)
     changed += _synchronize_regression_reuse(document)
-    changed += _synchronize_zigzag(document)
     if write:
         _write_json(TABLES_PATH, document)
     return changed

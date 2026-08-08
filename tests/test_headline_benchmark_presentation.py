@@ -37,22 +37,31 @@ def _raw_trial(
 
 
 class HeadlineFigureCollectionTests(unittest.TestCase):
-    def test_registered_akm_designs_are_added_to_both_runtime_views(self) -> None:
+    def test_registered_akm_designs_are_added_to_the_canonical_table(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
-        for table_name in ("akm_sorting", "mechanism_sorting"):
-            document["tables"][table_name]["rows"] = [
-                row
-                for row in document["tables"][table_name]["rows"]
-                if "akm_sorting_6" not in row[0]
-            ]
+        table = document["tables"]["akm_sorting"]
+        table["rows"] = [row for row in table["rows"] if "akm_sorting_6" not in row[0]]
 
         changed = paper_results._ensure_akm_runtime_rows(document)
 
-        self.assertEqual(changed, 2)
-        for table_name in ("akm_sorting", "mechanism_sorting"):
-            table = document["tables"][table_name]
-            row = next(row for row in table["rows"] if "akm_sorting_6" in row[0])
-            self.assertEqual(row[1:], ["#miss"] * (len(table["header"]) - 1))
+        self.assertEqual(changed, 1)
+        row = next(row for row in table["rows"] if "akm_sorting_6" in row[0])
+        self.assertEqual(row[1:], ["#miss"] * (len(table["header"]) - 1))
+
+    def test_unregistered_akm_designs_are_removed_from_the_canonical_table(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        table = document["tables"]["akm_sorting"]
+        table["rows"].append(
+            ["`akm_sorting_retired`", *("stale" for _ in table["header"][1:])]
+        )
+
+        changed = paper_results._ensure_akm_runtime_rows(document)
+
+        self.assertEqual(changed, 1)
+        self.assertNotIn(
+            "akm_sorting_retired",
+            {paper_results._row_label(table, row) for row in table["rows"]},
+        )
 
     def test_records_preserve_convergence_and_cap_status(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
@@ -157,26 +166,22 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertNotIn("akm_mobility_1", default_panel)
         self.assertIn("0.543s", default_panel)
 
-    def test_all_akm_tables_render_varied_parameters_instead_of_scenario_ids(self) -> None:
+    def test_render_writes_only_manuscript_table_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             generated = Path(directory) / "tables"
+            generated.mkdir(parents=True)
+            (generated / "retired.typ").write_text("stale", encoding="utf-8")
             with patch.object(paper_results, "GENERATED_DIR", generated):
                 paper_results.render(None)
-            fragments = {
-                name: (generated / f"{name}.typ").read_text(encoding="utf-8")
-                for name in paper_results.AKM_PARAMETER_TABLES
+            expected = {
+                *(f"{name}.typ" for name in paper_results.RENDERED_TABLES),
+                "akm_mobility_defaults.typ",
+                "akm_mobility_lsmr.typ",
+                "akm_sorting_defaults.typ",
+                "akm_sorting_lsmr.typ",
             }
 
-        for name, fragment in fragments.items():
-            self.assertNotIn("akm_mobility_", fragment)
-            self.assertNotIn("akm_sorting_", fragment)
-            if "sorting" in name:
-                self.assertIn("Sorting strength $rho$", fragment)
-                self.assertIn("[10000]", fragment)
-                self.assertIn("[150000]", fragment)
-            else:
-                self.assertIn("Move probability $delta$", fragment)
-                self.assertIn("[0.001]", fragment)
+            self.assertEqual({path.name for path in generated.glob("*.typ")}, expected)
 
 
 class HeadlineFigurePlotTests(unittest.TestCase):

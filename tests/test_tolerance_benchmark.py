@@ -11,7 +11,7 @@ import pandas as pd
 from benchmarks.tolerance.measure import TOLERANCES, coefficient_error_se, residual_error
 from scripts import make_figures
 from scripts.benchmark_methods import METHODS
-from scripts.make_figures import CROSS_PACKAGE_BACKENDS, CROSSOVER_FILES, MECHANISM_BACKENDS
+from scripts.make_figures import CROSS_PACKAGE_BACKENDS, MECHANISM_BACKENDS
 from scripts.plot_tolerance import (
     METHOD_ORDER,
     _axis_limits,
@@ -84,8 +84,7 @@ class TolerancePlotTests(unittest.TestCase):
             *CROSS_PACKAGE_BACKENDS,
             *MECHANISM_BACKENDS,
             *METHOD_ORDER,
-            *CROSSOVER_FILES["OLS"][1],
-            *CROSSOVER_FILES["PPML"][1],
+            "GLFEM.jl",
         }
         for key in keys:
             self.assertIn(key, METHODS)
@@ -105,9 +104,7 @@ class TolerancePlotTests(unittest.TestCase):
                 patch.object(make_figures, "RESULTS", results),
                 patch.object(make_figures, "FIGURES", figures),
                 patch.object(make_figures, "_load_points", return_value=[]),
-                patch.object(make_figures, "_load_crossover_results", return_value={}),
                 patch.object(make_figures, "headline_figure"),
-                patch.object(make_figures, "crossover_figure"),
                 patch.object(make_figures, "tolerance_figure") as tolerance,
             ):
                 make_figures.main()

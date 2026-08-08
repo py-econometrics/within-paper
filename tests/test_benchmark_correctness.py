@@ -26,9 +26,9 @@ from benchmarks.ols.pyfixest import fit_ols
 from benchmarks.ols.run import PACKAGE_RUNTIME_BACKENDS, run_experiment
 from benchmarks.ppml import pyfixest as ppml_pyfixest
 from benchmarks.ppml.pyfixest import fit_ppml
-from benchmarks.within import amortization, scaling, setup_cost
+from benchmarks.within import amortization
 from benchmarks.within.map import map_demean_with_sweeps
-from scripts import analyze_gap_runtime, compute_hardness, paper_results
+from scripts import compute_hardness, paper_results
 from scripts.paper_results import _render_trial_result
 
 
@@ -169,19 +169,6 @@ class FailureLoggingTests(unittest.TestCase):
                 failure_repetitions=3,
             )
 
-    def test_standalone_scaling_exception_becomes_a_failed_row(self) -> None:
-        categories = np.zeros((4, 2), dtype=np.uint32)
-        rhs = np.ones((4, 1))
-        with (
-            patch.object(scaling, "solve_batch", return_value=None),
-            patch.object(scaling, "Solver", side_effect=RuntimeError("solver failed")),
-        ):
-            row = scaling._measure(categories, rhs, "additive")
-
-        self.assertFalse(row["converged"])
-        self.assertFalse(row["capped"])
-        self.assertEqual(row["error"], "solver failed")
-
 class HardnessTests(unittest.TestCase):
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
         block = sp.csr_matrix(np.ones((3, 4)))
@@ -203,49 +190,6 @@ class HardnessTests(unittest.TestCase):
         ):
             self.assertAlmostEqual(compute_hardness._component_rho(block), 0.25)
         self.assertEqual(calls, ["propack", "arpack"])
-
-
-class GapAnalysisTests(unittest.TestCase):
-    def test_final_runtime_rows_join_to_hardness_points(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            results = root / "results"
-            results.mkdir()
-            hardness = root / "hardness.csv"
-            pd.DataFrame(
-                [
-                    {
-                        "dataset_id": "simple",
-                        "n_obs_raw": 1_000,
-                        "fe_a": "indiv_id",
-                        "fe_b": "firm_id",
-                        "one_minus_rho": 0.25,
-                        "worst_component_obs_share": 1.0,
-                        "rho_qr": 0.75,
-                        "kind": "base",
-                    }
-                ]
-            ).to_csv(hardness, index=False)
-            pd.DataFrame(
-                [
-                    {
-                        "design": "simple",
-                        "backend": "rust-map",
-                        "view": "default",
-                        "runtime_s": runtime,
-                        "converged": True,
-                        "n_obs": 1_000,
-                        "n_fe": 3,
-                    }
-                    for runtime in (1.0, 2.0)
-                ]
-            ).to_csv(results / "ols.csv", index=False)
-
-            report = analyze_gap_runtime.analyze(hardness, results)
-
-        self.assertEqual(len(report["points"]), 1)
-        self.assertEqual(report["points"][0]["view"], "default")
-        self.assertEqual(report["points"][0]["median_time"], 1.5)
 
 
 class PythonFitTests(unittest.TestCase):
@@ -471,50 +415,6 @@ class PythonFitTests(unittest.TestCase):
         self.assertEqual(result["converged"].tolist(), [False, True])
         self.assertIn("exited with status 1", result.loc[0, "error"])
 
-class SetupCostTests(unittest.TestCase):
-    def test_akm_mobility_setup_contract(self) -> None:
-        self.assertEqual(
-            setup_cost.MOBILITY_DESIGNS,
-            tuple(name for name in SCENARIOS if name.startswith("akm_mobility_")),
-        )
-        self.assertEqual(setup_cost.AKM_REPETITIONS, 20)
-        self.assertEqual(setup_cost.OPTIONS.tol, 1e-12)
-        self.assertEqual(setup_cost.OPTIONS.maxiter, 10_000)
-
-        categories, rhs = solver_data(make_base_data(1_000, "difficult", 43))
-        rows = setup_cost._measure(
-            "small",
-            categories,
-            rhs,
-            experiment="test",
-            repetitions=1,
-        )
-
-        self.assertEqual(len(rows), 1)
-        row = rows[0]
-        self.assertEqual(row["preconditioner"], "additive")
-        self.assertEqual(row["n_planned"], 1)
-        self.assertTrue(row["converged"])
-        self.assertLess(row["max_eta"], 1e-8)
-        self.assertLess(row["max_delta"], 1e-7)
-
-    def test_setup_cost_rejects_a_capped_reference(self) -> None:
-        categories = np.zeros((4, 2), dtype=np.uint32)
-        rhs = np.ones((4, 1))
-        warmup = SimpleNamespace(converged=[True], demeaned=rhs)
-        reference = SimpleNamespace(converged=[False], demeaned=rhs)
-
-        with patch.object(setup_cost, "solve_batch", side_effect=[warmup, reference]):
-            with self.assertRaisesRegex(RuntimeError, "tight reference did not converge"):
-                setup_cost._measure(
-                    "capped-reference",
-                    categories,
-                    rhs,
-                    experiment="test",
-                    repetitions=1,
-                )
-
-
 class PaperResultTests(unittest.TestCase):
     @staticmethod
     def _rows(design: str, backend: str, n_obs: int, n_fe: int, view: str):
@@ -583,8 +483,15 @@ class PaperResultTests(unittest.TestCase):
             self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["ppml"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][2], "2.00s")
-            self.assertEqual(document["tables"]["mechanism_mobility"]["rows"][0][2], "2.00s")
             self.assertEqual(document["tables"]["correia_synthetic"]["rows"][0][2], "2.00s")
+            matched = next(
+                point
+                for point in document["headline_figure"]["points"]
+                if point["design"] == "akm_mobility_1"
+                and point["view"] == "matched"
+                and point["backend"] == "rust-map"
+            )
+            self.assertEqual(matched["median_time"], 2.0)
 
     def test_five_ols_runtime_tables_reserve_default_lsmr_ablation_columns(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
@@ -681,73 +588,6 @@ class PaperResultTests(unittest.TestCase):
             ):
                 paper_results.render(None)
         synchronize.assert_not_called()
-
-    def test_accuracy_frontier_uses_one_median_row_per_setting(self) -> None:
-        document = {"tables": {"accuracy_frontier": {"rows": []}}}
-        rows = [
-            {
-                "design": "simple", "backend": "rust-map", "tolerance": "1e-8",
-                "runtime_s": runtime, "max_eta": eta, "converged": "true",
-            }
-            for runtime, eta in (("0.02", "2e-8"), ("0.04", "4e-8"), ("0.06", "6e-8"))
-        ]
-        with patch.object(paper_results, "_latest_rows", return_value=rows):
-            paper_results._synchronize_accuracy_frontier(document)
-        rendered = document["tables"]["accuracy_frontier"]["rows"]
-        self.assertEqual(len(rendered), 1)
-        self.assertEqual(rendered[0][3], "0.040s")
-        self.assertEqual(rendered[0][4], "$4.0 times 10^(-8)$")
-
-    def test_accuracy_frontier_keeps_a_capped_setting(self) -> None:
-        document = {"tables": {"accuracy_frontier": {"rows": []}}}
-        rows = [
-            {
-                "design": "simple",
-                "backend": "rust-map",
-                "tolerance": "1e-10",
-                "runtime_s": "1",
-                "max_eta": "",
-                "repetition": str(repetition),
-                "n_planned": "3",
-                "converged": "false",
-                "capped": "true",
-            }
-            for repetition in range(3)
-        ]
-        with patch.object(paper_results, "_latest_rows", return_value=rows):
-            paper_results._synchronize_accuracy_frontier(document)
-
-        rendered = document["tables"]["accuracy_frontier"]["rows"]
-        self.assertEqual(rendered[0][3:], ["capped (0/3)", "--"])
-
-    def test_factor_scaling_does_not_average_failed_trials(self) -> None:
-        document = {"tables": {"factor_scaling": {"rows": []}}}
-        rows = [
-            {
-                "n_factors": "2",
-                "setup_s": "1",
-                "solve_s": "2",
-                "setup_share": "0.333",
-                "iterations_max": "5",
-                "converged": "true",
-                "capped": "false",
-            },
-            {
-                "n_factors": "2",
-                "setup_s": "100",
-                "solve_s": "100",
-                "setup_share": "0.5",
-                "iterations_max": "10000",
-                "converged": "false",
-                "capped": "true",
-            },
-        ]
-        with patch.object(paper_results, "_latest_rows", return_value=rows):
-            paper_results._synchronize_factor_scaling(document)
-
-        rendered = document["tables"]["factor_scaling"]["rows"][0]
-        self.assertEqual(rendered[2], "1.000 (1/2)")
-        self.assertEqual(rendered[3], "2.000 (1/2)")
 
     def test_akm_setup_table_separates_two_and_three_factors(self) -> None:
         document = {
