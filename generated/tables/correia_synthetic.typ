@@ -5,17 +5,17 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
+  columns: (1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[PyFixest #linebreak() MAP #linebreak() none], th[fixest (R) #linebreak() MAP #linebreak() accelerated], th[FEM.jl #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Dataset], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`synthetic-complete`], [1.00 (1.00)], [0.062s], [0.060s], [0.033s], [0.109s],
-  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.093s], [0.133s], [0.053s], [0.097s],
-  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.235s], [0.330s], [0.181s], [0.843s],
-  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.598s], [1.15s], [0.274s], [0.450s],
-  [`synthetic-assortative`], [$1.33 times 10^(-3)$ (0.70)], [13.5s], [1.35s], [1.19s], [0.264s],
+  [`synthetic-complete`], [1.00 (1.00)], [0.111s], [#miss], [#miss], [0.227s], [0.088s], [0.047s],
+  [`synthetic-uniform-easy`], [0.651 (1.00)], [0.170s], [#miss], [#miss], [0.178s], [0.165s], [0.068s],
+  [`synthetic-uniform-hard`], [0.184 (1.00)], [0.362s], [#miss], [#miss], [0.951s], [0.359s], [0.233s],
+  [`synthetic-uniform-harder`], [0.0249 (1.00)], [0.748s], [#miss], [#miss], [0.560s], [1.18s], [0.288s],
+  [`synthetic-assortative`], [$1.33 times 10^(-3)$ (0.70)], [13.0s], [#miss], [#miss], [0.379s], [1.37s], [1.19s],
   table.hline(stroke: 0.8pt + table-rule),
 )

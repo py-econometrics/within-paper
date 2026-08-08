@@ -51,7 +51,7 @@ Dropping `r-*` Pixi packages is deliberate: R and Julia run natively, and
 3. `feat(benchmarks): add the R fixest OLS driver`
 4. `feat(benchmarks): add the Julia OLS driver`
 5. `feat(benchmarks): register the OLS benchmarker set`
-6. `feat(benchmarks): add the OLS and AKM sweep entry points`
+6. `feat(benchmarks): add the OLS and AKM comparison entry points`
 
 ### PR 5: feat(benchmarks): PPML drivers
 
@@ -121,7 +121,7 @@ manuscript `#include` in the same PR.
 
 ### PR 13: feat: the time-versus-accuracy frontier
 
-1. `feat(benchmarks): sweep native tolerances for the accuracy frontier`
+1. `feat(benchmarks): vary native tolerances for the accuracy frontier`
 2. `feat(pipeline): render the accuracy-frontier table`
 3. `build(paper): wire the accuracy-frontier table into an existing slot`
 4. `build(paper): rebuild the PDF`

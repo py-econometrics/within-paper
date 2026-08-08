@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
-matplotlib.rcParams["svg.hashsalt"] = "within-paper-tolerance"
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from benchmarks.core.methods import canonical, legend_label, linestyle, style
-from benchmarks.core.paths import ROOT
-
-DEFAULT_INPUT = ROOT / "results" / "runs" / "latest" / "tolerance_frontier.csv"
-DEFAULT_OUTPUT = ROOT / "figures" / "results" / "tolerance_frontier.svg"
+from scripts.benchmark_methods import METHODS
 
 METHOD_ORDER = (
     "within-off",
@@ -30,8 +24,14 @@ METHOD_ORDER = (
 )
 
 METRICS = (
-    ("coefficient_error_se", "Slope error (reference SE)"),
-    ("residual_error", r"Residual error (relative $\ell_2$ norm)"),
+    (
+        "coefficient_error_se",
+        r"Slope error (reference SE; greater precision $\rightarrow$)",
+    ),
+    (
+        "residual_error",
+        r"Residual error (relative $\ell_2$ norm; greater precision $\rightarrow$)",
+    ),
 )
 
 
@@ -45,12 +45,11 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
     """Return one median point per design, method, and tolerance."""
     required = {
         "design",
-        "method",
-        "label",
+        "backend",
         "tolerance",
         "default_tolerance",
-        "time_s",
-        "success",
+        "runtime_s",
+        "converged",
         "coefficient_error_se",
         "residual_error",
     }
@@ -59,27 +58,26 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tolerance results are missing columns: {missing}")
 
     data = raw.copy()
-    # Result files recorded before the spellings were unified say "lsmr_off"
-    # where new ones say "within-off". Resolve on the way in so one figure can
-    # read both, and so METHOD_ORDER holds canonical names only.
-    data["method"] = data["method"].map(lambda value: canonical(value) or value)
-    data["success"] = _coerce_bool_series(data["success"])
+    data["converged"] = _coerce_bool_series(data["converged"])
+    data["capped"] = _coerce_bool_series(
+        data["capped"] if "capped" in data else pd.Series(False, index=data.index)
+    )
     numeric = [
         "tolerance",
         "default_tolerance",
-        "time_s",
+        "runtime_s",
         "coefficient_error_se",
         "residual_error",
     ]
     for column in numeric:
         data[column] = pd.to_numeric(data[column], errors="coerce")
 
-    keys = ["design", "method", "label", "tolerance", "default_tolerance"]
+    keys = ["design", "backend", "tolerance", "default_tolerance"]
     rows: list[dict] = []
     for key, group in data.groupby(keys, dropna=False, sort=False):
         successful = group[
-            group["success"]
-            & np.isfinite(group["time_s"])
+            group["converged"]
+            & np.isfinite(group["runtime_s"])
             & np.isfinite(group["coefficient_error_se"])
             & np.isfinite(group["residual_error"])
         ]
@@ -88,8 +86,9 @@ def aggregate_results(raw: pd.DataFrame) -> pd.DataFrame:
                 **dict(zip(keys, key, strict=True)),
                 "n_trials": len(group),
                 "n_success": len(successful),
+                "n_capped": int(group["capped"].sum()),
                 "median_time_s": (
-                    float(successful["time_s"].median())
+                    float(successful["runtime_s"].median())
                     if len(successful)
                     else np.nan
                 ),
@@ -119,7 +118,9 @@ def _axis_limits(
     floor = max(float(values.min()) / 5, np.finfo(np.float64).eps)
     lower = min(floor, float(values.min()) / 2)
     upper = float(values.max()) * 2
-    return (lower, upper), floor
+    # The figure is organized by achieved precision, so smaller errors appear to
+    # the right even though the plotted quantity is an error measure.
+    return (upper, lower), floor
 
 
 def _runtime_limits(points: pd.DataFrame) -> tuple[float, float]:
@@ -138,17 +139,23 @@ def _failure_note(points: pd.DataFrame, design: str) -> str | None:
         return None
     entries = []
     for method in METHOD_ORDER:
-        subset = failed[failed["method"] == method]
+        subset = failed[failed["backend"] == method]
         if subset.empty:
             continue
-        label = legend_label(method).replace("\n", " — ")
-        count = len(subset)
-        suffix = "setting" if count == 1 else "settings"
-        entries.append(f"{label}: {count} {suffix}")
+        label = METHODS[method][0].replace("\n", " — ")
+        capped = int((subset["n_capped"] == subset["n_trials"]).sum())
+        failed_count = len(subset) - capped
+        parts = []
+        if capped:
+            parts.append(f"{capped} capped")
+        if failed_count:
+            parts.append(f"{failed_count} failed")
+        entries.append(f"{label}: {', '.join(parts)}")
     return "No returned solution\n" + "\n".join(entries)
 
 
 def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
+    matplotlib.rcParams["svg.hashsalt"] = "within-paper-tolerance"
     points = aggregate_results(raw)
     designs = sorted(
         points["design"].dropna().unique(),
@@ -188,7 +195,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             for method in METHOD_ORDER:
                 method_points = points[
                     (points["design"] == design)
-                    & (points["method"] == method)
+                    & (points["backend"] == method)
                     & (points["n_success"] > 0)
                     & np.isfinite(points["median_time_s"])
                     & np.isfinite(points[metric])
@@ -197,13 +204,13 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
                     continue
                 method_points["plot_error"] = method_points[metric].clip(lower=floor)
                 method_points = method_points.sort_values("plot_error")
-                colour, marker = style(method)
+                _, colour, marker, line = METHODS[method]
                 ax.plot(
                     method_points["plot_error"],
                     method_points["median_time_s"],
                     color=colour,
                     linewidth=1.2,
-                    linestyle=linestyle(method),
+                    linestyle=line,
                     alpha=0.75,
                     zorder=2,
                 )
@@ -263,27 +270,18 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
             for spine in ("top", "right"):
                 ax.spines[spine].set_visible(False)
 
-    labels = {
-        method: legend_label(method)
-        for method in METHOD_ORDER
-        if (points["method"] == method).any()
-    }
-    handles = [
-        Line2D(
-            [0],
-            [0],
-            color=style(method)[0],
-            marker=style(method)[1],
-            linewidth=1.2,
-            linestyle=linestyle(method),
-            markersize=6,
-            markeredgecolor="white",
-            markeredgewidth=0.5,
-            label=labels[method],
+    handles = []
+    for method in METHOD_ORDER:
+        if not (points["backend"] == method).any():
+            continue
+        label, colour, marker, line = METHODS[method]
+        handles.append(
+            Line2D(
+                [0], [0], color=colour, marker=marker, linewidth=1.2,
+                linestyle=line, markersize=6, markeredgecolor="white",
+                markeredgewidth=0.5, label=label,
+            )
         )
-        for method in METHOD_ORDER
-        if method in labels
-    ]
     handles.append(
         Line2D(
             [0],
@@ -317,7 +315,7 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
         0.025,
         "Each point is the median of repeated fits on one fixed sample. "
         f"Lines vary the method's native tolerance; all methods use {cap_text}. "
-        "Smaller errors indicate greater precision.",
+        "Error decreases and precision increases from left to right.",
         ha="center",
         fontsize=7.3,
         color="#444444",
@@ -327,20 +325,3 @@ def tolerance_figure(raw: pd.DataFrame, output: Path) -> None:
     metadata = {"Date": None} if output.suffix.lower() == ".svg" else None
     fig.savefig(output, bbox_inches="tight", metadata=metadata)
     plt.close(fig)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    args = parser.parse_args()
-
-    if not args.input.exists():
-        raise SystemExit(f"{args.input} is missing. Run `pixi run bench-tolerance`.")
-    raw = pd.read_csv(args.input)
-    tolerance_figure(raw, args.output)
-    print(f"[figure] wrote {args.output}")
-
-
-if __name__ == "__main__":
-    main()

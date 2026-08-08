@@ -1,148 +1,1163 @@
 {
-  "legacy_gpu": {
-    "note": "Older PyFixest benchmark run; hardware and software versions unrecorded.",
-    "ols_torch_cuda": {
-      "difficult": "8.73s",
-      "simple": "4.73s"
-    }
-  },
-  "prose": {
-    "setup_difficult_setup_s": 0.8758755000308156,
-    "setup_difficult_share": 0.3319326827636981,
-    "setup_difficult_solve_s": 1.7628387499134988,
-    "setup_simple_setup_s": 8.068801125045866,
-    "setup_simple_share": 0.7947389125940293,
-    "setup_simple_solve_s": 2.1195310830371454,
-    "zigzag_fem_s": 0.7110340595245361,
-    "zigzag_within_s": 0.01118156296433881
+  "headline_figure": {
+    "points": [
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.3875272919540293,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.5432386660249904,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.483,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.3304645,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 1.1303794580162505,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 0.551298540958669,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 0.894,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 0.585473416,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 17.975343416968826,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 0.4436055839760229,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 2.577,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 2.029851625,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 54.52937470795587,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 0.4042900410131551,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 5.83,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 2.93438675,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 83.99363741697744,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 0.3816243749461137,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 6.534,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 3.37440525,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 84.30249820795143,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 0.3651347910054028,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 7.246,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 4.294626958,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.5013335410039872,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 4.291608792031184,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.4093189159757457,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_1",
+        "family": "mobility",
+        "gap": 0.41,
+        "median_time": 0.639027500001248,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 1.865931374952197,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 7.511798040999565,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 0.582033707993105,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_2",
+        "family": "mobility",
+        "gap": 0.0769,
+        "median_time": 0.6382808330236003,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 37.517038957972545,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 21.165726083971094,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 1.5494320840225555,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_3",
+        "family": "mobility",
+        "gap": 0.00367,
+        "median_time": 0.4943431250285357,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 83.32517245801864,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 30.13656983402325,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 2.4189026670064777,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_4",
+        "family": "mobility",
+        "gap": 0.00107,
+        "median_time": 0.4578390839742496,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 83.87583458400331,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 41.367017000040505,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 3.4207543749944307,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_5",
+        "family": "mobility",
+        "gap": 0.00011000000000000002,
+        "median_time": 0.4547098329639993,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 84.41601766704116,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 44.21098662499571,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 6.240600832970813,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_mobility_6",
+        "family": "mobility",
+        "gap": 4.8200000000000006e-05,
+        "median_time": 0.4138637500000186,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.3675112079363316,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.5739392919931561,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.452,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.371093541,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 1.3982887080637738,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 1.030151457991451,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 0.872,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 0.582246916,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 18.593312875018455,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 0.8670560420723632,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 1.712,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 1.113804625,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 37.18987062491942,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 0.7917314579244703,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 2.954,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 1.410345709,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 60.13666174991522,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 0.8412355410400778,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 5.928,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 1.92158625,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 62.52905383403413,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "default"
+      },
+      {
+        "backend": "within",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 0.6506802079966292,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "fixest",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 6.232,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "FEM.jl",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 2.30733425,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "default"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.4682457910384983,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 4.990895499940962,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.4249159169849008,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_1",
+        "family": "sorting",
+        "gap": 0.395,
+        "median_time": 0.7028586249798536,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 2.206586208078079,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 3.520912916981615,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 0.4839565840084106,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_2",
+        "family": "sorting",
+        "gap": 0.0654,
+        "median_time": 1.2098929999629036,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 38.85370774997864,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 8.937405458069406,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 0.945557540981099,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_3",
+        "family": "sorting",
+        "gap": 0.00298,
+        "median_time": 0.9570410409942268,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 65.9246022910811,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 17.376303000026383,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 2.0438447080086917,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_4",
+        "family": "sorting",
+        "gap": 0.0013100000000000002,
+        "median_time": 1.0039772499585524,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 63.51157600001898,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 20.52900395798497,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 2.6602567499503493,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_5",
+        "family": "sorting",
+        "gap": 0.0008240000000000001,
+        "median_time": 1.0201399159850553,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "rust-map",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 66.93676429206971,
+        "n_capped": 3,
+        "n_success": 0,
+        "n_trials": 3,
+        "status": "capped",
+        "view": "matched"
+      },
+      {
+        "backend": "within-off",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 23.611666916054673,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-diagonal",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 2.9855181669117883,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      },
+      {
+        "backend": "within-additive",
+        "design": "akm_sorting_6",
+        "family": "sorting",
+        "gap": 0.00042500000000000003,
+        "median_time": 0.7579520420404151,
+        "n_capped": 0,
+        "n_success": 3,
+        "n_trials": 3,
+        "status": "complete",
+        "view": "matched"
+      }
+    ],
+    "schema_version": 1
   },
   "schema_version": 1,
   "tables": {
-    "accuracy_frontier": {
-      "align": "(left, left, right, right, right)",
-      "columns": "(1.15fr, 1.15fr, 0.9fr, 0.95fr, 0.95fr)",
-      "header": [
-        "Design",
-        "Backend",
-        "Tolerance",
-        "Wall time",
-        "Achieved $eta$"
-      ],
-      "rows": [
-        [
-          "simple",
-          "`rust-map`",
-          "0.0001",
-          "0.022s",
-          "$3.8 times 10^(-6)$"
-        ],
-        [
-          "",
-          "",
-          "1e-05",
-          "0.021s",
-          "$4.9 times 10^(-7)$"
-        ],
-        [
-          "",
-          "",
-          "1e-06",
-          "0.023s",
-          "$6.4 times 10^(-8)$"
-        ],
-        [
-          "",
-          "",
-          "1e-08",
-          "0.024s",
-          "$1.1 times 10^(-9)$"
-        ],
-        [
-          "",
-          "`within-additive`",
-          "0.0001",
-          "0.044s",
-          "$7.5 times 10^(-4)$"
-        ],
-        [
-          "",
-          "",
-          "1e-06",
-          "0.042s",
-          "$5.1 times 10^(-6)$"
-        ],
-        [
-          "",
-          "",
-          "1e-08",
-          "0.046s",
-          "$9.0 times 10^(-8)$"
-        ],
-        [
-          "",
-          "",
-          "1e-10",
-          "0.047s",
-          "$1.4 times 10^(-9)$"
-        ],
-        [
-          "difficult",
-          "`rust-map`",
-          "0.0001",
-          "0.060s",
-          "$4.3 times 10^(-3)$"
-        ],
-        [
-          "",
-          "",
-          "1e-05",
-          "0.281s",
-          "$8.2 times 10^(-4)$"
-        ],
-        [
-          "",
-          "",
-          "1e-06",
-          "0.907s",
-          "$1.6 times 10^(-4)$"
-        ],
-        [
-          "",
-          "",
-          "1e-08",
-          "2.81s",
-          "$1.6 times 10^(-6)$"
-        ],
-        [
-          "",
-          "`within-additive`",
-          "0.0001",
-          "0.035s",
-          "$1.9 times 10^(-3)$"
-        ],
-        [
-          "",
-          "",
-          "1e-06",
-          "0.043s",
-          "$1.0 times 10^(-5)$"
-        ],
-        [
-          "",
-          "",
-          "1e-08",
-          "0.044s",
-          "$4.1 times 10^(-7)$"
-        ],
-        [
-          "",
-          "",
-          "1e-10",
-          "0.046s",
-          "$2.9 times 10^(-9)$"
-        ]
-      ]
-    },
     "agreement": {
       "align": "(left, left, right, right)",
       "columns": "(0.95fr, 1.0fr, 0.95fr, 1.25fr)",
@@ -156,392 +1171,426 @@
         [
           "#agreement-simple",
           "`rust-map`",
-          "0.99871660",
+          "1.00463872",
           "--"
         ],
         [
           "",
           "`within`",
-          "0.99871660",
+          "1.00463872",
+          "0"
+        ],
+        [
+          "",
+          "`fixest`",
+          "1.00463872",
           "$1.1 times 10^(-15)$"
         ],
         [
           "",
-          "`fixest`",
-          "0.99871660",
-          "$1.1 times 10^(-14)$"
-        ],
-        [
-          "",
           "`FEM.jl`",
-          "0.99871660",
-          "$9.3 times 10^(-14)$"
+          "1.00463872",
+          "$2.8 times 10^(-14)$"
         ],
         [
           "#agreement-difficult",
           "`rust-map`",
-          "1.00321070",
+          "0.99953355",
           "--"
         ],
         [
           "",
           "`within`",
-          "1.00321085",
-          "$1.5 times 10^(-7)$"
+          "0.99953387",
+          "$3.2 times 10^(-7)$"
         ],
         [
           "",
           "`fixest`",
-          "1.00321085",
-          "$1.5 times 10^(-7)$"
+          "0.99953387",
+          "$3.2 times 10^(-7)$"
         ],
         [
           "",
           "`FEM.jl`",
-          "1.00321069",
-          "$6.7 times 10^(-9)$"
+          "0.99953385",
+          "$3.0 times 10^(-7)$"
         ]
       ]
     },
     "akm_mobility": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Scenario",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`akm_mobility_1`",
-          "0.373 (1.00)",
-          "0.287s",
-          "0.450s",
-          "0.333s",
-          "0.649s"
+          "0.41 (1.00)",
+          "0.388s",
+          "2.45s",
+          "0.350s",
+          "0.543s",
+          "0.483s",
+          "0.330s"
         ],
         [
           "`akm_mobility_2`",
-          "0.0709 (1.00)",
-          "1.11s",
-          "0.878s",
-          "0.607s",
-          "0.463s"
+          "0.0769 (1.00)",
+          "1.13s",
+          "3.60s",
+          "0.453s",
+          "0.551s",
+          "0.894s",
+          "0.585s"
         ],
         [
           "`akm_mobility_3`",
-          "$5.02 times 10^(-3)$ (0.88)",
-          "12.6s",
-          "1.91s",
-          "1.84s",
-          "0.370s"
+          "$3.67 times 10^(-3)$ (0.87)",
+          "18.0s",
+          "capped (0/3)",
+          "1.02s",
+          "0.444s",
+          "2.58s",
+          "2.03s"
         ],
         [
           "`akm_mobility_4`",
-          "$1.18 times 10^(-3)$ (0.63)",
-          "44.6s",
-          "5.82s",
-          "2.72s",
-          "0.356s"
+          "$1.07 times 10^(-3)$ (0.61)",
+          "54.5s",
+          "capped (0/3)",
+          "1.37s",
+          "0.404s",
+          "5.83s",
+          "2.93s"
         ],
         [
           "`akm_mobility_5`",
-          "$1.02 times 10^(-3)$ (0.66)",
-          "47.9s (3/5)",
-          "5.85s",
-          "3.04s",
-          "0.356s"
+          "$1.10 times 10^(-4)$ (0.52)",
+          "capped (0/3)",
+          "capped (0/3)",
+          "2.10s",
+          "0.382s",
+          "6.53s",
+          "3.37s"
         ],
         [
           "`akm_mobility_6`",
-          "$4.63 times 10^(-4)$ (0.64)",
-          "failed (0/3)",
-          "7.23s",
-          "3.95s",
-          "0.335s"
+          "$4.82 times 10^(-5)$ (0.29)",
+          "capped (0/3)",
+          "capped (0/3)",
+          "3.10s",
+          "0.365s",
+          "7.25s",
+          "4.29s"
+        ]
+      ]
+    },
+    "akm_setup_cost": {
+      "align": "(left, right, right, right, right, right)",
+      "columns": "(1.25fr, 1.05fr, 0.8fr, 0.8fr, 0.8fr, 0.8fr)",
+      "header": [
+        "Scenario",
+        "Gap (share)",
+        "2 FE setup",
+        "2 FE solve",
+        "3 FE setup",
+        "3 FE solve"
+      ],
+      "rows": [
+        [
+          "`akm_mobility_1`",
+          "0.41 (1.00)",
+          "0.119s",
+          "0.323s",
+          "0.123s",
+          "0.239s"
+        ],
+        [
+          "`akm_mobility_2`",
+          "0.0769 (1.00)",
+          "0.125s",
+          "0.285s",
+          "0.129s",
+          "0.264s"
+        ],
+        [
+          "`akm_mobility_3`",
+          "$3.67 times 10^(-3)$ (0.87)",
+          "0.039s",
+          "0.150s",
+          "0.047s",
+          "0.254s"
+        ],
+        [
+          "`akm_mobility_4`",
+          "$1.07 times 10^(-3)$ (0.61)",
+          "0.053s",
+          "0.131s",
+          "0.057s",
+          "0.250s"
+        ],
+        [
+          "`akm_mobility_5`",
+          "$1.10 times 10^(-4)$ (0.52)",
+          "0.057s",
+          "0.123s",
+          "0.067s",
+          "0.231s"
+        ],
+        [
+          "`akm_mobility_6`",
+          "$4.82 times 10^(-5)$ (0.29)",
+          "0.067s",
+          "0.057s",
+          "0.073s",
+          "0.176s"
         ]
       ]
     },
     "akm_sorting": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.15fr, 0.95fr, 0.72fr, 0.72fr, 0.78fr, 0.82fr, 0.70fr, 0.70fr)",
       "header": [
         "Scenario",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`akm_sorting_1`",
-          "$8.94 times 10^(-3)$ (0.96)",
-          "7.50s",
-          "1.27s",
-          "1.40s",
-          "0.387s"
+          "0.395 (1.00)",
+          "0.368s",
+          "2.80s",
+          "0.367s",
+          "0.574s",
+          "0.452s",
+          "0.371s"
         ],
         [
           "`akm_sorting_2`",
-          "$3.58 times 10^(-3)$ (0.96)",
-          "13.5s",
-          "2.13s",
-          "1.73s",
-          "0.425s"
+          "0.0654 (1.00)",
+          "1.40s",
+          "2.17s",
+          "0.433s",
+          "1.03s",
+          "0.872s",
+          "0.582s"
         ],
         [
           "`akm_sorting_3`",
-          "$6.80 times 10^(-3)$ (0.96)",
-          "9.33s",
-          "2.00s",
-          "1.59s",
-          "0.406s"
+          "$2.98 times 10^(-3)$ (1.00)",
+          "18.6s",
+          "capped (0/3)",
+          "0.831s",
+          "0.867s",
+          "1.71s",
+          "1.11s"
         ],
         [
           "`akm_sorting_4`",
-          "$4.38 times 10^(-3)$ (0.96)",
-          "14.5s",
-          "2.14s",
-          "1.65s",
-          "0.412s"
+          "$1.31 times 10^(-3)$ (1.00)",
+          "37.2s",
+          "capped (0/3)",
+          "1.12s",
+          "0.792s",
+          "2.95s",
+          "1.41s"
         ],
         [
           "`akm_sorting_5`",
-          "$2.17 times 10^(-3)$ (0.96)",
-          "26.7s",
-          "3.10s",
-          "1.99s",
-          "0.410s"
-        ]
-      ]
-    },
-    "amortization": {
-      "align": "(center, right, right, right, right)",
-      "columns": "(0.6fr, 1.0fr, 1.0fr, 0.8fr, 1.1fr)",
-      "header": [
-        "RHS $K$",
-        "`diagonal` (s)",
-        "`additive` (s)",
-        "Ratio",
-        "`additive` per RHS (s)"
-      ],
-      "rows": [
-        [
-          "1",
-          "3.87",
-          "0.21",
-          "18.4x",
-          "0.210"
+          "$8.24 times 10^(-4)$ (1.00)",
+          "60.1s",
+          "capped (0/3)",
+          "1.42s",
+          "0.841s",
+          "5.93s",
+          "1.92s"
         ],
         [
-          "2",
-          "6.91",
-          "0.26",
-          "26.8x",
-          "0.129"
-        ],
-        [
-          "5",
-          "13.98",
-          "0.45",
-          "30.8x",
-          "0.091"
-        ],
-        [
-          "10",
-          "21.48",
-          "0.68",
-          "31.6x",
-          "0.068"
-        ],
-        [
-          "25",
-          "58.20",
-          "1.94",
-          "30.1x",
-          "0.077"
+          "`akm_sorting_6`",
+          "$4.25 times 10^(-4)$ (1.00)",
+          "capped (0/3)",
+          "capped (0/3)",
+          "1.73s",
+          "0.651s",
+          "6.23s",
+          "2.31s"
         ]
       ]
     },
     "correia_real": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.05fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`credit`",
           "0.402 (1.00)",
-          "0.136s",
-          "0.123s",
-          "0.088s",
-          "0.117s"
+          "0.198s",
+          "#miss",
+          "#miss",
+          "0.213s",
+          "0.155s",
+          "0.094s"
         ],
         [
           "`soccer`",
           "0.889 (1.00)",
+          "0.034s",
+          "#miss",
+          "#miss",
+          "0.056s",
           "0.014s",
-          "0.013s",
-          "0.010s",
-          "0.028s"
+          "0.010s"
         ],
         [
           "`enron`",
           "$7.04 times 10^(-3)$ (0.99)",
-          "2.90s",
-          "0.508s",
-          "0.311s",
-          "0.304s"
+          "2.95s",
+          "#miss",
+          "#miss",
+          "0.398s",
+          "0.537s",
+          "0.316s"
         ],
         [
           "`github`",
           "$6.30 times 10^(-4)$ (0.32)",
-          "failed (0/3)",
-          "1.40s",
-          "1.44s",
-          "0.188s"
+          "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.312s",
+          "1.43s",
+          "1.44s"
         ],
         [
           "`patents`",
           "$5.18 times 10^(-4)$ (0.95)",
-          "failed (0/3)",
-          "1.02s",
-          "0.570s",
-          "0.267s"
+          "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.384s",
+          "1.05s",
+          "0.582s"
         ],
         [
           "`workers`",
           "$2.74 times 10^(-4)$ (0.63)",
-          "failed (0/3)",
-          "1.97s",
-          "1.45s",
-          "0.155s"
+          "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.284s",
+          "1.98s",
+          "1.45s"
         ],
         [
           "`schools`",
           "$2.21 times 10^(-3)$ (1.00)",
-          "5.61s",
-          "0.800s",
-          "0.484s",
-          "0.131s"
+          "5.79s",
+          "#miss",
+          "#miss",
+          "0.238s",
+          "0.825s",
+          "0.495s"
         ],
         [
           "`directors`",
           "$5.12 times 10^(-4)$ (0.30)",
-          "failed (0/3)",
-          "0.281s",
-          "0.452s",
-          "0.190s"
+          "capped (0/3)",
+          "#miss",
+          "#miss",
+          "0.339s",
+          "0.280s",
+          "0.459s"
         ]
       ]
     },
     "correia_synthetic": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "`synthetic-complete`",
           "1.00 (1.00)",
-          "0.062s",
-          "0.060s",
-          "0.033s",
-          "0.109s"
+          "0.111s",
+          "#miss",
+          "#miss",
+          "0.227s",
+          "0.088s",
+          "0.047s"
         ],
         [
           "`synthetic-uniform-easy`",
           "0.651 (1.00)",
-          "0.093s",
-          "0.133s",
-          "0.053s",
-          "0.097s"
+          "0.170s",
+          "#miss",
+          "#miss",
+          "0.178s",
+          "0.165s",
+          "0.068s"
         ],
         [
           "`synthetic-uniform-hard`",
           "0.184 (1.00)",
-          "0.235s",
-          "0.330s",
-          "0.181s",
-          "0.843s"
+          "0.362s",
+          "#miss",
+          "#miss",
+          "0.951s",
+          "0.359s",
+          "0.233s"
         ],
         [
           "`synthetic-uniform-harder`",
           "0.0249 (1.00)",
-          "0.598s",
-          "1.15s",
-          "0.274s",
-          "0.450s"
+          "0.748s",
+          "#miss",
+          "#miss",
+          "0.560s",
+          "1.18s",
+          "0.288s"
         ],
         [
           "`synthetic-assortative`",
           "$1.33 times 10^(-3)$ (0.70)",
-          "13.5s",
-          "1.35s",
-          "1.19s",
-          "0.264s"
-        ]
-      ]
-    },
-    "factor_scaling": {
-      "align": "(center, center, right, right, right, right)",
-      "columns": "(0.6fr, 0.6fr, 0.9fr, 0.9fr, 0.9fr, 0.9fr)",
-      "header": [
-        "Factors $Q$",
-        "Pairs",
-        "Setup (s)",
-        "Solve (s)",
-        "Setup share",
-        "Iterations"
-      ],
-      "rows": [
-        [
-          "2",
-          "1",
-          "0.077",
-          "0.151",
-          "34%",
-          "25"
-        ],
-        [
-          "3",
-          "3",
-          "0.078",
-          "0.192",
-          "29%",
-          "24"
-        ],
-        [
-          "4",
-          "6",
-          "0.102",
-          "0.282",
-          "27%",
-          "29"
-        ],
-        [
-          "5",
-          "10",
-          "0.141",
-          "0.417",
-          "25%",
-          "35"
+          "13.0s",
+          "#miss",
+          "#miss",
+          "0.379s",
+          "1.37s",
+          "1.19s"
         ]
       ]
     },
@@ -565,126 +1614,10 @@
         ],
         [
           "difficult",
-          "8447",
-          "248",
-          "181",
-          "24"
-        ]
-      ]
-    },
-    "mechanism_mobility": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.94fr, 0.86fr, 0.94fr, 0.94fr)",
-      "header": [
-        "Scenario",
-        "Gap (share)",
-        "`rust-map-matched`",
-        "`within-off`",
-        "`within-diagonal`",
-        "`within-additive`"
-      ],
-      "rows": [
-        [
-          "`akm_mobility_1`",
-          "0.373 (1.00)",
-          "0.406s",
-          "4.09s",
-          "0.290s",
-          "0.708s"
-        ],
-        [
-          "`akm_mobility_2`",
-          "0.0709 (1.00)",
-          "1.89s",
-          "8.39s",
-          "0.484s",
-          "0.527s"
-        ],
-        [
-          "`akm_mobility_3`",
-          "$5.02 times 10^(-3)$ (0.88)",
-          "26.9s",
-          "21.7s",
-          "1.46s",
-          "0.432s"
-        ],
-        [
-          "`akm_mobility_4`",
-          "$1.18 times 10^(-3)$ (0.63)",
-          "79.8s (3/5)",
-          "35.2s",
-          "2.46s",
-          "0.404s"
-        ],
-        [
-          "`akm_mobility_5`",
-          "$1.02 times 10^(-3)$ (0.66)",
-          "failed (0/3)",
-          "38.6s",
-          "3.11s",
-          "0.397s"
-        ],
-        [
-          "`akm_mobility_6`",
-          "$4.63 times 10^(-4)$ (0.64)",
-          "failed (0/3)",
-          "35.4s (3/5)",
-          "5.55s",
-          "0.373s"
-        ]
-      ]
-    },
-    "mechanism_sorting": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.94fr, 0.86fr, 0.94fr, 0.94fr)",
-      "header": [
-        "Scenario",
-        "Gap (share)",
-        "`rust-map-matched`",
-        "`within-off`",
-        "`within-diagonal`",
-        "`within-additive`"
-      ],
-      "rows": [
-        [
-          "`akm_sorting_1`",
-          "$8.94 times 10^(-3)$ (0.96)",
-          "14.5s",
-          "14.4s",
-          "0.946s",
-          "0.451s"
-        ],
-        [
-          "`akm_sorting_2`",
-          "$3.58 times 10^(-3)$ (0.96)",
-          "27.6s",
-          "19.8s",
-          "1.41s",
-          "0.495s"
-        ],
-        [
-          "`akm_sorting_3`",
-          "$6.80 times 10^(-3)$ (0.96)",
-          "20.2s",
-          "17.4s",
-          "1.39s",
-          "0.488s"
-        ],
-        [
-          "`akm_sorting_4`",
-          "$4.38 times 10^(-3)$ (0.96)",
-          "29.3s",
-          "17.9s",
-          "1.37s",
-          "0.485s"
-        ],
-        [
-          "`akm_sorting_5`",
-          "$2.17 times 10^(-3)$ (0.96)",
-          "57.5s",
-          "17.1s",
-          "1.51s",
-          "0.484s"
+          "8159",
+          "249",
+          "180",
+          "22"
         ]
       ]
     },
@@ -707,14 +1640,14 @@
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "306 MiB",
-          "359 MiB"
+          "354 MiB",
+          "409 MiB"
         ],
         [
           "difficult (near-nested)",
           "$1.30 times 10^(-3)$ (1.00)",
-          "318 MiB",
-          "354 MiB"
+          "359 MiB",
+          "408 MiB"
         ],
         [
           "#memory-1m",
@@ -725,50 +1658,56 @@
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "679 MiB",
-          "1,000 MiB"
+          "833 MiB",
+          "1,101 MiB"
         ],
         [
           "difficult (near-nested)",
           "$1.67 times 10^(-5)$ (1.00)",
-          "702 MiB",
-          "884 MiB"
+          "821 MiB",
+          "949 MiB"
         ]
       ]
     },
     "ols": {
-      "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.86fr)",
+      "align": "(left, right, right, right, right, right, right, right)",
+      "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Design",
         "Gap (share)",
         "`rust-map`",
+        "`within-off`",
+        "`within-diagonal`",
+        "`within`",
         "`fixest`",
-        "`FEM.jl`",
-        "`within`"
+        "`FEM.jl`"
       ],
       "rows": [
         [
           "simple (well-connected)",
           "0.857 (1.00)",
-          "2.98s",
-          "2.82s",
-          "2.53s",
-          "12.0s"
+          "2.58s",
+          "2.69s",
+          "2.64s",
+          "11.5s",
+          "2.64s",
+          "2.16s"
         ],
         [
           "difficult (near-nested)",
           "$1.67 times 10^(-7)$ (1.00)",
-          "416.2s",
-          "73.0s",
-          "31.7s",
-          "4.37s"
+          "337.2s",
+          "11.0s",
+          "capped (0/3)",
+          "4.45s",
+          "63.5s",
+          "27.8s"
         ]
       ]
     },
     "ppml": {
       "align": "(left, right, right, right, right, right)",
-      "columns": "(1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr)",
+      "columns": "(1.25fr, 0.42fr, 0.72fr, 0.72fr, 0.80fr, 0.90fr)",
       "header": [
         "Design",
         "FE",
@@ -781,96 +1720,80 @@
         [
           "simple (well-connected)",
           "3",
-          "10.1s",
-          "5.57s",
-          "8.68s",
-          "7.82s"
+          "7.86s",
+          "4.72s",
+          "5.76s",
+          "9.25s"
         ],
         [
           "difficult (near-nested)",
           "3",
-          "failed (0/3)",
-          "319.8s",
-          "166.8s",
-          "5.05s"
+          "capped (0/3)",
+          "439.4s",
+          "129.8s",
+          "5.43s"
         ]
       ]
     },
-    "ppml_inner_outer": {
-      "align": "(left, left, center, right, right, right)",
-      "columns": "(1.0fr, 1.15fr, 0.78fr, 0.85fr, 0.95fr, 0.85fr)",
+    "regression_reuse": {
+      "align": "(left, left, right, right, right, right)",
+      "columns": "(0.8fr, 1.25fr, 0.85fr, 0.85fr, 0.85fr, 0.7fr)",
       "header": [
         "Design",
-        "Preconditioner",
-        "Rebuilt",
-        "Outer steps",
-        "Inner LSMR",
-        "Total"
+        "Policy",
+        "Setup",
+        "Solve",
+        "Total",
+        "Speedup"
       ],
       "rows": [
         [
           "simple",
-          "`off`",
-          "no",
-          "100 (capped)",
-          "192#h(0.18em)492",
-          "86.8s"
+          "Diagonal",
+          "0.052s",
+          "0.640s",
+          "0.692s",
+          "1.0x"
         ],
         [
           "",
-          "`diagonal`",
-          "no",
-          "100 (capped)",
-          "189#h(0.18em)419",
-          "88.6s"
+          "Additive, rebuilt",
+          "2.89s",
+          "1.56s",
+          "4.46s",
+          "0.2x"
         ],
         [
           "",
-          "`additive`",
-          "no",
-          "100 (capped)",
-          "192#h(0.18em)118",
-          "120.0s"
-        ],
-        [
-          "",
-          "`additive`",
-          "yes",
-          "32",
-          "1#h(0.18em)905",
-          "2.17s"
+          "Additive, cached",
+          "0.283s",
+          "1.55s",
+          "1.83s",
+          "0.4x"
         ],
         [
           "difficult",
-          "`off`",
-          "no",
-          "100 (capped)",
-          "198#h(0.18em)257",
-          "90.7s"
+          "Diagonal",
+          "0.050s",
+          "50.3s",
+          "50.3s",
+          "1.0x"
         ],
         [
           "",
-          "`diagonal`",
-          "no",
-          "100 (capped)",
-          "198#h(0.18em)210",
-          "204.6s"
+          "Additive, rebuilt",
+          "0.434s",
+          "1.34s",
+          "1.77s",
+          "28.4x"
         ],
         [
           "",
-          "`additive`",
-          "no",
-          "100 (capped)",
-          "195#h(0.18em)882",
-          "140.8s"
-        ],
-        [
-          "",
-          "`additive`",
-          "yes",
-          "63",
-          "3#h(0.18em)351",
-          "3.90s"
+          "Additive, cached",
+          "0.040s",
+          "1.19s",
+          "1.23s",
+          "41.1x"
         ]
       ]
     }

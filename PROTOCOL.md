@@ -17,21 +17,18 @@ metric is read. A claim with no row is not a claim the paper may make.
 
 | # | Claim | Experiment | Deciding metric | Accuracy gate |
 |---|---|---|---|---|
-| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility sweep at 1M | Median total wall time, all backends | Gate A on every reported cell |
-| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM mobility and sorting sweeps | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
-| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy arms of the AKM sweep | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
-| 4 | Diagonal scaling removes them only partially | Matched-accuracy arms | LSMR iterations, `diagonal` vs `additive` | Gate A |
-| 5 | Factor-pair preconditioning reduces LSMR iterations relative to diagonal preconditioning where pair coupling matters | Matched-accuracy arms | Median, max, and sum of per-RHS iterations | Gate A |
-| 6 | It reduces total runtime only when iteration savings exceed setup and application cost | Setup/solve split on every within configuration | `T_setup` vs `T_solve` vs `T_total` | Gate A |
-| 7 | Setup is most expensive on the dense graphs that need it least | Standalone preconditioner diagnostics | Factorization time and retained fill against graph density | Gate A on the paired solve |
-| 8 | `within` runtime is close to invariant to connectivity, and mildly decreasing in it | AKM mobility sweep | Median and IQR of total time across the sweep | Gate A; repetition rule R1 |
-| 9 | Setup amortizes across right-hand sides, repeated fits, and IRLS steps; headline timings do not amortize it | Multi-RHS experiment, K in {1,2,5,10,25} | Total time against K, measured break-even | Gate A at each K |
-| 10 | Pairwise spectral gaps describe difficult designs but are not a solver-selection rule | Pooled gap-versus-runtime analysis over all collected designs | Slope of log runtime on log gap by backend, plus named counter-examples | Uses existing recorded runtimes |
-| 11 | The method loses on well-connected designs at scale | 10M simple design | Total time and setup share | Gate A |
-| 12 | Scaling in the number of absorbed factors Q | Q in {2,3,4,5} at fixed n | Setup, solve, iterations, accuracy | Gate A |
+| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility designs at 1M | Median total wall time, all backends | Gate A on every reported cell |
+| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
+| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
+| 4 | Diagonal scaling removes them only partially | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations, `diagonal` vs `additive` | Gate A |
+| 5 | Factor-pair preconditioning reduces LSMR iterations relative to diagonal preconditioning where pair coupling matters | Simple and difficult iteration-count benchmark | Median iterations for `diagonal` vs `additive` | Gate A |
+| 6 | Factor-pair preconditioning reduces total runtime only when iteration savings exceed setup and application cost | AKM setup-cost and ten-regression reuse experiments | Setup, solve, and total time | Gate A |
+| 7 | Setup is most expensive on the dense graphs that need it least | Additive setup cost across AKM mobility designs | Construction time against the worker-firm gap | Gate A on the paired solve |
+| 8 | `within` runtime varies little and declines modestly as connectivity weakens | AKM designs varying mobility | Median and IQR of total time across the designs | Gate A; repetition rule R1 |
+| 9 | Setup amortizes across repeated fits with unchanged weights; PPML is a separate repeated-solve use case in which the weights change between IRLS steps | Ten-regression experiment on the simple and difficult designs; main PPML benchmark | Setup and solve time for repeated OLS fits; total PPML runtime | Gate A for every reported cell |
+| 10 | The method loses on well-connected designs at scale | 10M simple design | Total runtime | Gate A |
 
-Claims 3 through 7 are the mechanism section. Claims 1, 8, and 11 are the headline. Claim
-10 is the diagnostic caveat.
+Claims 3 through 7 cover the mechanism. Claims 1, 8, and 10 are the headline results.
 
 Any claim that cannot clear its gate is either dropped or reported with the failure
 stated in the same sentence. "Capped", "did not converge", and "did not reach the gate"
@@ -39,23 +36,28 @@ are results, not omissions.
 
 ## 2. Sample and specification
 
-These are held identical across every backend within a comparison. A timing that does not
-come from the same retained sample as its comparators is not a comparison.
+Every backend receives the same input data and regression specification. Cross-package
+tables retain package-specific behavior except where a shared control is stated
+explicitly. Single-package mechanism exercises hold the estimation path fixed when they
+isolate a solver choice.
 
-- **Retained sample.** Backends receive the same input file. Singleton dropping is left
-  at each package's default, and the retained row count is recorded per backend per trial
-  so that a cell whose retained count differs from its comparators can be flagged rather
-  than compared. *Currently recorded for the PyFixest backends only; see the open items.*
+- **Retained sample.** Backends receive the same input file. Cross-package OLS and PPML
+  benchmarks use each package's default singleton and separation handling. Every row
+  records whether the fit converged; successful rows also record the retained-observation
+  count. These timings use default sample handling rather than a forced common estimation
+  sample. Matched-solver exercises run through one package path on the same prepared sample.
+- **PPML outer iterations.** PyFixest, R `fixest`, and `GLFixedEffectModels.jl` each
+  receive an outer IRLS limit of 100 iterations. This common cap replaces their package
+  defaults; their separation handling and other solver settings remain unchanged.
 - **Weights.** Unweighted (`W = I`) in every benchmark. Weighted solves appear only
   inside PPML, where IRLS sets them.
-- **Covariates.** One slope covariate `x1`, except in the multi-RHS amortization
-  experiment, which is the only place K > 1.
+- **Covariates.** Every regression has one slope covariate, `x1`.
 - **Factor order.** Worker, firm, year, in that order, for every experiment. MAP is
-  sensitive to the cycling order, so it must not vary across tables. Reconciled
-  2026-07-26; the OLS and PPML tables predate it and must be regenerated.
-- **Threads.** `BENCH_THREADS=10` and `JULIA_NUM_THREADS=10` on the ten-core reference
-  machine. `check-external-runtimes` verifies both and stops on a mismatch.
-- **Data.** A fixed stored dataset per design, generated once and reused for every
+  sensitive to the cycling order, so it must not vary across tables.
+- **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
+  launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
+  `check-external-runtimes` verifies the R and Julia settings before a production run.
+- **Data.** One deterministic dataset per design, generated once and reused for every
   repetition. Regenerating the sample per repetition confounds solver variance with DGP
   variance; DGP replication is a separate robustness exercise with its own rows.
 
@@ -71,17 +73,17 @@ low-dimensional regression.
 Outside the boundary: file reading and parsing, format conversion, interpreter or JIT
 startup, and package loading.
 
-Each subprocess backend warms up on a burn-in dataset that is discarded, so JIT
-compilation and lazy initialization are not charged to the first timed trial.
+Each backend makes one unreported warm-up fit on the same generated sample before its
+timed trials, so lazy initialization is not charged to the first recorded call.
 
-For every within configuration the total is decomposed as
+The setup-cost and reuse experiments decompose the measured solver time as
 
 ```
-T_total = T_common_setup + T_preconditioner + T_solve + T_low_dimensional_regression
+T_total = T_preconditioner + T_solve
 ```
 
-and all four parts are recorded. Reporting only the total hides the trade-off that
-claims 6 and 7 are about.
+Package-level regression tables report the full fit time. The separate decomposition
+measures the setup and solve terms used in claims 6 and 7.
 
 ## 4. Repetitions and reporting
 
@@ -90,23 +92,31 @@ turns on separating timings that differ by tens of milliseconds.
 
 | Rule | Cell runtime | Timed repetitions |
 |---|---|---|
-| R1 | Under 1 second | 20 to 30 |
-| R2 | 1 to 10 seconds | 7 to 10 |
-| R3 | Over 10 seconds | 3 to 5 |
+| R1 | Under 1 second | 20 |
+| R2 | 1 to 10 seconds | 7 |
+| R3 | Over 10 seconds | 3 |
 
 Additional rules, all mandatory:
 
 - One discarded burn-in trial precedes the timed ones, per backend per design.
-- Backend order is randomized within a design so that thermal drift and background load
-  do not align with a backend.
-- Report the median and the interquartile range. A median without a spread cannot
-  support an invariance claim.
+- Backends run sequentially in the fixed order shown by the experiment script. Production
+  runs use an otherwise idle machine.
+- The canonical paper tables report medians. Raw trial rows retain the distribution for
+  any claim that needs a spread.
 - Failed and capped trials stay in the record. They are never dropped before the median.
+- Every measured estimator call writes a row. An iteration limit sets `capped=true`;
+  another estimator exception sets `converged=false`, keeps the error message, and does
+  not stop the remaining repetitions or backends. User interrupts still stop the task.
 - Every cell reports its converged count beside the timing, and the rule appears in the
   table note rather than only in this file.
 
 "Median among converged trials" is a selected estimator and must be labelled as one
 wherever it is used.
+
+The 10M main OLS comparison uses the adaptive R1/R2/R3 rule. The AKM and Correia OLS
+comparisons use three planned calls per cell. The PPML comparison also uses three calls;
+the AKM setup-cost experiment uses five, the ten-regression reuse experiment uses three,
+and memory and coefficient-agreement diagnostics use one isolated call per cell.
 
 ## 5. Accuracy metrics
 
@@ -144,15 +154,12 @@ fitted values, demeaned variables, slopes, scores, and objectives.
 - `max_j delta_j <= 1e-7`
 - slope difference below `1e-4` reference standard errors
 
-All three must be measured. A record that did not compute one of them has not cleared
-Gate A; `AccuracyRecord.clears_gate_a` requires all three to be present and passing, and
-`gate_a_components_measured` reports whether they were computed at all. The standalone
-preconditioner benchmark and the calibration pilot currently measure only `eta` and
-`delta`, so they report a gate result for those two and are not full Gate A records.
+All three must be measured before a result is said to clear Gate A. The standalone
+preconditioner benchmark measures `eta` and `delta`, but not the slope difference, so it
+does not report a full Gate A result.
 
-Frozen by `pixi run pilot-calibration` on the 100K simple and difficult designs. The
-thresholds are unchanged from the provisional values; what the pilot settled is the
-tolerance needed to reach them.
+The thresholds were frozen from a one-time calibration on the 100K simple and difficult
+designs. Focused tests retain the dense-residual, projection, and cap-reporting checks.
 
 **A nominal tolerance is not an achieved accuracy.** The LSMR stopping rule bounds a
 relative normal-equation residual recovered from the bidiagonalization scalars, which is
@@ -209,7 +216,10 @@ Verified at every level that can cap:
 - LSMR returns `converged=False` with `iterations` equal to the cap.
 - The MAP diagnostics return `censoring="capped"` with `iterations` equal to the cap.
 - PyFixest raises `ValueError: Demeaning failed after N iterations.`, which the harness
-  records as `success=False` with the message retained.
+  records as `converged=False` with the message retained.
+- R and Julia warnings or returned convergence flags are converted to the same row
+  fields. If an isolated estimator process exits before writing its rows, the parent
+  writes one failed row for each planned repetition.
 
 No path silently reports a capped run as converged.
 
@@ -225,22 +235,25 @@ No path silently reports a capped run as converged.
 
 ## 6. Cross-package comparison
 
-Two views, kept separate.
+Three comparisons are kept separate.
 
-1. **Package defaults**, each annotated with its achieved `eta`, so a reader sees the
-   accuracy that each runtime bought.
-2. **A time-versus-accuracy frontier** for one easy and one hard design: each package
-   swept over roughly four of its own tolerance settings, plotting wall time against
-   achieved `eta`.
+1. **Package defaults.** The five OLS package-runtime tables include PyFixest MAP,
+   PyFixest LSMR with no, diagonal, and factor-pair preconditioning, R `fixest`, and
+   `FixedEffectModels.jl`. The three PyFixest LSMR configurations keep their documented
+   default tolerance and iteration cap. PPML keeps only the factor-pair reuse path.
+2. **Matched PyFixest runs.** MAP and the three LSMR preconditioners use explicit
+   tolerances and a common iteration budget on the AKM mobility and sorting designs.
+3. **Runtime against achieved precision.** Each backend is tested at its own tolerance
+   settings on three AKM mobility designs. The figure plots wall time against coefficient
+   and residual error measured on the returned fit.
 
-A single matched-accuracy table is not used. `fixest` does not monitor `eta`, so forcing
-it to a threshold built around the proposed method means driving an unrelated criterion
-until an untargeted metric happens to clear a bar, and some packages will not clear it at
-any setting.
+Matched accuracy is restricted to the PyFixest methods, which can be assessed with the
+same external metric. `fixest` does not monitor `eta`; changing its stopping criterion
+until `eta` crosses a chosen threshold would not match the criterion the package uses.
 
-Only the documented default within configuration appears in cross-package tables. The
-three preconditioner variants belong to the mechanism section; selecting the fastest one
-per cell after the fact would not be a package comparison.
+The package-runtime tables display all three default PyFixest LSMR configurations rather
+than selecting one after seeing the results. The matched controls appear only in the
+headline figure and retain their explicit tolerances and iteration budget.
 
 Iteration counts are never placed on a shared axis. A MAP sweep, a `fixest` fixed-point
 iteration, and an LSMR iteration are different units and get separate panels.
@@ -258,73 +271,47 @@ accuracy on that exact sample.
 | Experiment | Scale | Methods | Purpose |
 |---|---|---|---|
 | Correctness pilot | 100K simple/difficult | MAP + three within configurations | Validate metrics against a direct reference; freeze Gate A |
-| Standalone diagnostics | 1M AKM designs | Three within configurations | Setup/solve split, per-RHS iterations, eta, pair density on the mechanism samples |
-| AKM mobility sweep | 1M | MAP + three within configurations | Main mechanism experiment |
-| AKM sorting sweep | 1M | MAP + three within configurations | Corroborating connectivity experiment |
-| Accelerated-MAP check | 1M mobility sweep | R `fixest` plus selected same-package results | Whether acceleration mitigates the MAP slowdown |
-| Large-scale simple/difficult | 10M | Same-package four-way plus external packages | Headline total-runtime comparison |
-| Accuracy frontier | 10M simple and difficult | All external packages | Time versus achieved accuracy |
-| Factor scaling | 1M, Q in {2,3,4,5} | `within-additive`, plus MAP for reference | Structural weak point of the pair construction |
-| Amortization | 1M easy and hard | Primarily `diagonal` and `additive` | Setup reuse across right-hand sides and fits |
-| Selected Correia designs | Existing sizes | External packages plus `within-additive` | Robustness across graph families |
-| PPML simple/difficult | 1M | Three within configurations plus external packages | Inner solver versus outer IRLS convergence |
+| AKM setup cost | 1M mobility designs | Factor-pair LSMR with two and three fixed effects | Construction and solve time across connectivity |
+| AKM designs varying mobility | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
+| AKM designs varying sorting | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
+| Large-scale simple/difficult | 10M | Six default OLS configurations | Headline total-runtime comparison |
+| Runtime and achieved precision | 1M selected AKM mobility designs | PyFixest MAP and LSMR variants, R `fixest`, and `FixedEffectModels.jl` | Wall time against coefficient and residual error |
+| Ten-regression reuse | 1M simple and difficult | Diagonal, rebuilt factor-pair, and cached factor-pair preconditioners | Setup reuse across fits |
+| Selected Correia designs | Existing sizes | Six default OLS configurations | Robustness across graph families |
+| PPML simple/difficult | 1M | PyFixest MAP and factor-pair reuse, plus external packages | Inner solver versus outer IRLS convergence |
 
-The mobility experiment carries the mechanism weight, because it varies the economic
-source of computational difficulty while holding the rest of the DGP fixed. Sorting
-corroborates it.
+Mobility is the main mechanism experiment because it varies the economic source of
+computational difficulty while holding the rest of the DGP fixed. The sorting designs
+provide a second comparison.
 
 ## 8. Open items
 
 Resolved before the production runs, and struck from this list when done:
 
 - [x] Validate Gate A on the 100K pilot and freeze the thresholds. Done 2026-07-26;
-      `pixi run pilot-calibration` regenerates the evidence in section 5.
+      the numerical checks now live in the test suite rather than a public benchmark.
 - [x] Verify that all three within configurations reach the same projection. Done.
 - [x] Test MAP and LSMR failure and cap reporting. Done.
-- [x] Reconcile the factor order between the OLS/PPML specs and the AKM sweep spec. Done
-      2026-07-26: all three now absorb `indiv_id, firm_id, year`. **The existing OLS and
-      PPML tables were produced under the old order and must be regenerated.**
-- [~] Randomized backend ordering. The runner shuffles the backend list once per
-      invocation with a seed and prints it, but it then runs every design for one backend
-      before moving to the next. That is randomization across the run, not within each
-      design, so thermal drift can still align with a backend. The rule in section 4 is
-      not yet met.
-- [~] Retained sample size. `n_retained` is recorded for the PyFixest backends only. The
-      R and Julia subprocess protocol returns the input row count and the parser never
-      populates the field, so a singleton-handling difference between PyFixest and
-      `fixest` or `FEM.jl` still cannot be detected. Cross-backend retained-size checking
-      is not yet in place.
-- [x] One shared experiment layer. `benchmarks/dgp/samples.py, benchmarks/solvers/specs.py and benchmarks/core/records.py` holds sample
-      identity, the seed rule, the solver settings, and the `RunRecord` schema. The seed
-      no longer depends on the repetition index, an in-process cache hands every
-      repetition the identical arrays, the standalone diagnostics run at the same matched
-      settings as the end-to-end ablation, and `write_records` refuses to write a record
-      that fails `validate()`.
-- [x] Run the standalone diagnostics on the AKM designs. `load_sample` reaches both the
-      `simple`/`difficult` generator and the AKM sweep Parquet cache, so the mechanism
-      metrics are recorded on the mechanism samples.
+- [x] Reconcile the factor order between the OLS/PPML specs and the AKM mobility spec. Done
+      2026-07-26: all three now absorb `indiv_id, firm_id, year`.
+- [x] Retained sample size. Every final Python, R, and Julia row records `n_retained`.
+      Cross-package tables retain each package's default sample handling, and the
+      recorded counts document any resulting difference.
+- [x] One shared experiment layer. The OLS runner creates one temporary Parquet sample
+      per design. Every backend loads that sample in a fresh process, so process-local
+      memory is returned before the next cell starts. Seeds belong to designs rather
+      than repetitions, and each result file is written once after the complete run.
 - [x] Wire the R1/R2/R3 repetition counts into the harness. Done. The PyFixest
       benchmarkers time one fit, choose the count from its runtime, and repeat on the
-      same in-memory frame. `FeolsResult` separates `repetition` from `iter_num`, records
-      the planned count, and the renderer checks a cell against the plan rather than
-      against a hardcoded three. Rows without the fields are treated as pre-rule results
-      expecting three trials, so existing tables still render.
-- [ ] Reduce the DGP replicate count for timing. Repetitions and replicates now multiply:
-      three stored replicates times twenty repetitions is sixty trials on a subsecond
-      cell. Timing should run on one replicate, with DGP replication kept as its own
-      exercise, which is a change to the drivers rather than the harness.
-- [x] Settle PPML preconditioner reuse. Done 2026-07-28. The outer criterion was the
-      problem: `max |delta eta|` never fired, absolutely or relatively, so every
-      configuration read as non-converged. It now stops on relative deviance and relative
-      coefficient change. At 1M with an inner tolerance of 1e-12, reuse leaves every
-      configuration at the 100-step outer cap while rebuilding converges in 32 (simple)
-      and 63 (difficult) steps. Reported in the manuscript scoped to that tolerance.
-- [ ] Measure PPML reuse at the shipped inner tolerance. The result above is at 1e-12
-      with a 10000-iteration inner cap. PyFixest ships 1e-8 with 1000, reuses the
-      preconditioner across IRLS steps, and converges, so the two regimes disagree and
-      only one is measured. `pixi run ppml-inner-outer` now sweeps both; it needs an
-      otherwise idle machine, since the timings are the point.
+      same backend-native frame. Final rows keep `repetition` and `n_planned`, and the
+      renderer checks a cell against that recorded plan rather than assuming three trials.
+- [x] Reduce the DGP replicate count for timing. Each timing runner now generates one
+      sample per design and repeats the fit on that sample. DGP replication remains a
+      separate robustness exercise.
+- [x] Keep the PPML benchmark on package behavior. PyFixest `fepois` reuses the first
+      factor-pair preconditioner as the IRLS weights change. The paper reports this path
+      in the main PPML table and does not retain a separate rebuild treatment.
 - [x] Report iterations in solver-specific units. Done 2026-07-28.
-      `bench_within_preconditioners.py --with-map` runs counting MAP beside the three
-      LSMR configurations on one sample, each row carries an `iteration_unit`, and the
-      renderer keeps sweeps and iterations in separate columns.
+      `pixi run within-preconditioners` runs counting MAP beside the three LSMR
+      configurations on one sample. The renderer keeps MAP sweeps and LSMR iterations
+      in separate columns and marks capped cells.

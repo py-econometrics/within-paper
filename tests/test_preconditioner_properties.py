@@ -238,7 +238,9 @@ class PreconditionerPropertyTests(unittest.TestCase):
                 )
                 options = within.LsmrOptions()
                 baseline = within.solve_batch(
-                    np.asfortranarray(design.astype(np.uint32)), rhs, options
+                    np.asfortranarray(design.astype(np.uint32)),
+                    rhs,
+                    options=options,
                 )
 
                 relabelled = design.copy()
@@ -248,7 +250,9 @@ class PreconditionerPropertyTests(unittest.TestCase):
                     relabelled[:, factor] = permutation[design[:, factor]]
 
                 permuted = within.solve_batch(
-                    np.asfortranarray(relabelled.astype(np.uint32)), rhs, options
+                    np.asfortranarray(relabelled.astype(np.uint32)),
+                    rhs,
+                    options=options,
                 )
 
                 difference = np.abs(
@@ -276,17 +280,17 @@ class PreconditionerPropertyTests(unittest.TestCase):
         joint = within.solve_batch(
             np.asfortranarray(stacked.astype(np.uint32)),
             np.asfortranarray(rhs_stacked),
-            options,
+            options=options,
         )
         part_left = within.solve_batch(
             np.asfortranarray(left.astype(np.uint32)),
             np.asfortranarray(rhs_left),
-            options,
+            options=options,
         )
         part_right = within.solve_batch(
             np.asfortranarray(right.astype(np.uint32)),
             np.asfortranarray(rhs_right),
-            options,
+            options=options,
         )
 
         expected = np.vstack(
@@ -357,7 +361,7 @@ class TwoFactorContractionTests(unittest.TestCase):
                 )
 
     def test_paper_example_gap_is_one_third(self) -> None:
-        """The worked footnote in Section 5 reports a gap of 1/3."""
+        """The appendix's worked spectral-gap example reports 1/3."""
         design = TWO_FACTOR_DESIGNS["connected"]
         self.assertAlmostEqual(1.0 - self._rho(design), 1.0 / 3.0, places=12)
 

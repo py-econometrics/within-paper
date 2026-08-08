@@ -13,6 +13,6 @@
   table.header(th[Design], th[`map` (sweeps)], th[`off`], th[`diagonal`], th[`additive`]),
   table.hline(stroke: 0.45pt + table-rule),
   [simple], [14], [37], [16], [14],
-  [difficult], [8447], [248], [181], [24],
+  [difficult], [8159], [249], [180], [22],
   table.hline(stroke: 0.8pt + table-rule),
 )

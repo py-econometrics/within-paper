@@ -5,14 +5,14 @@
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
 #let miss = text(fill: rgb("#777777"))[--]
 #table(
-  columns: (1.25fr, 0.55fr, 0.78fr, 0.78fr, 0.85fr, 0.78fr),
+  columns: (1.25fr, 0.42fr, 0.72fr, 0.72fr, 0.80fr, 0.90fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[FE], th[PyFixest #linebreak() MAP #linebreak() none], th[fixest (R) #linebreak() MAP #linebreak() accelerated], th[GLFEM.jl #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Design], th[FE], th[PyFixest #linebreak() MAP], th[fixest], th[GLFEM.jl], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [3], [10.1s], [5.57s], [8.68s], [7.82s],
-  [difficult (near-nested)], [3], [failed (0/3)], [319.8s], [166.8s], [5.05s],
+  [simple (well-connected)], [3], [7.86s], [4.72s], [5.76s], [9.25s],
+  [difficult (near-nested)], [3], [capped (0/3)], [439.4s], [129.8s], [5.43s],
   table.hline(stroke: 0.8pt + table-rule),
 )

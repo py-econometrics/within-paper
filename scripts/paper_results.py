@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Manage reproducible benchmark results for the paper.
 
-This script uses only the Python standard library, so runtime checks can run before the
-Pixi environment is available. Paper table data is stored in
-``results/paper/benchmark_tables.json``; ``render`` writes the Typst includes, and
-``collect`` folds the raw benchmark output into them.
+Runtime preflight has no third-party imports, so it can run before the Pixi environment
+is available. Rendering loads the AKM configuration only when it needs parameter labels.
+Paper table data is stored in ``results/paper/benchmark_tables.json``; ``render`` writes
+the Typst includes, and ``collect`` folds the raw benchmark output into them.
 """
 
 from __future__ import annotations
@@ -18,26 +18,40 @@ import re
 import shutil
 import subprocess
 import tomllib
-import time
 import urllib.request
 import zipfile
 from statistics import median
 from pathlib import Path
 
 
-# The timing rules live with the benchmark harness that produces the numbers,
-# not beside the renderer that formats them, so that "median over converged
-# trials, failures kept in the denominator" has one implementation rather than
-# one per consumer. The module is standard-library only, which is what lets
-# this script keep running before the Pixi environment exists; a test pins
-# that property.
-from benchmarks.core.timing import summarize_times
-from benchmarks.core.methods import METHOD_TABLE_HEADER, canonical
-from benchmarks.core.paths import CORREIA_DIR, LATEST_RUN, ROOT
+from scripts.benchmark_methods import METHODS
+
+ROOT = Path(__file__).absolute().parents[1]
+LATEST_RUN = ROOT / "results" / "runs" / "latest"
+CORREIA_DIR = ROOT / "benchmarks" / "data" / "correia_data"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 RUNTIME_CONFIG = ROOT / "config" / "external_runtimes.json"
 EXPECTED_TRIALS = 3
+
+# The headline figure is a presentation of the two controlled AKM benchmark
+# families.  The tables remain the canonical source of the gap calculation;
+# this registry only fixes which package/runtime cells belong in each panel.
+HEADLINE_FIGURE_BACKENDS = {
+    "default": ("rust-map", "within", "fixest", "FEM.jl"),
+    "matched": ("rust-map", "within-off", "within-diagonal", "within-additive"),
+}
+RENDERED_TABLES = (
+    "agreement",
+    "akm_setup_cost",
+    "correia_real",
+    "correia_synthetic",
+    "iterations",
+    "memory",
+    "ols",
+    "ppml",
+    "regression_reuse",
+)
 
 
 def _read_json(path: Path) -> dict:
@@ -79,8 +93,10 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _run(command: list[str]) -> str:
-    return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT).strip()
+def _run(command: list[str], *, env: dict[str, str] | None = None) -> str:
+    return subprocess.check_output(
+        command, text=True, stderr=subprocess.STDOUT, env=env
+    ).strip()
 
 
 def _git_dirty() -> bool:
@@ -105,8 +121,8 @@ def check_external_runtimes(_: argparse.Namespace) -> None:
     config = _read_json(RUNTIME_CONFIG)
     failures: list[str] = []
     bench_threads, bench_threads_error = _positive_thread_setting("BENCH_THREADS")
-    julia_threads, julia_threads_error = _positive_thread_setting("JULIA_NUM_THREADS")
-    failures.extend(error for error in (bench_threads_error, julia_threads_error) if error)
+    if bench_threads_error:
+        failures.append(bench_threads_error)
     if shutil.which("Rscript") is None:
         failures.append("Rscript is not on PATH")
     else:
@@ -163,21 +179,31 @@ def check_external_runtimes(_: argparse.Namespace) -> None:
             with (project / "Manifest.toml").open("rb") as handle:
                 expected_julia = tomllib.load(handle).get("julia_version")
             try:
-                julia_version = _run(["julia", "--version"])
+                julia_env = dict(os.environ)
+                if bench_threads is not None:
+                    julia_env["JULIA_NUM_THREADS"] = str(bench_threads)
+                julia_version = _run(["julia", "--version"], env=julia_env)
                 if expected_julia and expected_julia not in julia_version:
                     failures.append(
                         f"Julia runtime: expected {expected_julia} from Manifest.toml, found {julia_version}"
                     )
-                if julia_threads is not None:
-                    configured_threads = _run(["julia", "-e", "print(Threads.nthreads())"])
-                    if configured_threads.strip() != str(julia_threads):
+                if bench_threads is not None:
+                    configured_threads = _run(
+                        ["julia", "-e", "print(Threads.nthreads())"], env=julia_env
+                    )
+                    if configured_threads.strip() != str(bench_threads):
                         failures.append(
                             f"Julia is using {configured_threads.strip()} thread(s), "
-                            f"but JULIA_NUM_THREADS={julia_threads}"
+                            f"but BENCH_THREADS={bench_threads}"
                         )
                     else:
                         print(f"Julia threads: {configured_threads.strip()}")
-                print(_run(["julia", f"--project={project}", "-e", "using Pkg; Pkg.status()"] ))
+                print(
+                    _run(
+                        ["julia", f"--project={project}", "-e", "using Pkg; Pkg.status()"],
+                        env=julia_env,
+                    )
+                )
             except subprocess.CalledProcessError as exc:
                 failures.append(f"Julia project check failed: {exc.output.strip()}")
     if failures:
@@ -196,12 +222,9 @@ def fetch_correia(args: argparse.Namespace) -> None:
     metadata_dir = CORREIA_DIR / "metadata"
     if not metadata_dir.exists():
         raise SystemExit(f"Metadata directory not found: {metadata_dir}")
-    selected = set(args.datasets or [])
     for metadata_path in sorted(metadata_dir.glob("*.json")):
         metadata = _read_json(metadata_path)
         slug = metadata["slug"]
-        if selected and slug not in selected:
-            continue
         destination = CORREIA_DIR / f"{slug}.csv"
         if destination.exists() and _sha256(destination) == metadata["checksum_csv"]:
             print(f"[ok] {slug}: existing CSV checksum verified")
@@ -232,18 +255,55 @@ def _display_header(cell: str) -> str:
     if cell == "Backend":
         return "Configuration"
     key = cell.strip("`")
-    return METHOD_TABLE_HEADER.get(key, cell)
+    return _method_header(key) if key in METHODS else cell
 
 
 def _display_method_cell(cell: str) -> str:
     """Format an exact internal method key when it occurs in a table body."""
     key = cell.strip("`")
-    if cell.startswith("`") and cell.endswith("`"):
-        return METHOD_TABLE_HEADER.get(key, cell)
+    if cell.startswith("`") and cell.endswith("`") and key in METHODS:
+        return _method_header(key)
     return cell
 
 
+def _method_header(key: str) -> str:
+    lsmr_preconditioners = {
+        "within-off": "none",
+        "within-diagonal": "diagonal",
+        "within": "factor-pair",
+        "within-additive": "factor-pair",
+    }
+    if key in lsmr_preconditioners:
+        return (
+            "PyFixest #linebreak() LSMR #linebreak() "
+            f"{lsmr_preconditioners[key]}"
+        )
+    label = METHODS[key][0]
+    return label.replace(" ", " #linebreak() ", 1) if " " in label else label
+
+
+AKM_PARAMETER_TABLES = {
+    "akm_setup_cost": ("Move probability $delta$", "akm_mobility_"),
+}
+
+
+def _akm_parameterized_table(name: str, table: dict) -> dict:
+    """Replace internal AKM design keys with their varied parameter at render time."""
+    presentation = AKM_PARAMETER_TABLES.get(name)
+    if presentation is None:
+        return table
+    header, prefix = presentation
+    rows = []
+    for source in table["rows"]:
+        design = _row_label(table, source)
+        if not design.startswith(prefix):
+            raise ValueError(f"Unexpected design {design!r} in {name}")
+        rows.append([_akm_parameter_label(design), *source[1:]])
+    return {**table, "header": [header, *table["header"][1:]], "rows": rows}
+
+
 def _table_fragment(name: str, table: dict) -> str:
+    table = _akm_parameterized_table(name, table)
     lines = [
         "// Generated by scripts/paper_results.py; do not edit by hand.",
         "#let table-rule = rgb(\"#7b8494\")",
@@ -263,7 +323,7 @@ def _table_fragment(name: str, table: dict) -> str:
         "  table.hline(stroke: 0.45pt + table-rule),",
     ]
     for row in table["rows"]:
-        marker = row[0]
+        marker = _row_label(table, row)
         if marker == "#memory-100k":
             lines.append("  table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],")
             continue
@@ -292,108 +352,115 @@ def _table_fragment(name: str, table: dict) -> str:
     return "\n".join(lines)
 
 
-def render(args: argparse.Namespace) -> None:
-    # Synchronize before rendering so that a table fragment can never be built
-    # from a result file that is older than the raw benchmark output beside it.
-    # Rendering used to read the stored document as-is, which made every table
-    # correct only until the next benchmark run.
-    _synchronize_canonical_tables()
+def _akm_parameter_label(design: str) -> str:
+    """The controlled variable printed in the appendix AKM tables.
+
+    Import the generator configuration only when rendering.  Keeping the
+    standard-library collector importable without the benchmark environment is
+    useful for preflight checks and keeps the canonical table as the source of
+    the measured values.
+    """
+    from benchmarks.akm import SCENARIOS
+
+    config = SCENARIOS[design]
+    value = config["delta"] if design.startswith("akm_mobility_") else config["rho"]
+    return f"{value:g}"
+
+
+def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
+    """Project one wide AKM table into a compact appendix panel.
+
+    The source table deliberately remains unchanged: it is the one
+    machine-readable location for the recorded package-default cells.  The
+    two rendered panels merely group those cells by the comparison they answer.
+    """
+    source_name = _row_label(table, table["rows"][0])
+    mobility = source_name.startswith("akm_mobility_")
+    parameter = "Move probability $delta$" if mobility else "Sorting strength $rho$"
+    if panel == "defaults":
+        backends = ("rust-map", "fixest", "FEM.jl", "within")
+        columns = "(1.15fr, 0.95fr, 0.82fr, 0.70fr, 0.70fr, 0.95fr)"
+    elif panel == "lsmr":
+        backends = ("within-off", "within-diagonal", "within")
+        columns = "(1.20fr, 1.00fr, 0.90fr, 0.96fr, 1.00fr)"
+    else:
+        raise ValueError(f"Unknown AKM appendix panel {panel!r}")
+
+    rows = []
+    for source in table["rows"]:
+        design = _row_label(table, source)
+        rows.append(
+            [
+                _akm_parameter_label(design),
+                _table_cell(table, source, "Gap (share)"),
+                *(_table_cell(table, source, backend) for backend in backends),
+            ]
+        )
+    return {
+        "columns": columns,
+        "align": "(right, right, right, right, right, right)"
+        if panel == "defaults"
+        else "(right, right, right, right, right)",
+        "header": [parameter, "Gap (share)", *backends],
+        "rows": rows,
+    }
+
+
+def render(_: argparse.Namespace) -> None:
     document = _read_json(TABLES_PATH)
     tables = document["tables"]
-    prose = document.get("prose", {})
-    destination = Path(args.output_dir) if args.output_dir else GENERATED_DIR
+    destination = GENERATED_DIR
     destination.mkdir(parents=True, exist_ok=True)
-    for name, table in tables.items():
+    targets = {destination / f"{name}.typ" for name in RENDERED_TABLES}
+    for family in ("mobility", "sorting"):
+        for panel in ("defaults", "lsmr"):
+            targets.add(destination / f"akm_{family}_{panel}.typ")
+    for path in destination.glob("*.typ"):
+        if path not in targets:
+            path.unlink()
+    for name in RENDERED_TABLES:
+        table = tables[name]
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
+    for family in ("mobility", "sorting"):
+        table = tables[f"akm_{family}"]
+        for panel in ("defaults", "lsmr"):
+            target = destination / f"akm_{family}_{panel}.typ"
+            target.write_text(
+                _table_fragment(target.stem, _akm_appendix_panel(table, panel=panel)),
+                encoding="utf-8",
+            )
     values = ["// Generated result values; do not edit by hand."]
-    ppml_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["ppml"]["rows"]
-    }
-    ppml_simple = ppml_rows["simple (well-connected)"]
-    ppml_difficult = ppml_rows["difficult (near-nested)"]
-    ols_difficult = tables["ols"]["rows"][1]
-    correia_real_rows = {
-        _clean_cell(row[0]): row
-        for row in tables["correia_real"]["rows"]
-    }
-    enron = correia_real_rows["enron"]
-    agreement_rows = tables["agreement"]["rows"]
-    memory_rows = tables["memory"]["rows"]
+    agreement_table = tables["agreement"]
+    memory_table = tables["memory"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
         values = []
         for row in rows:
-            map_memory, within_memory = _numeric_cell(row[2]), _numeric_cell(row[3])
+            map_memory = _numeric_cell(_table_cell(memory_table, row, "rust-map"))
+            within_memory = _numeric_cell(_table_cell(memory_table, row, "within"))
             if map_memory is not None and within_memory is not None:
                 values.append(within_memory - map_memory)
         return values
 
-    def gap_without_share(value: str) -> str:
-        return re.sub(r"\s+\([^)]*\)\s*$", "", value)
-
-    def seconds_range(row: list[str], columns: range) -> str:
-        candidates = [
-            value
-            for column in columns
-            if (value := _numeric_cell(row[column])) is not None
-        ]
-        if not candidates:
-            return "--"
-        lower = _format_seconds(min(candidates)).removesuffix("s")
-        upper = _format_seconds(max(candidates))
-        return f"{lower}--{upper}"
-
-    memory_100k = memory_overheads(memory_rows[1:3])
-    memory_1m = memory_overheads(memory_rows[4:6])
-    directors_share = _component_share(tables["correia_real"]["rows"][-1][1])
+    memory_100k_rows = _rows_after_marker(memory_table, "#memory-100k")
+    memory_1m_rows = _rows_after_marker(memory_table, "#memory-1m")
+    memory_100k = memory_overheads(memory_100k_rows)
+    memory_1m = memory_overheads(memory_1m_rows)
+    agreement_simple_rows = _rows_after_marker(agreement_table, "#agreement-simple")
+    agreement_difficult_rows = _rows_after_marker(agreement_table, "#agreement-difficult")
     prose_values = {
-        "result_ols_difficult_gap": gap_without_share(ols_difficult[1]),
-        "result_ols_difficult_rust_map": ols_difficult[2],
-        "result_ols_difficult_fixest": ols_difficult[3],
-        "result_ols_difficult_fem": ols_difficult[4],
-        "result_ols_difficult_within": ols_difficult[5],
-        "result_correia_enron_fem": enron[4],
-        "result_correia_enron_within": enron[5],
-        "result_ppml_simple_range": seconds_range(ppml_simple, range(2, 6)),
-        "result_ppml_difficult_three_fixest": ppml_difficult[3],
-        "result_ppml_difficult_three_glfem": ppml_difficult[4],
-        "result_ppml_difficult_three_within": ppml_difficult[5],
-        "result_agreement_simple_gap": gap_without_share(memory_rows[1][1]),
-        "result_agreement_difficult_gap": gap_without_share(memory_rows[2][1]),
-        "result_agreement_simple_max": _largest_metric(agreement_rows[:4], 3),
-        "result_agreement_difficult_max": _largest_metric(agreement_rows[4:], 3),
-        "result_setup_simple_setup": _format_seconds(float(prose["setup_simple_setup_s"])),
-        "result_setup_simple_solve": _format_seconds(float(prose["setup_simple_solve_s"])),
-        "result_setup_simple_share": f"{float(prose['setup_simple_share']):.0%}",
-        "result_setup_difficult_setup": _format_seconds(float(prose["setup_difficult_setup_s"])),
-        "result_setup_difficult_solve": _format_seconds(float(prose["setup_difficult_solve_s"])),
-        "result_setup_difficult_share": f"{float(prose['setup_difficult_share']):.0%}",
-        # The abstract quotes a magnitude, so it has to move with the run
-        # rather than be typed in once and go stale.
-        "result_ols_difficult_within_vs_rust_map": _format_ratio(
-            _numeric_cell(ols_difficult[2]), _numeric_cell(ols_difficult[5])
+        "result_agreement_simple_max": _largest_metric(
+            agreement_table, agreement_simple_rows, "Absolute difference"
         ),
-        "result_ols_difficult_within_vs_fixest": _format_ratio(
-            _numeric_cell(ols_difficult[3]), _numeric_cell(ols_difficult[5])
+        "result_agreement_difficult_max": _largest_metric(
+            agreement_table, agreement_difficult_rows, "Absolute difference"
         ),
-        "result_ppml_within_vs_fixest": _format_ratio(_numeric_cell(ppml_difficult[3]), _numeric_cell(ppml_difficult[5])),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
-        "result_directors_component_share": (
-            f"{directors_share:.0%}" if directors_share is not None else "--"
-        ),
-        "result_zigzag_within": _format_seconds(float(prose["zigzag_within_s"])),
-        "result_zigzag_fem": _format_seconds(float(prose["zigzag_fem_s"])),
     }
-    # Values synchronized straight into the result file, such as the legacy CUDA
-    # timings of Appendix C, are published without further formatting.
-    prose_values.update(
-        {name: value for name, value in prose.items() if name.startswith("result_")}
-    )
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
-    print(f"[render] wrote {len(tables)} table fragments to {destination}")
+    print(f"[render] wrote {len(targets)} table fragments to {destination}")
 
 
 def collect(_: argparse.Namespace) -> None:
@@ -418,69 +485,21 @@ def collect(_: argparse.Namespace) -> None:
     print(f"[collect] updated {updated} paper table cells")
 
 
-def _is_git_tracked(path: Path) -> bool:
-    try:
-        subprocess.run(
-            ["git", "ls-files", "--error-unmatch", str(path.relative_to(ROOT))],
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except subprocess.CalledProcessError:
-        return False
-    return True
-
-
-def archive_legacy_results(_: argparse.Namespace) -> None:
-    """Archive untracked generated files without touching input caches."""
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    archive_root = ROOT / "results" / "legacy" / stamp
-    sources = (
-        ROOT / "benchmarks" / "results",
-        ROOT / "figures" / "benchmarks",
-        ROOT / "results" / "runs",
-    )
-    moved = 0
-    skipped: list[Path] = []
-    for source in sources:
-        if not source.exists():
-            continue
-        for path in sorted(source.rglob("*")):
-            if not path.is_file():
-                continue
-            if _is_git_tracked(path):
-                skipped.append(path)
-                continue
-            destination = archive_root / path.relative_to(ROOT)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(path), str(destination))
-            moved += 1
-    if moved:
-        print(f"[archive] moved {moved} generated files to {archive_root}")
-    else:
-        print("[archive] no untracked generated files found")
-    if skipped:
-        print("[archive] left tracked files in place:")
-        for path in skipped:
-            print(f"  {path.relative_to(ROOT)}")
-
-
 def _rows_from_csvs() -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    for pattern in ("benchmarks/results/*.csv",):
-        for path in ROOT.glob(pattern):
-            try:
-                with path.open(newline="", encoding="utf-8") as handle:
-                    rows.extend(
-                        {
-                            **row,
-                            "_source_file": str(path.relative_to(ROOT)),
-                        }
-                        for row in csv.DictReader(handle)
-                    )
-            except (OSError, UnicodeDecodeError):
-                continue
+    for filename in (
+        "ols.csv",
+        "ppml.csv",
+        "akm.csv",
+        "correia.csv",
+    ):
+        path = _latest(filename)
+        if not path.exists():
+            continue
+        with path.open(newline="", encoding="utf-8") as handle:
+            rows.extend(
+                {**row, "_source_file": filename} for row in csv.DictReader(handle)
+            )
     return rows
 
 
@@ -494,49 +513,27 @@ def _format_seconds(value: float) -> str:
 
 
 def _row_success(row: dict[str, str]) -> bool:
-    return str(row.get("success", "True")).strip().lower() in {"true", "1"}
+    return str(row.get("converged", "")).strip().lower() in {"true", "1"}
+
+
+def _row_capped(row: dict[str, str]) -> bool:
+    return str(row.get("capped", "")).strip().lower() in {"true", "1"}
+
+
+def _row_time(row: dict[str, str]) -> str:
+    return row.get("runtime_s", "")
 
 
 def _cell_is_complete(candidates: list[dict[str, str]]) -> bool:
-    """Whether a cell holds every trial it was supposed to.
-
-    A cell used to be three trials, full stop. With the R1/R2/R3 rule it is one
-    group of repetitions per DGP replicate, and the repetition count is chosen
-    per replicate from its own runtime, so the plan is a property of the
-    replicate rather than of the cell. Checking the recorded plan against the
-    pooled total would call a perfectly good cell incomplete: three replicates
-    of seven repetitions is twenty-one rows against a plan of seven.
-
-    Rows carrying no plan are pre-rule results, where one row per replicate and
-    three replicates is the whole cell.
-    """
-    by_replicate: dict[int | None, list[dict[str, str]]] = {}
-    for row in candidates:
-        by_replicate.setdefault(_integer_field(row, "iter_num"), []).append(row)
-
-    if not any(_integer_field(row, "n_planned") for row in candidates):
-        return len(candidates) == EXPECTED_TRIALS
-
-    if len(by_replicate) != EXPECTED_TRIALS:
-        return False
-    for rows in by_replicate.values():
-        planned = {_integer_field(row, "n_planned") for row in rows}
-        planned.discard(None)
-        # One replicate runs under one plan, and must deliver exactly it.
-        if len(planned) != 1 or len(rows) != planned.pop():
-            return False
-    return True
+    planned = {_integer_field(row, "n_planned") for row in candidates}
+    planned.discard(None)
+    expected = next(iter(planned)) if len(planned) == 1 else EXPECTED_TRIALS
+    repetitions = {_integer_field(row, "repetition") for row in candidates}
+    return len(planned) <= 1 and repetitions == set(range(expected))
 
 
-def _trial_key(row: dict[str, str]) -> tuple[int | None, int]:
-    """Identify a trial by DGP replicate and timing repetition.
-
-    Repetitions on one fixed sample and replicates of the DGP are different
-    things (PROTOCOL.md section 2), so they are separate coordinates. Rows
-    without a repetition are pre-rule results and count as repetition zero.
-    """
-    repetition = _integer_field(row, "repetition")
-    return (_integer_field(row, "iter_num"), 0 if repetition is None else repetition)
+def _trial_key(row: dict[str, str]) -> int | None:
+    return _integer_field(row, "repetition")
 
 
 def _render_trial_result(candidates: list[dict[str, str]]) -> str:
@@ -544,52 +541,144 @@ def _render_trial_result(candidates: list[dict[str, str]]) -> str:
     if not candidates:
         return "#miss"
 
-    summarized = [row for row in candidates if row.get("n_runs", "")]
-    if summarized:
-        if len(candidates) != 1:
-            return "incomplete"
-        row = summarized[0]
-        total = _integer_field(row, "n_runs")
-        successful = _integer_field(row, "n_success")
-        values = []
-        try:
-            if row.get("time", ""):
-                values.append(float(row["time"]))
-        except (TypeError, ValueError):
-            return "incomplete"
-    else:
-        trial_ids = [_trial_key(row) for row in candidates]
-        if any(replicate is None for replicate, _ in trial_ids):
-            return "incomplete"
-        if len(set(trial_ids)) != len(trial_ids):
-            return "incomplete"
-        total = len(candidates)
-        successful_rows = [row for row in candidates if _row_success(row)]
-        successful = len(successful_rows)
-        values = []
-        for row in successful_rows:
-            try:
-                values.append(float(row["time"]))
-            except (KeyError, TypeError, ValueError):
-                return "incomplete"
-
-    if successful is None or not 0 <= successful <= total:
+    trial_ids = [_trial_key(row) for row in candidates]
+    if None in trial_ids or len(set(trial_ids)) != len(trial_ids):
         return "incomplete"
-    if not summarized and not _cell_is_complete(candidates):
+    if not _cell_is_complete(candidates):
         return "incomplete"
-    summary = summarize_times(values, n_attempted=total)
+    total = len(candidates)
+    successful_rows = [row for row in candidates if _row_success(row)]
+    successful = len(successful_rows)
+    try:
+        values = [float(_row_time(row)) for row in successful_rows]
+    except (TypeError, ValueError):
+        return "incomplete"
     if successful == 0:
-        return f"failed (0/{total})"
-    if summary.median_s is None:
-        return "incomplete"
-    rendered = _format_seconds(summary.median_s)
+        status = "capped" if all(_row_capped(row) for row in candidates) else "failed"
+        return f"{status} (0/{total})"
+    rendered = _format_seconds(median(values))
     if successful < total:
         return f"{rendered} ({successful}/{total})"
     return rendered
 
 
-def _runtime_dataset(row: dict[str, str]) -> str | None:
-    return row.get("dgp") or row.get("source_dataset_id") or row.get("dataset")
+def _headline_point(
+    candidates: list[dict[str, str]],
+    *,
+    design: str,
+    family: str,
+    view: str,
+    backend: str,
+    gap: float | None,
+) -> dict[str, object]:
+    """One structured record for the 2-by-2 headline figure.
+
+    The plot must distinguish a returned median from an iteration cap.  A
+    capped run has no successful fit, but its elapsed wall time is informative:
+    it is a lower bound on the time required to finish the requested solve.
+    Non-cap failures have no comparable timing and are left out of the plot.
+    """
+    if not candidates:
+        return {
+            "design": design,
+            "family": family,
+            "view": view,
+            "backend": backend,
+            "gap": gap,
+            "median_time": None,
+            "n_trials": 0,
+            "n_success": 0,
+            "n_capped": 0,
+            "status": "missing",
+        }
+
+    successful = [row for row in candidates if _row_success(row)]
+    capped = [row for row in candidates if _row_capped(row)]
+
+    def median_time(rows: list[dict[str, str]]) -> float | None:
+        values = []
+        for row in rows:
+            try:
+                value = float(_row_time(row))
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                values.append(value)
+        return float(median(values)) if values else None
+
+    complete = _cell_is_complete(candidates)
+    if successful:
+        status = "complete" if complete and len(successful) == len(candidates) else "partial"
+        elapsed = median_time(successful)
+    elif complete and len(capped) == len(candidates):
+        status = "capped"
+        elapsed = median_time(capped)
+    elif complete:
+        status = "failed"
+        elapsed = None
+    else:
+        status = "incomplete"
+        elapsed = median_time(successful)
+
+    return {
+        "design": design,
+        "family": family,
+        "view": view,
+        "backend": backend,
+        "gap": gap,
+        "median_time": elapsed,
+        "n_trials": len(candidates),
+        "n_success": len(successful),
+        "n_capped": len(capped),
+        "status": status,
+    }
+
+
+def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> int:
+    """Record the AKM headline-figure projection in the tracked result file.
+
+    An absent raw AKM file means that the current benchmark command did not run
+    this experiment.  In that case keep the last collected figure records;
+    treating absence as a new set of failures would erase a valid paper figure.
+    """
+    if not _latest("akm.csv").exists():
+        return 0
+
+    points: list[dict[str, object]] = []
+    for family in ("mobility", "sorting"):
+        table = document["tables"][f"akm_{family}"]
+        for view in ("default", "matched"):
+            for source in table["rows"]:
+                design = _row_label(table, source)
+                gap = _numeric_cell(_table_cell(table, source, "Gap (share)"))
+                for backend in HEADLINE_FIGURE_BACKENDS[view]:
+                    candidates = [
+                        row
+                        for row in raw
+                        if _matches_runtime_target(
+                            row,
+                            design,
+                            backend,
+                            {"n_obs": 1_000_000, "n_fe": 3},
+                            f"akm.csv:{view}",
+                        )
+                    ]
+                    points.append(
+                        _headline_point(
+                            candidates,
+                            design=design,
+                            family=family,
+                            view=view,
+                            backend=backend,
+                            gap=gap,
+                        )
+                    )
+
+    figure = {"schema_version": 1, "points": points}
+    if document.get("headline_figure") == figure:
+        return 0
+    document["headline_figure"] = figure
+    return len(points)
 
 
 def _integer_field(row: dict[str, str], name: str) -> int | None:
@@ -604,37 +693,35 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
         {
             str(row.get("n_fe") or "missing")
             for row in rows
-            if "fepois_bench__" in row.get("_source_file", "")
+            if row.get("_source_file") == "ppml.csv"
             and _integer_field(row, "n_fe") != 3
         }
     )
     if unexpected:
         raise ValueError(
             "PPML result files must contain only n_fe=3 rows; found "
-            f"{', '.join(unexpected)}. Archive old results and rerun without "
-            "--reuse-existing."
+            f"{', '.join(unexpected)}."
         )
 
 
 def _paper_runtime_target(
-    table_name: str, row: list[str]
+    table_name: str, table: dict, row: list[str]
 ) -> tuple[str, dict[str, int], str]:
     """Return the exact run specification represented by a paper timing cell."""
-    dataset = _clean_cell(row[0]).split(" ")[0]
+    dataset = _row_label(table, row).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
-    if table_name in {
-        "akm_mobility",
-        "akm_sorting",
-        "mechanism_mobility",
-        "mechanism_sorting",
-    }:
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": 3}, "feols_akm_sweep__"
+    if table_name in {"akm_mobility", "akm_sorting"}:
+        return dataset, {"n_obs": 1_000_000, "n_fe": 3}, "akm.csv:default"
     if table_name == "ols":
-        return dataset, {"n_obs": 10_000_000, "model_k": 1, "n_fe": 3}, "feols_bench__"
+        return dataset, {"n_obs": 10_000_000, "n_fe": 3}, "ols.csv:default"
     if table_name == "ppml":
-        return dataset, {"n_obs": 1_000_000, "model_k": 1, "n_fe": int(row[1])}, "fepois_bench__"
-    return dataset, {"model_k": 1, "n_fe": 2}, "correia-benchmarks.csv"
+        return (
+            dataset,
+            {"n_obs": 1_000_000, "n_fe": int(_table_cell(table, row, "FE"))},
+            "ppml.csv:default",
+        )
+    return dataset, {"n_fe": 2}, "correia.csv:default"
 
 
 def _matches_runtime_target(
@@ -644,19 +731,21 @@ def _matches_runtime_target(
     requirements: dict[str, int],
     source_marker: str,
 ) -> bool:
-    if source_marker not in row.get("_source_file", ""):
+    filename, view = source_marker.split(":", 1)
+    if row.get("_source_file") != filename or row.get("view") != view:
         return False
-    if _runtime_dataset(row) != dataset:
+    if row.get("design") != dataset:
         return False
-    if canonical(row.get("backend") or row.get("algo") or "") != backend:
+    raw_backend = row.get("backend", "")
+    if raw_backend != backend:
         return False
     return all(_integer_field(row, field) == value for field, value in requirements.items())
 
 
 def _numeric_cell(value: str) -> float | None:
-    if "failed" in value.lower():
-        # A failed cell such as "failed (0/3)" carries no runtime; do not let the
-        # "0" in the trial count read back as a 0.0-second measurement.
+    if "failed" in value.lower() or "capped" in value.lower():
+        # A failed or capped cell such as "capped (0/3)" carries no runtime; do not
+        # let the "0" in the trial count read back as a 0.0-second measurement.
         return None
     scientific = re.search(
         r"(-?\d[\d,]*\.?\d*)\s+times\s+10\^\((-?\d+)\)", value
@@ -671,7 +760,11 @@ def _numeric_cell(value: str) -> float | None:
 
 
 def _largest_metric(
-    rows: list[list[str]], column: int, *, backend: str | None = None
+    table: dict,
+    rows: list[list[str]],
+    column: str,
+    *,
+    backend: str | None = None,
 ) -> str:
     """The largest numeric cell in one column, optionally within one backend.
 
@@ -680,26 +773,14 @@ def _largest_metric(
     a measured worst case.
     """
     candidates = [
-        row[column]
+        _table_cell(table, row, column)
         for row in rows
-        if (backend is None or _clean_cell(row[1]) == backend)
-        and _numeric_cell(row[column]) is not None
+        if (backend is None or _clean_cell(_table_cell(table, row, "Backend")) == backend)
+        and _numeric_cell(_table_cell(table, row, column)) is not None
     ]
     if not candidates:
         return "--"
     return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
-
-
-def _component_share(value: str) -> float | None:
-    match = re.search(r"\((0(?:\.\d+)?|1(?:\.0+)?)\)\s*$", value)
-    return float(match.group(1)) if match else None
-
-
-def _format_ratio(numerator: float | None, denominator: float | None) -> str:
-    if numerator is None or denominator is None or denominator == 0:
-        return "--"
-    ratio = numerator / denominator
-    return f"{ratio:.0f} times" if ratio >= 10 else f"{ratio:.1f} times"
 
 
 def _format_typst_scientific(value: float) -> str:
@@ -714,9 +795,86 @@ def _clean_cell(value: str) -> str:
     return value.replace("`", "")
 
 
+def _header_index(table: dict, header: str) -> int:
+    """Return a table column by its stable semantic header, not its position."""
+    headers = [_clean_cell(value) for value in table["header"]]
+    try:
+        return headers.index(header)
+    except ValueError as error:
+        raise ValueError(f"Table does not have a {header!r} column") from error
+
+
+def _table_cell(table: dict, row: list[str], header: str) -> str:
+    return row[_header_index(table, header)]
+
+
+def _set_table_cell(table: dict, row: list[str], header: str, value: str) -> None:
+    row[_header_index(table, header)] = value
+
+
+def _row_label(table: dict, row: list[str]) -> str:
+    for header in ("Scenario", "Design", "Dataset"):
+        try:
+            return _clean_cell(_table_cell(table, row, header))
+        except ValueError:
+            continue
+    # Structural table markers always occupy the first cell. Tables such as the
+    # tolerance frontier use a different label column but still need rendering.
+    return _clean_cell(row[0])
+
+
+def _rows_after_marker(table: dict, marker: str) -> list[list[str]]:
+    """Return rows in the section immediately following a structural marker."""
+    rows = table["rows"]
+    for index, row in enumerate(rows):
+        if _row_label(table, row) != marker:
+            continue
+        section = []
+        for candidate in rows[index + 1 :]:
+            if _row_label(table, candidate).startswith("#"):
+                break
+            section.append(candidate)
+        return section
+    raise ValueError(f"Table marker {marker!r} was not found")
+
+
+def _backend_columns(table: dict) -> tuple[tuple[int, str], ...]:
+    return tuple(
+        (index, _clean_cell(header))
+        for index, header in enumerate(table["header"])
+        if _clean_cell(header) in METHODS
+    )
+
+
+def _ensure_akm_runtime_rows(document: dict) -> int:
+    """Match the canonical AKM rows to the registered designs."""
+    from benchmarks.akm import SCENARIOS
+
+    changed = 0
+    for family in ("mobility", "sorting"):
+        prefix = f"akm_{family}_"
+        expected = [name for name in SCENARIOS if name.startswith(prefix)]
+        table = document["tables"][f"akm_{family}"]
+        rows_by_design = {_row_label(table, row): row for row in table["rows"]}
+        synchronized = [
+            rows_by_design.get(
+                design,
+                [f"`{design}`", *("#miss" for _ in table["header"][1:])],
+            )
+            for design in expected
+        ]
+        if synchronized != table["rows"]:
+            old_designs = set(rows_by_design)
+            changed += max(1, len(old_designs ^ set(expected)))
+            table["rows"] = synchronized
+    return changed
+
+
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
-    return "--" if value in {"#miss", "failed", "--"} else value
+    if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
+        return "--"
+    return value
 
 
 def _format_hardness(gap: float, share: float) -> str:
@@ -733,51 +891,50 @@ def _format_hardness(gap: float, share: float) -> str:
 
 
 def _synchronize_hardness(document: dict) -> int:
-    rows = _latest_rows("hardness.csv") or []
+    rows = _latest_rows("hardness.csv")
+    # A partial collection must not erase an earlier gap.
+    if rows is None:
+        return 0
     diagnostics = {
         row["dataset_id"]: row
         for row in rows
         if {row["fe_a"], row["fe_b"]} in ({"indiv_id", "firm_id"}, {"id1", "id2"})
     }
 
-    def update(table_name: str, source_id: str, target_row: list[str]) -> int:
+    def update(source_id: str, target_row: list[str]) -> int:
         diagnostic = diagnostics.get(source_id)
         if diagnostic is None:
-            if target_row[1] != "#miss":
-                target_row[1] = "#miss"
-                return 1
             return 0
         rendered = _format_hardness(
             float(diagnostic["one_minus_rho"]),
             float(diagnostic["worst_component_obs_share"]),
         )
-        if target_row[1] == rendered:
+        if _table_cell(table, target_row, "Gap (share)") == rendered:
             return 0
-        target_row[1] = rendered
+        _set_table_cell(table, target_row, "Gap (share)", rendered)
         return 1
 
     changed = 0
-    for table_name in (
-        "akm_mobility",
-        "akm_sorting",
-        "mechanism_mobility",
-        "mechanism_sorting",
-    ):
-        for row in document["tables"][table_name]["rows"]:
-            scenario = _clean_cell(row[0])
-            changed += update(table_name, f"{scenario}_1000000_k1_iter_1", row)
-    for row in document["tables"]["ols"]["rows"]:
-        family = row[0].split()[0]
-        changed += update("ols", f"{family}_10000000_k1_iter_1", row)
+    for table_name in ("akm_mobility", "akm_sorting"):
+        table = document["tables"][table_name]
+        for row in table["rows"]:
+            scenario = _row_label(table, row)
+            changed += update(scenario, row)
+    table = document["tables"]["ols"]
+    for row in table["rows"]:
+        family = _row_label(table, row).split()[0]
+        changed += update(family, row)
     for table_name in ("correia_synthetic", "correia_real"):
-        for row in document["tables"][table_name]["rows"]:
-            changed += update(table_name, _clean_cell(row[0]), row)
-    for index, row in enumerate(document["tables"]["memory"]["rows"]):
-        if row[0].startswith("#"):
+        table = document["tables"][table_name]
+        for row in table["rows"]:
+            changed += update(_row_label(table, row), row)
+    table = document["tables"]["memory"]
+    for index, row in enumerate(table["rows"]):
+        if _row_label(table, row).startswith("#"):
             continue
-        family = row[0].split()[0]
-        size = "100000" if index < 4 else "1000000"
-        changed += update("memory", f"memory_{family}_{size}", row)
+        family = _row_label(table, row).split()[0]
+        size = "100k" if index < 4 else "1m"
+        changed += update(f"memory_{family}_{size}", row)
     return changed
 
 
@@ -786,216 +943,148 @@ def _synchronize_agreement(document: dict) -> int:
     if observations is None:
         return 0
     by_key = {
-        (row["dgp"], canonical(row["backend"])): row
+        (row["design"], row["backend"]): row
         for row in observations
-        if canonical(row["backend"]) and _integer_field(row, "model_k") == 1
     }
     changed = 0
     dgp = ""
-    for row in document["tables"]["agreement"]["rows"]:
-        if row[0] == "#agreement-simple":
+    table = document["tables"]["agreement"]
+    for row in table["rows"]:
+        marker = _row_label(table, row)
+        if marker == "#agreement-simple":
             dgp = "simple"
-        elif row[0] == "#agreement-difficult":
+        elif marker == "#agreement-difficult":
             dgp = "difficult"
-        backend = _clean_cell(row[1])
+        backend = _clean_cell(_table_cell(table, row, "Backend"))
         source = by_key.get((dgp, backend))
         if source is None:
             replacement = ["#miss", "#miss"]
-        elif source.get("success", "").lower() != "true":
-            replacement = ["failed", "failed"]
+        elif not _row_success(source):
+            status = "capped" if _row_capped(source) else "failed"
+            replacement = [status, status]
         else:
             replacement = [
                 f"{float(source['x1']):.8f}",
                 "--" if backend == "rust-map" else _format_typst_scientific(float(source["max_abs_diff"])),
             ]
-        for index, value in enumerate(replacement, start=2):
-            if row[index] != value:
-                row[index] = value
+        for header, value in zip(("$hat(beta)_1$", "Absolute difference"), replacement):
+            if _table_cell(table, row, header) != value:
+                _set_table_cell(table, row, header, value)
                 changed += 1
     return changed
 
 
-def _synchronize_setup_cost(document: dict) -> int:
-    rows = _latest_rows("within_setup_cost_summary.csv")
-    if rows is None:
+def _synchronize_akm_setup_cost(document: dict) -> int:
+    """Fill setup and solve times for two- and three-factor AKM designs."""
+    rows = _latest_rows("akm_setup_cost.csv")
+    table = document["tables"].get("akm_setup_cost")
+    if table is None or rows is None:
         return 0
-    summary = {row["dgp"]: row for row in rows}
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for dgp in ("simple", "difficult"):
-        row = summary.get(dgp)
-        if row is None or _integer_field(row, "k") != 1:
-            raise ValueError(f"Missing one-covariate setup summary for {dgp}")
-        if _integer_field(row, "n_runs") != EXPECTED_TRIALS:
-            raise ValueError(f"Setup summary for {dgp} does not contain {EXPECTED_TRIALS} runs")
-        if row.get("all_converged_reused", "").lower() != "true" or row.get(
-            "all_converged_oneshot", ""
-        ).lower() != "true":
-            raise ValueError(f"Setup benchmark did not converge for {dgp}")
-        fields = {
-            f"setup_{dgp}_setup_s": float(row["median_setup_wall_s"]),
-            f"setup_{dgp}_solve_s": float(row["median_solve_after_setup_wall_s"]),
-            f"setup_{dgp}_share": float(row["median_setup_share_of_reused_total"]),
-        }
-        for key, value in fields.items():
-            if prose.get(key) != value:
-                prose[key] = value
-                changed += 1
-    return changed
 
-
-def _synchronize_accuracy_frontier(document: dict) -> int:
-    """Fill the frontier table from the tolerance sweep.
-
-    Each package is swept over its own tolerance settings and the achieved
-    external residual is recorded beside the wall time, so the reader sees the
-    accuracy each runtime bought instead of a single matched point that some
-    packages cannot reach.
-    """
-    measured = _latest_rows("accuracy_frontier.csv")
-    table = document["tables"].get("accuracy_frontier")
-    if table is None or measured is None:
-        return 0
-    rows = [row for row in measured if _row_success(row)]
-
-    labels = {
-        "pyfixest-rust-map": "`rust-map`",
-        "pyfixest-within-additive": "`within-additive`",
+    mobility_table = document["tables"]["akm_mobility"]
+    gap_by_design = {
+        _row_label(mobility_table, row): _table_cell(mobility_table, row, "Gap (share)")
+        for row in mobility_table["rows"]
     }
-    rendered: list[list[str]] = []
-    for design in ("simple", "difficult"):
-        for package, label in labels.items():
-            matching = [
+
+    def cells(design: str, n_factors: int) -> list[str]:
+        group = [
+            row
+            for row in rows
+            if row.get("design") == design
+            and _integer_field(row, "n_factors") == n_factors
+        ]
+        successful = [row for row in group if _row_success(row)]
+        if not group:
+            return ["#miss", "#miss"]
+        if not _cell_is_complete(group):
+            return ["incomplete", "incomplete"]
+        if not successful:
+            status = "capped" if all(_row_capped(row) for row in group) else "failed"
+            return [status, status]
+        return [
+            _format_seconds(median(float(row["setup_s"]) for row in successful)),
+            _format_seconds(median(float(row["solve_s"]) for row in successful)),
+        ]
+
+    rendered = []
+    for source in mobility_table["rows"]:
+        design = _row_label(mobility_table, source)
+        rendered.append(
+            [
+                f"`{design}`",
+                gap_by_design[design],
+                *cells(design, 2),
+                *cells(design, 3),
+            ]
+        )
+    if rendered == table["rows"]:
+        return 0
+    table["rows"] = rendered
+    return len(rendered)
+
+
+def _synchronize_regression_reuse(document: dict) -> int:
+    """Fill the ten-regression comparison of preconditioner cache policies."""
+    rows = _latest_rows("regression_reuse.csv")
+    table = document["tables"].get("regression_reuse")
+    if table is None or rows is None:
+        return 0
+
+    policies = (
+        ("diagonal", "Diagonal"),
+        ("additive_rebuilt", "Additive, rebuilt"),
+        ("additive_cached", "Additive, cached"),
+    )
+    designs = ("simple", "difficult")
+    summaries: dict[tuple[str, str], tuple[float, float, float] | str] = {}
+    for design in designs:
+        for policy, _label in policies:
+            group = [
                 row
                 for row in rows
-                if row.get("dgp") == design and row.get("package") == package
+                if row.get("design") == design and row.get("policy") == policy
             ]
-            for index, row in enumerate(
-                sorted(matching, key=lambda r: float(r["max_eta"]), reverse=True)
-            ):
-                eta = float(row["max_eta"])
-                rendered.append(
-                    [
-                        f"{design}" if index == 0 and label == list(labels.values())[0] else "",
-                        label if index == 0 else "",
-                        row["setting"].split("=")[-1],
-                        _format_seconds(float(row["time_s"])),
-                        _format_typst_scientific(eta),
-                    ]
+            successful = [row for row in group if _row_success(row)]
+            key = (design, policy)
+            if not group:
+                summaries[key] = "#miss"
+            elif not _cell_is_complete(group):
+                summaries[key] = "incomplete"
+            elif not successful:
+                summaries[key] = (
+                    "capped" if all(_row_capped(row) for row in group) else "failed"
                 )
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
+            else:
+                summaries[key] = tuple(
+                    median(float(row[field]) for row in successful)
+                    for field in ("setup_s", "solve_s", "total_s")
+                )
 
-
-def _synchronize_ppml_inner_outer(document: dict) -> int:
-    """Fill the PPML table separating outer IRLS steps from inner LSMR work.
-
-    A common outer iteration cap is not a common accuracy condition, so the
-    table reports whether the outer loop converged rather than only how many
-    steps it took.
-    """
-    rows = _latest_rows("ppml_inner_outer.csv")
-    table = document["tables"].get("ppml_inner_outer")
-    if table is None or rows is None:
-        return 0
-
-    rendered: list[list[str]] = []
-    for design in ("simple", "difficult"):
-        first = True
-        for row in [r for r in rows if r.get("dgp") == design]:
-            converged = str(row.get("outer_converged", "")).lower() in {"true", "1"}
-            steps = row.get("outer_iterations", "")
+    rendered = []
+    for design in designs:
+        baseline = summaries[(design, "diagonal")]
+        baseline_total = baseline[2] if isinstance(baseline, tuple) else None
+        for index, (policy, label) in enumerate(policies):
+            summary = summaries[(design, policy)]
+            design_cell = design if index == 0 else ""
+            if not isinstance(summary, tuple):
+                rendered.append(
+                    [design_cell, label, summary, summary, summary, "--"]
+                )
+                continue
+            setup, solve, total = summary
+            speedup = f"{baseline_total / total:.1f}x" if baseline_total else "--"
             rendered.append(
                 [
-                    design if first else "",
-                    f"`{row['preconditioner']}`",
-                    "yes" if str(row.get("rebuild_each_step", "")).lower() in {"true", "1"} else "no",
-                    steps if converged else f"{steps} (capped)",
-                    f"{int(float(row['inner_iterations_sum'])):,}".replace(",", "#h(0.18em)"),
-                    _format_seconds(float(row["total_s"])),
+                    design_cell,
+                    label,
+                    _format_seconds(setup),
+                    _format_seconds(solve),
+                    _format_seconds(total),
+                    speedup,
                 ]
             )
-            first = False
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
-
-
-def _synchronize_factor_scaling(document: dict) -> int:
-    """Fill the table of setup and solve cost as the factor count grows.
-
-    Q enters the construction through the Q(Q-1)/2 pair enumeration, so this is
-    the axis on which the Schwarz preconditioner is most exposed, and every
-    other experiment in the paper holds it at three.
-    """
-    rows = _latest_rows("factor_scaling.csv")
-    table = document["tables"].get("factor_scaling")
-    if table is None or rows is None:
-        return 0
-
-    by_q: dict[int, list[dict]] = {}
-    for row in rows:
-        by_q.setdefault(int(row["n_factors"]), []).append(row)
-
-    rendered = []
-    for n_factors in sorted(by_q):
-        group = by_q[n_factors]
-
-        def med(field: str) -> float:
-            return float(median(float(item[field]) for item in group))
-
-        rendered.append(
-            [
-                str(n_factors),
-                str(n_factors * (n_factors - 1) // 2),
-                f"{med('setup_s'):.3f}",
-                f"{med('solve_s'):.3f}",
-                f"{med('setup_share'):.0%}",
-                f"{med('iterations_max'):.0f}",
-            ]
-        )
-    if rendered == table["rows"]:
-        return 0
-    table["rows"] = rendered
-    return len(rendered)
-
-
-def _synchronize_amortization(document: dict) -> int:
-    """Fill the table of total time against the number of right-hand sides.
-
-    The break-even is read off the measurements rather than from a closed form,
-    because marginal solve cost is not exactly linear in K.
-    """
-    rows = _latest_rows("amortization.csv")
-    table = document["tables"].get("amortization")
-    if table is None or rows is None:
-        return 0
-
-    def med(k: int, name: str, field: str) -> float | None:
-        picked = [
-            float(item[field])
-            for item in rows
-            if int(item["k_rhs"]) == k and item["preconditioner"] == name
-        ]
-        return float(median(picked)) if picked else None
-
-    rendered = []
-    for k in sorted({int(item["k_rhs"]) for item in rows}):
-        diagonal, additive = med(k, "diagonal", "total_s"), med(k, "additive", "total_s")
-        if diagonal is None or additive is None:
-            continue
-        rendered.append(
-            [
-                str(k),
-                f"{diagonal:.2f}",
-                f"{additive:.2f}",
-                f"{diagonal / additive:.1f}x",
-                f"{additive / k:.3f}",
-            ]
-        )
     if rendered == table["rows"]:
         return 0
     table["rows"] = rendered
@@ -1003,7 +1092,7 @@ def _synchronize_amortization(document: dict) -> int:
 
 
 ITERATION_COLUMNS = (
-    ("map", "map-sweep"),
+    ("rust-map", "map-sweep"),
     ("within-off", "lsmr-iteration"),
     ("within-diagonal", "lsmr-iteration"),
     ("within-additive", "lsmr-iteration"),
@@ -1040,7 +1129,7 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
     for design in designs:
         cells = [design]
         for label, _unit in ITERATION_COLUMNS:
-            trials = [r for r in rows if r["design"] == design and r["solver_label"] == label]
+            trials = [r for r in rows if r["design"] == design and r["backend"] == label]
             counts = [
                 float(r["iterations_max"]) for r in trials if r.get("iterations_max", "")
             ]
@@ -1051,67 +1140,11 @@ def _iteration_rows(rows: list[dict[str, str]]) -> list[list[str]]:
                 continue
             # A capped cell keeps its count and says so. Dropping it would make
             # a solver that never converged look like the fastest one.
-            capped = any(r.get("censoring") == "capped" for r in trials)
+            capped = any(str(r.get("capped", "")).lower() in {"true", "1"} for r in trials)
             value = f"{median(counts):.0f}"
             cells.append(f"{value} (capped)" if capped else value)
         rendered.append(cells)
     return rendered
-
-
-def _synchronize_zigzag(document: dict) -> int:
-    """Store the synthetic-zigzag within/FEM.jl medians used in the manuscript.
-
-    Read both times directly from the raw benchmark output.
-    """
-    path = ROOT / "benchmarks" / "results" / "correia-benchmarks.csv"
-    if not path.exists():
-        return 0
-    with path.open(newline="", encoding="utf-8") as handle:
-        rows = [
-            row
-            for row in csv.DictReader(handle)
-            if row.get("dataset") == "synthetic-zigzag"
-        ]
-    times: dict[str, float] = {}
-    for row in rows:
-        backend = canonical(row.get("algo") or "")
-        if backend in {"within", "FEM.jl"} and str(row.get("success", "")).lower() == "true":
-            try:
-                times[backend] = float(row["time"])
-            except (KeyError, TypeError, ValueError):
-                continue
-    prose = document.setdefault("prose", {})
-    changed = 0
-    for backend, key in (("within", "zigzag_within_s"), ("FEM.jl", "zigzag_fem_s")):
-        value = times.get(backend)
-        if value is not None and prose.get(key) != value:
-            prose[key] = value
-            changed += 1
-    return changed
-
-
-def _reject_source_collision(
-    table: str, dataset: str, backend: str, candidates: list[dict[str, str]]
-) -> None:
-    """Fail loudly when two result files claim the same cell.
-
-    The harness writes one file per backend label, so this can only happen if a
-    file was renamed without relabelling the `backend` column inside it. The
-    renderer would otherwise report the cell as "incomplete" from duplicate
-    trial ids, which does not say why.
-    """
-    per_backend_sources = {
-        row.get("_source_file", "")
-        for row in candidates
-        if "__" in row.get("_source_file", "")
-    }
-    if len(per_backend_sources) > 1:
-        listed = ", ".join(sorted(per_backend_sources))
-        raise ValueError(
-            f"{table}/{dataset}/{backend} draws on more than one per-backend "
-            f"result file: {listed}. Two files carry the same `backend` label; "
-            "relabel or remove one."
-        )
 
 
 def _synchronize_canonical_tables(
@@ -1126,22 +1159,31 @@ def _synchronize_canonical_tables(
     _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
-    changed = 0
+    changed = _ensure_akm_runtime_rows(document)
+    runtime_tables = {
+        "ols", "ppml", "akm_mobility", "akm_sorting",
+        "correia_synthetic", "correia_real",
+    }
     for name, table in document["tables"].items():
-        if name in {"memory", "agreement"}:
+        if name not in runtime_tables:
             continue
-        headers = [_clean_cell(cell) for cell in table["header"]]
         for row in table["rows"]:
-            dataset, requirements, source_marker = _paper_runtime_target(name, row)
-            for column, backend in enumerate(headers[2:], start=2):
+            dataset, requirements, source_marker = _paper_runtime_target(name, table, row)
+            filename, _view = source_marker.split(":", 1)
+            # An absent raw result means that this experiment was not part of
+            # the current run. It is different from a present file with no
+            # matching row, which should continue to show as missing.
+            if not _latest(filename).exists():
+                continue
+            for column, backend in _backend_columns(table):
+                backend_source = source_marker
                 candidates = [
                     source
                     for source in raw
                     if _matches_runtime_target(
-                        source, dataset, backend, requirements, source_marker
+                        source, dataset, backend, requirements, backend_source
                     )
                 ]
-                _reject_source_collision(name, dataset, backend, candidates)
                 rendered = _render_trial_result(candidates)
                 if row[column] != rendered:
                     row[column] = rendered
@@ -1149,46 +1191,51 @@ def _synchronize_canonical_tables(
     measurements = _latest_rows("memory.csv")
     if measurements is not None:
         table = document["tables"]["memory"]
-        for index, row in enumerate(table["rows"]):
-            if row[0].startswith("#"):
+        size = ""
+        for row in table["rows"]:
+            label = _row_label(table, row)
+            if label == "#memory-100k":
+                size = "100k"
                 continue
-            dgp = row[0].split()[0]
-            size = "100k" if index < 4 else "1m"
-            for column, backend in ((2, "rust"), (3, "rust-cg")):
+            if label == "#memory-1m":
+                size = "1m"
+                continue
+            dgp = label.split()[0]
+            for column, backend in _backend_columns(table):
                 candidates = [
                     item
                     for item in measurements
-                    if item["dgp"] == dgp
+                    if item["design"] == dgp
                     and item["size"] == size
                     and item["backend"] == backend
-                    and _integer_field(item, "model_k") == 1
                 ]
                 match = next(
                     (
                         item
                         for item in candidates
-                        if item["success"].lower() == "true"
+                        if _row_success(item)
                     ),
                     None,
                 )
                 if match and match["rss_mb"]:
                     rendered = f"{int(float(match['rss_mb'])):,} MiB"
                 elif candidates:
-                    rendered = "failed"
+                    rendered = (
+                        "capped"
+                        if all(_row_capped(item) for item in candidates)
+                        else "failed"
+                    )
                 else:
                     rendered = "#miss"
                 if row[column] != rendered:
                     row[column] = rendered
                     changed += 1
     changed += _synchronize_hardness(document)
+    changed += _synchronize_headline_figure(document, raw)
     changed += _synchronize_agreement(document)
-    changed += _synchronize_setup_cost(document)
-    changed += _synchronize_accuracy_frontier(document)
-    changed += _synchronize_ppml_inner_outer(document)
     changed += _synchronize_iterations(document)
-    changed += _synchronize_factor_scaling(document)
-    changed += _synchronize_amortization(document)
-    changed += _synchronize_zigzag(document)
+    changed += _synchronize_akm_setup_cost(document)
+    changed += _synchronize_regression_reuse(document)
     if write:
         _write_json(TABLES_PATH, document)
     return changed
@@ -1200,14 +1247,14 @@ def main() -> None:
     sub.add_parser("check-external-runtimes").set_defaults(func=check_external_runtimes)
     sub.add_parser("setup-julia-env").set_defaults(func=setup_julia_env)
     fetch = sub.add_parser("fetch-correia")
-    fetch.add_argument("--datasets", nargs="*", help="Dataset metadata IDs to fetch (default: all)")
-    fetch.add_argument("--offline", action="store_true", help="Validate local CSVs without network access")
+    fetch.add_argument(
+        "--offline",
+        action="store_true",
+        help="Validate local CSVs without network access",
+    )
     fetch.set_defaults(func=fetch_correia)
     sub.add_parser("collect").set_defaults(func=collect)
-    sub.add_parser("archive-legacy-results").set_defaults(func=archive_legacy_results)
-    render_parser = sub.add_parser("render")
-    render_parser.add_argument("--output-dir", type=Path)
-    render_parser.set_defaults(func=render)
+    sub.add_parser("render").set_defaults(func=render)
     args = parser.parse_args()
     args.func(args)
 
