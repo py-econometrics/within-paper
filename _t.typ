@@ -58,8 +58,8 @@
       sparse approximate Cholesky factorization, and we use the resulting operator inside a Krylov solver
       for least squares. On a near-nested ten-million-observation design, the preconditioned solver
       completes in 4.10s against 62.3s for the fastest MAP implementation; for Poisson models on the same
-      design the times are 5.42s and 439.4s. On dense, well-connected graphs MAP remains faster, and we
-      report the spectral diagnostic that separates the two regimes. Because the preconditioner depends on
+      design the times are 5.42s and 439.4s. On dense, well-connected graphs MAP remains faster, and the
+      normalized-Laplacian gap $lambda_2$ is larger. Because the preconditioner depends on
       the fixed effects and the weights but not on the right-hand side, one factorization serves the many
       residualizations that randomization inference and multi-metric readouts require: measured cost per
       right-hand side falls from 0.137s to 0.047s between one and twenty-five columns.
@@ -81,7 +81,7 @@ a handful of coefficients of interest and millions of nuisance fixed-effect coef
 takes to remove those nuisance coefficients becomes part of the experiment's operating cost, and in the
 hardest cases it decides whether a specification is estimated at all.
 
-The Frisch--Waugh--Lovell theorem reduces the problem to residualizing the outcome and the covariates
+The Frisch-Waugh-Lovell theorem reduces the problem to residualizing the outcome and the covariates
 against the fixed effects before estimating the coefficients of interest @frisch1933 @lovell1963. For a
 right-hand side $mu$, let $D$ be the sparse fixed-effect design matrix and $W$ a diagonal matrix of
 observation weights. The residualization problem is
@@ -93,7 +93,7 @@ $
 $
 
 The same matrix $G$ serves the outcome and every covariate, so a solver can amortize its setup cost across
-right-hand sides. Our contribution is a preconditioner that uses the cross-factor structure of $G$. MAP
+right-hand sides. We use a preconditioner that draws on the cross-factor structure of $G$. MAP
 uses only the diagonal blocks of $G$ and passes cross-factor information through repeated residual
 updates. We instead solve overlapping pairwise blocks approximately and combine their corrections with an
 additive Schwarz construction, so that the co-occurrence structure enters the solver directly.
@@ -110,7 +110,7 @@ A marketplace experiment records outcomes at the level of a pair: a traveller an
 driver, a buyer and a listing. Absorbing user and item effects removes persistent differences in
 propensity to convert and in item quality. The cross-tabulation $C_(U I)$ counts how often each user is
 observed with each item, and it is the weighted adjacency matrix of a bipartite graph. The identical
-object appears in matched employer--employee data as the worker--firm cross-tabulation, which is why the
+object appears in matched employer-employee data as the worker-firm cross-tabulation, which is why the
 benchmarks below use designs from that literature: they are public, standard, and parameterized by the
 graph feature we care about.
 
@@ -119,7 +119,7 @@ firms over a career, whereas a user on a platform interacts with a handful of it
 catalogue of millions, and a readout window of two weeks leaves most users observed once. Users who
 appear with several items act as movers, and they are the only observations that connect item effects to
 one another. When such users are scarce, user and item effects are nearly confounded within small
-subgraphs, and each MAP sweep carries little information across the graph.
+subgraphs, and each MAP pass carries little information across the graph.
 
 == Cluster randomization under interference
 
@@ -128,11 +128,11 @@ randomize at the cluster level @ugander2013 @eckles2017. The design problem is t
 cuts as little edge weight as possible, since edges crossing cluster boundaries carry the contamination
 that biases the estimate.
 
-The quantity the designer minimizes and the quantity that governs MAP convergence are computed from the
-same weighted graph. A partition that cuts little edge weight leaves the corresponding factor-pair block
-close to block diagonal with thin bridges between the blocks, and the spectral gap defined in Section 3 is
-then small. A cluster design that succeeds in limiting spillovers therefore hands the solver the graph on
-which MAP converges most slowly. We report this connection as a structural one; we have not benchmarked a
+Both the partition criterion and the links that slow MAP come from the same weighted graph. A partition
+that cuts little edge weight leaves the corresponding factor-pair block close to block diagonal, with thin
+bridges between the blocks. The normalized-Laplacian gap $lambda_2$ defined in Section 3 is then small. A
+cluster design that limits spillovers can therefore also leave MAP with a graph on which it converges
+slowly. We report this connection as a structural one; we have not benchmarked a
 cluster-randomized design directly, and the strength of the effect will depend on how the analysis panel
 is constructed.
 
@@ -146,7 +146,7 @@ the design matrix $D$ and the weights $W$ are unchanged; only the vector being r
 factor-pair preconditioner depends on $D$ and $W$ alone, so one factorization serves every column, and
 Section 5 reports the measured decline in cost per right-hand side.
 
-= Why MAP slows down, and a diagnostic
+= Why MAP slows down, and a connectivity measure
 
 Let the factors be user, item, and period. The Gramian has the block form
 
@@ -160,22 +160,14 @@ $
 
 Each diagonal block holds weighted level counts and is diagonal. MAP, also called iterative demeaning or
 the zig-zag algorithm, updates one factor at a time @guimaraes2010 @gaure2013: it computes the weighted
-mean of the current partial residual within each level of factor $q$ and subtracts it. A complete sweep is
+mean of the current partial residual within each level of factor $q$ and subtracts it. A complete pass is
 cheap because every update divides by a diagonal count, and the cross-tabulations are never solved as
-coupled systems. When the graph is poorly connected, each sweep transfers only a small amount of
-information across the narrow bridges, and many sweeps are required. A diagnostic for a factor pair is the
-spectral gap
-
-$
-  g a p_(q r) = 1 - rho_(q r),
-  quad rho_(q r) = sigma_2^2 (
-    G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2)
-  ),
-$
-
-omitting the unit singular value attached to each connected component. A small gap indicates near nesting
-or weak cross-exposure. We treat it as a diagnostic rather than a solver-selection rule, because component
-size and setup cost also determine runtime.
+coupled systems. When the graph is poorly connected, each pass transfers only a small amount of
+information across the narrow bridges, and many passes are required. Following @jochmans2019, we measure
+the connectivity of a connected factor-pair graph by $lambda_2$, the second-smallest eigenvalue of its
+normalized Laplacian. Smaller values indicate near nesting or weak cross-exposure. With three factors,
+$lambda_2$ describes one pair and does not bound convergence of the full model. Component size and setup
+cost also determine runtime, so we treat $lambda_2$ as a diagnostic rather than a solver-selection rule.
 
 = The factor-pair preconditioner
 
@@ -195,8 +187,8 @@ $
   M^(-1) = sum_((q,r)) R_(q r)' Omega_(q r) A_(q r) Omega_(q r) R_(q r),
 $
 
-where $A_(q r)$ approximates the inverse of the pair block. With three factors the user--item,
-user--period, and item--period corrections overlap, and a level appearing in two subdomains receives
+where $A_(q r)$ approximates the inverse of the pair block. With three factors the user-item,
+user-period, and item-period corrections overlap, and a level appearing in two subdomains receives
 weight $1 slash sqrt(2)$ on each side so that the squared weights sum to one.
 
 Large pair systems cannot be inverted densely. Eliminating one side of a bipartite graph is a division by
@@ -223,23 +215,23 @@ with 10 cores and 16 GB of memory.
       inset: (x: 4pt, y: 3pt),
       align: (left, right, right, right, right, right),
       table.hline(stroke: 0.75pt + rule),
-      table.header(th[Design], th[Gap], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
+      table.header(th[Design], th[$lambda_2$], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[OLS, 10M observations]],
-      [simple (well-connected)], [0.857], [2.30s], [2.54s], [2.09s], [11.0s],
-      [difficult (near-nested)], [$1.67 times 10^(-7)$], [306.2s], [62.3s], [26.9s], [*4.10s*],
+      [simple (well-connected)], [0.622], [2.30s], [2.54s], [2.09s], [11.0s],
+      [difficult (near-nested)], [$8.35 times 10^(-8)$], [306.2s], [62.3s], [26.9s], [*4.10s*],
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[Poisson, 1M observations]],
-      [simple (well-connected)], [--], [7.86s], [4.72s], [5.76s], [8.61s],
-      [difficult (near-nested)], [--], [capped], [439.4s], [129.8s], [*5.42s*],
+      [simple (well-connected)], [-], [7.86s], [4.72s], [5.76s], [8.61s],
+      [difficult (near-nested)], [-], [capped], [439.4s], [129.8s], [*5.42s*],
       table.hline(stroke: 0.75pt + rule),
     )
   ]
 ]
 
-On the simple design the graph is dense, MAP converges in few sweeps, and `within` is slowest because the
+On the simple design the graph is dense, MAP converges in few passes, and `within` is slowest because the
 preconditioner does not repay its setup cost; 76% of its demeaning time is spent on construction. On the
-difficult design the ranking reverses. The gap falls to $1.67 times 10^(-7)$, unaccelerated MAP takes
+difficult design the ranking reverses. $lambda_2$ falls to $8.35 times 10^(-8)$, unaccelerated MAP takes
 306.2s and the fastest MAP backend 62.3s, while `within` completes in 4.10s. The setup share falls to 37%,
 which indicates that construction is being amortized within a single fit.
 
@@ -247,9 +239,9 @@ The Poisson rows matter for experiment readouts because platform outcomes are fr
 bookings, clicks, or sessions. Iteratively reweighted least squares repeats the demeaning step at every
 iteration @correia2020ppmlhdfe, so any change in absorption cost is multiplied by the number of
 iterations. On the difficult design `rust-map` does not converge within its cap and `fixest` takes 439.4s,
-against 5.42s for `within`. A controlled sweep that varies two-sided mobility while holding the rest of
+against 5.42s for `within`. A controlled comparison that varies two-sided mobility while holding the rest of
 the data-generating process fixed reproduces the pattern: `within` stays between 0.369s and 0.557s across
-the sweep, whereas MAP reaches its 10,000-sweep cap at the lowest mobility. Across a broader set of public
+the designs, whereas MAP reaches its 10,000-pass cap at the lowest mobility. Across a broader set of public
 benchmark datasets, accelerated MAP wins on small or compact graphs, and the factor-pair preconditioner
 wins on the larger networks whose hard components cover much of the sample.
 
@@ -288,7 +280,7 @@ than as a measured result.
 
 In a 100,000-observation numerical check the largest slope difference from MAP is $3.2 times 10^(-7)$;
 comparisons use fitted values and residuals, because fixed-effect coefficients themselves depend on
-normalization. The preconditioned solver uses more memory, with an incremental peak-RSS cost of 128--268
+normalization. The preconditioned solver uses more memory, with an incremental peak-RSS cost of 128-268
 MiB at one million observations.
 
 = Practical guidance and software
@@ -296,7 +288,7 @@ MiB at one million observations.
 Accelerated MAP remains a good default for dense, well-connected graphs and for one-off fits where setup
 cannot amortize. The factor-pair preconditioner is intended for sparse two-sided exposure, cluster designs
 with thin bridges, count outcomes estimated by IRLS, and workloads that residualize many right-hand sides
-against one fixed-effect structure. The gap identifies difficult pair graphs; pilot timings should decide
+against one fixed-effect structure. A small $lambda_2$ identifies weakly connected pair graphs; pilot timings should decide
 whether setup is recovered.
 
 The method is available in the open-source `within` project @within. The computational core is written in

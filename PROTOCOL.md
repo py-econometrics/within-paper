@@ -18,12 +18,12 @@ metric is read. A claim with no row is not a claim the paper may make.
 | # | Claim | Experiment | Deciding metric | Accuracy gate |
 |---|---|---|---|---|
 | 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility designs at 1M | Median total wall time, all backends | Gate A on every reported cell |
-| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
+| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP passes and runtime against worker-firm normalized-Laplacian gap \(\lambda_2\) | Gate A, or explicit censoring |
 | 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
 | 4 | Diagonal scaling removes them only partially | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations, `diagonal` vs `additive` | Gate A |
 | 5 | Factor-pair preconditioning reduces LSMR iterations relative to diagonal preconditioning where pair coupling matters | Simple and difficult iteration-count benchmark | Median iterations for `diagonal` vs `additive` | Gate A |
 | 6 | Factor-pair preconditioning reduces total runtime only when iteration savings exceed setup and application cost | AKM setup-cost and ten-regression reuse experiments | Setup, solve, and total time | Gate A |
-| 7 | Setup is most expensive on the dense graphs that need it least | Additive setup cost across AKM mobility designs | Construction time against the worker-firm gap | Gate A on the paired solve |
+| 7 | Setup is most expensive on the dense graphs that need it least | Additive setup cost across AKM mobility designs | Construction time against worker-firm normalized-Laplacian gap \(\lambda_2\) | Gate A on the paired solve |
 | 8 | `within` runtime varies little and declines modestly as connectivity weakens | AKM designs varying mobility | Median and IQR of total time across the designs | Gate A; repetition rule R1 |
 | 9 | Setup amortizes across repeated fits with unchanged weights; PPML is a separate repeated-solve use case in which the weights change between IRLS steps | Ten-regression experiment on the simple and difficult designs; main PPML benchmark | Setup and solve time for repeated OLS fits; total PPML runtime | Gate A for every reported cell |
 | 10 | The method loses on well-connected designs at scale | 10M simple design | Total runtime | Gate A |

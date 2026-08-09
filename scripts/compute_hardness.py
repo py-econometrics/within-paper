@@ -1,4 +1,4 @@
-"""Compute pairwise spectral gaps for every paper design."""
+"""Compute pairwise normalized-Laplacian gaps for every paper design."""
 
 from __future__ import annotations
 
@@ -36,11 +36,11 @@ class PairHardness:
     n_q_levels: int
     n_r_levels: int
     n_components: int
-    rho_qr: float
-    worst_component_obs_share: float
-    worst_component_n_obs: int
-    worst_component_n_q_levels: int
-    worst_component_n_r_levels: int
+    lambda2_qr: float
+    weakest_component_obs_share: float
+    weakest_component_n_obs: int
+    weakest_component_n_q_levels: int
+    weakest_component_n_r_levels: int
 
 
 def _top_two_singular_values(matrix: sp.csr_matrix) -> np.ndarray:
@@ -60,9 +60,13 @@ def _top_two_singular_values(matrix: sp.csr_matrix) -> np.ndarray:
     raise RuntimeError("singular-value calculation failed (" + "; ".join(errors) + ")")
 
 
-def _component_rho(cooccurrence: sp.csr_matrix) -> float:
-    if min(cooccurrence.shape) < 2:
-        return 0.0
+def _component_lambda2(cooccurrence: sp.csr_matrix) -> float:
+    """Return lambda2 of one connected weighted bipartite component."""
+    rows, columns = cooccurrence.shape
+    if rows == 1 and columns == 1:
+        return 2.0
+    if min(rows, columns) == 1:
+        return 1.0
     row_sums = np.asarray(cooccurrence.sum(axis=1)).ravel()
     column_sums = np.asarray(cooccurrence.sum(axis=0)).ravel()
     normalized = (
@@ -72,7 +76,7 @@ def _component_rho(cooccurrence: sp.csr_matrix) -> float:
     ).tocsr()
     singular_values = np.sort(_top_two_singular_values(normalized))[::-1]
     sigma_2 = min(max(float(singular_values[1]), 0.0), 1.0)
-    return sigma_2**2
+    return max(1.0 - sigma_2, 0.0)
 
 
 def pair_hardness(q: np.ndarray, r: np.ndarray) -> PairHardness:
@@ -86,20 +90,22 @@ def pair_hardness(q: np.ndarray, r: np.ndarray) -> PairHardness:
     adjacency = sp.bmat([[None, cooccurrence], [cooccurrence.T, None]], format="csr")
     n_components, labels = connected_components(adjacency, directed=False, return_labels=True)
     q_labels, r_labels = labels[:n_q], labels[n_q:]
-    worst = PairHardness(n_q, n_r, n_components, 0, 0, 0, 0, 0)
+    weakest: PairHardness | None = None
     for component in range(n_components):
         q_mask, r_mask = q_labels == component, r_labels == component
         if not q_mask.any() or not r_mask.any():
             continue
         block = cooccurrence[q_mask][:, r_mask]
         n_obs = int(block.sum())
-        rho = _component_rho(block)
-        if rho > worst.rho_qr:
-            worst = PairHardness(
-                n_q, n_r, n_components, rho, n_obs / len(q), n_obs,
+        lambda2 = _component_lambda2(block)
+        if weakest is None or lambda2 < weakest.lambda2_qr:
+            weakest = PairHardness(
+                n_q, n_r, n_components, lambda2, n_obs / len(q), n_obs,
                 int(q_mask.sum()), int(r_mask.sum()),
             )
-    return worst
+    if weakest is None:
+        raise ValueError("factor pair has no observed connected component")
+    return weakest
 
 
 def _datasets():
@@ -107,7 +113,7 @@ def _datasets():
         yield name, "correia", pd.read_csv(CORREIA / f"{name}.csv"), ("id1", "id2")
     for name in SCENARIOS:
         yield name, "akm", make_akm_data(name), FE_COLUMNS
-    # The gap is a property of the exact sample each experiment times, so the
+    # lambda2 is a property of the exact sample each experiment times, so the
     # observation counts come from the runners themselves: BASE_N_OBS is the
     # headline OLS size and MEMORY_CELLS is the memory benchmark's sizes. Keeping
     # one authority for each n stops the reported gap from drifting to a design
@@ -130,11 +136,10 @@ def main() -> None:
                     "dataset_id": name, "kind": kind, "n_obs_raw": len(raw),
                     "n_obs": len(frame), "n_singletons_dropped": dropped,
                     "fe_a": left, "fe_b": right, **asdict(result),
-                    "one_minus_rho": 1 - result.rho_qr,
                 }
             )
         print(
-            f"compute-hardness / spectral gap / {name}: "
+            f"compute-hardness / normalized-Laplacian gap / {name}: "
             f"{time.perf_counter() - started:.3f} s",
             flush=True,
         )

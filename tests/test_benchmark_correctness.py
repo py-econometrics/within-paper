@@ -172,7 +172,31 @@ class FailureLoggingTests(unittest.TestCase):
 class HardnessTests(unittest.TestCase):
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
         block = sp.csr_matrix(np.ones((3, 4)))
-        self.assertAlmostEqual(compute_hardness._component_rho(block), 0.0)
+        self.assertAlmostEqual(compute_hardness._component_lambda2(block), 1.0)
+
+    def test_manuscript_graph_has_expected_lambda2(self) -> None:
+        block = sp.csr_matrix(np.array([[1, 1], [2, 0], [0, 2]]))
+        self.assertAlmostEqual(
+            compute_hardness._component_lambda2(block),
+            1.0 - np.sqrt(2.0 / 3.0),
+        )
+
+    def test_star_and_two_node_components_use_laplacian_values(self) -> None:
+        star = sp.csr_matrix(np.array([[2, 1, 3]]))
+        edge = sp.csr_matrix(np.array([[4]]))
+        self.assertEqual(compute_hardness._component_lambda2(star), 1.0)
+        self.assertEqual(compute_hardness._component_lambda2(edge), 2.0)
+
+    def test_multiple_components_select_the_smallest_lambda2(self) -> None:
+        q = np.array([0, 0, 1, 1, 2, 2, 3, 3, 3])
+        r = np.array([0, 1, 0, 0, 1, 1, 2, 3, 4])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertEqual(result.n_components, 2)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0 - np.sqrt(2.0 / 3.0))
+        self.assertAlmostEqual(result.weakest_component_obs_share, 2.0 / 3.0)
+        self.assertEqual(result.weakest_component_n_obs, 6)
+        self.assertEqual(result.weakest_component_n_q_levels, 3)
+        self.assertEqual(result.weakest_component_n_r_levels, 2)
 
     def test_sparse_calculation_falls_back_from_propack_to_arpack(self) -> None:
         calls = []
@@ -188,7 +212,7 @@ class HardnessTests(unittest.TestCase):
             patch.object(compute_hardness, "DENSE_MAX_ENTRIES", 0),
             patch.object(compute_hardness, "svds", side_effect=fake_svds),
         ):
-            self.assertAlmostEqual(compute_hardness._component_rho(block), 0.25)
+            self.assertAlmostEqual(compute_hardness._component_lambda2(block), 0.5)
         self.assertEqual(calls, ["propack", "arpack"])
 
 
@@ -563,7 +587,7 @@ class PaperResultTests(unittest.TestCase):
                 paper_results._synchronize_canonical_tables(document, write=False)
             self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
 
-    def test_partial_hardness_file_preserves_other_collected_gaps(self) -> None:
+    def test_partial_hardness_file_preserves_other_collected_lambda2_values(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         mobility_gap = document["tables"]["akm_mobility"]["rows"][0][1]
         rows = [
@@ -571,8 +595,8 @@ class PaperResultTests(unittest.TestCase):
                 "dataset_id": "akm_sorting_1",
                 "fe_a": "indiv_id",
                 "fe_b": "firm_id",
-                "one_minus_rho": "0.25",
-                "worst_component_obs_share": "1.0",
+                "lambda2_qr": "0.25",
+                "weakest_component_obs_share": "1.0",
             }
         ]
         with patch.object(paper_results, "_latest_rows", return_value=rows):
@@ -593,7 +617,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "Gap (share)"],
+                    "header": ["Scenario", "$lambda_2$ (share)"],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
                 },
                 "akm_setup_cost": {"rows": []},

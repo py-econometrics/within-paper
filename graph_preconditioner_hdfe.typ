@@ -117,17 +117,20 @@ means, then firm means, then year means. Each update uses only the residual left
 previous update; MAP repeats the sequence until changes in the residuals fall below a
 chosen tolerance.
 
-Yet those links matter for identification and computation @correia2017. They form a
+Yet those links matter for identification, precision, and computation @correia2017
+@jochmans2019. They form a
 graph in which movers create paths between firms, while stayers add observations without
 connecting firms. When few workers move between groups of firms, some combinations of
 worker and firm effects become difficult to separate. MAP can then require many
 repetitions before estimates in one group reflect changes in another. The same mobility
 links that identify worker and firm effects thus govern how quickly MAP converges.
 
-The pairwise spectral gap summarizes how strongly this graph is connected. A small gap
-indicates sparse mobility, strong sorting, or near nesting and is associated with slow
-MAP convergence. In models with more than two fixed-effect dimensions, the pairwise gap
-is only a diagnostic; it does not bound convergence of the full model.
+Following #cite(<jochmans2019>, form: "prose"), we measure the connectivity of a
+connected factor-pair graph by $lambda_2$, the second-smallest eigenvalue of its
+normalized Laplacian. The graph is weighted by the number of observed co-occurrences.
+Smaller values indicate weaker connectivity. The measure describes the connectivity of
+two fixed-effect dimensions. Unless stated otherwise, $lambda_2$ refers to the
+worker-firm graph.
 
 The same graph appears in the weighted cross-product matrix of the fixed-effect
 indicators, which we call the Gramian @correia2017. Its diagonal blocks count
@@ -137,7 +140,7 @@ worker-firm pair. MAP uses the diagonal blocks one at a time and does not use th
 pairwise counts directly.
 
 We therefore build a factor-pair graph preconditioner for designs with a small pairwise
-spectral gap, where MAP tends to converge slowly. A preconditioner transforms a linear
+$lambda_2$, where MAP tends to converge slowly. A preconditioner transforms a linear
 system so that an iterative solver reaches the same solution in fewer steps. Rather than
 handling the fixed-effect dimensions one at a time, our preconditioner builds a local
 problem for every pair, such as worker-firm and worker-year, and uses the observed links
@@ -151,7 +154,7 @@ factor-pair graph.]
 
 Constructing the factor-pair preconditioner takes time. On a well-connected graph, the
 reduction in iterations may not repay this setup cost because MAP and diagonal
-preconditioning are already fast. As the gap falls, however, the reduction in iterations
+preconditioning are already fast. As $lambda_2$ falls, however, the reduction in iterations
 can outweigh the construction cost. @fig-gap-runtime compares total regression times as
 worker-firm connectivity varies. The top row changes worker mobility; the bottom row
 changes sorting among movers. In each row, the left panel compares package defaults and
@@ -161,22 +164,23 @@ accuracy each method actually achieves.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
-  caption: [The panels plot median regression time against the worker-firm spectral gap
-  on logarithmic axes. Smaller gaps mean weaker connectivity. All panels use the same
-  reversed horizontal scale, so the gap decreases from left to right. Each simulated
+  caption: [The panels plot median regression time against the worker-firm
+  normalized-Laplacian gap $lambda_(2,W F)$ on logarithmic axes. We compute $lambda_2$
+  after removing singleton fixed-effect levels. Smaller values mean weaker connectivity.
+  All panels use the same reversed horizontal scale, so $lambda_2$ decreases from left to right. Each simulated
   worker-firm-year panel has 1 million observations. The top panels vary worker mobility;
   the bottom panels hold move probability at one and vary sorting. The left panels
   compare packages at their default settings, including their own treatment of
   fixed-effect levels observed only once. The right panels compare four PyFixest solver
   configurations, with tolerances chosen to give similar coefficient and residual
   errors. Filled markers indicate that all three planned fits produced estimates; hollow
-  markers indicate that only one or two did. Lines join the medians in order of spectral
-  gap and are not fitted trends. An arrow marks the median time for fits that reach the
+  markers indicate that only one or two did. Lines join the medians in order of $lambda_2$
+  and are not fitted trends. An arrow marks the median time for fits that reach the
   iteration limit. Because these fits did not finish, the marked time is a lower bound.
   Arrows are not joined to the lines. Fits that end in another error are omitted.]
 ) <fig-gap-runtime>
 
-At high connectivity, all implementations finish quickly. As the spectral gap falls, MAP
+At high connectivity, all implementations finish quickly. As $lambda_2$ falls, MAP
 and LSMR without factor-pair preconditioning slow down. Factor-pair LSMR remains fast. In
 the lowest-mobility designs, its run time falls because the worker-firm subproblems are
 cheaper to construct.
@@ -184,8 +188,8 @@ cheaper to construct.
 Sections 2-5 set up fixed-effect absorption and connect MAP convergence to graph
 connectivity. Section 6 develops the factor-pair preconditioner, and Section 7 reports the
 benchmarks. Section 8 describes the software; Section 9 concludes. The appendices give
-the algorithm, define the connectivity measure, report additional benchmarks, and
-compare coefficient estimates and memory use.
+the algorithm, report additional benchmarks, and compare coefficient estimates and
+memory use.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -476,11 +480,11 @@ in narrow regions of the graph, repeated residual updates separate the effects o
 gradually. MAP still converges, but it may repeat these updates many times. A complete
 pass is cheap because the diagonal block solves reduce to one-pass group means.
 
-We use the pairwise spectral gap $1-rho_(q r)$ as a diagnostic for MAP difficulty.
-Smaller values indicate weaker pairwise connectivity. Appendix B defines the statistic
-and describes how we treat disconnected components. A faster solver must use the
-pairwise links directly instead of passing their information through one factor update
-at a time.
+We use the normalized-Laplacian gap $lambda_(2,q r)$ as a diagnostic for MAP difficulty.
+Smaller values indicate weaker pairwise connectivity. For models with three or more
+fixed effects, the statistic describes one factor pair and is not a convergence bound
+for the full model. A faster solver must use the pairwise links directly instead of
+passing their information through one factor update at a time.
 
 = The Factor-Pair Schwarz Preconditioner
 
@@ -738,7 +742,7 @@ The main runtime tables use package-level regression APIs, as does the public Py
 benchmark suite, rather than timing the demeaning step alone. Each timing covers the full
 regression workflow: model setup, construction of the fixed-effect representation,
 residualization of the outcome and covariates, and estimation of the coefficient of
-interest. Appendix D compares the coefficient estimates returned by the preconditioned
+interest. Appendix C compares the coefficient estimates returned by the preconditioned
 solver and MAP. It also reports the memory cost of storing factor-pair information.
 
 For cross-package comparisons, every software implementation receives the same input
@@ -749,8 +753,12 @@ status and error. Any shared control is stated with the relevant table. The comp
 are not constrained to a common estimation sample. The later single-package mechanism
 experiments use a common prepared sample because they isolate the preconditioner.
 
-The runtime tables report the spectral-gap diagnostic $1-rho$ for the relevant factor
-pair. Its definition and limitations are given in Appendix B.
+The runtime tables report $lambda_2$ for the relevant factor pair. We compute it after
+removing singleton fixed-effect levels. For a disconnected pair graph, we compute
+$lambda_2$ within each connected component and report the smallest value. The number in
+parentheses is that component's share of retained observations. Pairwise $lambda_2$
+remains a diagnostic rather than a convergence bound for models with three or more fixed
+effects.
 
 The OLS package-runtime tables compare six configurations: PyFixest MAP, PyFixest LSMR
 with no, diagonal, or factor-pair preconditioning, R `fixest`, and
@@ -798,8 +806,8 @@ The main OLS benchmarks use synthetic AKM-style panels with one million observat
 one covariate, ten periods, and worker, firm, and year fixed effects. They vary the
 worker-firm graph in two ways while holding the rest of the data-generating process
 fixed. The mobility designs progressively reduce the number of workers who change firms.
-The sorting designs hold the move probability at one and increasingly concentrate moves
-within groups of firms. Appendix C reports further
+The sorting designs hold the move probability at one but assign a larger share of moves
+within groups of firms. Appendix B reports further
 synthetic designs, the empirical HDFE benchmarks assembled by Sergio Correia, and the
 exact package-default AKM timings behind @fig-gap-runtime.
 
@@ -809,8 +817,8 @@ Lower worker mobility leaves fewer workers connecting multiple firms. Because MA
 one fixed-effect dimension at a time, information about firm effects moves more slowly
 through the iteration. The factor-pair preconditioner uses the worker-firm links directly,
 so its relative advantage grows as mobility falls. The top row of
-@fig-gap-runtime shows the worker-firm gap falling from $0.41$ to
-$4.82 times 10^(-5)$. Under package defaults, all configurations in the first two designs
+@fig-gap-runtime shows worker-firm $lambda_2$ falling from $0.232$ to
+$2.41 times 10^(-5)$. Under package defaults, all configurations in the first two designs
 complete within 3.60 seconds. In the remaining designs, PyFixest MAP slows sharply or reaches
 its cap, and LSMR without preconditioning reaches its cap. Factor-pair LSMR falls from
 0.543 seconds in the first design to 0.365 seconds in the last.
@@ -820,8 +828,8 @@ its cap, and LSMR without preconditioning reaches its cap. Factor-pair LSMR fall
 Every worker changes firms between adjacent periods in these designs. The sorting
 parameter $rho$ controls how strongly workers are matched to similar firms; larger values
 concentrate moves within groups and weaken the links between them. The bottom row of
-@fig-gap-runtime reports this comparison. The gap falls from $0.395$ at $rho=0$ to
-$4.25 times 10^(-4)$ at $rho=150,000$. MAP rises from 0.368 seconds at $rho=0$ to
+@fig-gap-runtime reports this comparison. Worker-firm $lambda_2$ falls from $0.222$ at
+$rho=0$ to $2.13 times 10^(-4)$ at $rho=150,000$. MAP rises from 0.368 seconds at $rho=0$ to
 60.1 seconds at $rho=10,000$, then reaches its default cap at $rho=150,000$. LSMR
 without preconditioning reaches its default cap in the last four designs. Diagonal LSMR
 rises from 0.367 to 1.73 seconds. Factor-pair LSMR remains below 1.1 seconds and takes
@@ -847,10 +855,11 @@ firm, and year fixed effects.
   $t$. A dash means that no timing is available.
   `capped (0/n)` means that no run finishes before the iteration limit; `failed (0/n)`
   marks a failure other than reaching that limit. Both designs have 10 million
-  observations, one covariate, and worker, firm, and year fixed effects. In the Gap
-  (share) column, a smaller gap means weaker worker-firm connectivity. We compute the gap
-  after removing fixed-effect levels observed only once. The number in parentheses is
-  the share of remaining observations in the least-connected group of fixed-effect levels.]
+  observations, one covariate, and worker, firm, and year fixed effects. In the
+  $lambda_2$ (share) column, smaller values mean weaker worker-firm connectivity. We
+  compute $lambda_2$ after removing singleton fixed-effect levels. For a disconnected
+  pair graph, we report the smallest component value; the number in parentheses is that
+  component's share of retained observations.]
 ]]
 
 On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
@@ -945,10 +954,10 @@ million observations, with the same outcome and covariate used in both specifica
   specification, the table gives the median setup and solve time from five runs with 1
   million observations and an LSMR tolerance of $10^(-12)$. The two-fixed-effect
   specification absorbs worker and firm effects; the three-fixed-effect specification
-  also absorbs year effects. In the Gap (share) column, smaller values mean weaker
-  worker-firm connectivity. We compute the gap after removing fixed-effect levels
-  observed only once. The number in parentheses is the share of remaining observations
-  in the least-connected group of fixed-effect levels.]
+  also absorbs year effects. In the $lambda_2$ (share) column, smaller values mean weaker
+  worker-firm connectivity. We compute $lambda_2$ after removing singleton fixed-effect
+  levels. For a disconnected pair graph, we report the smallest component value; the
+  number in parentheses is that component's share of retained observations.]
 ]]
 
 Setup is cheaper in the low-mobility designs. With two fixed effects, median setup declines
@@ -1117,7 +1126,7 @@ seconds.
 
 PPML calls the demeaning routine repeatedly because each IRLS step solves a new weighted
 problem. In our benchmark, PyFixest reuses the first preconditioner as the weights change.
-Our results support factor-pair preconditioning when the gap diagnostic is small, a fit
+Our results support factor-pair preconditioning when pairwise $lambda_2$ is small, a fit
 is unexpectedly slow, or an estimator requires several fixed-effect solves.
 
 #set heading(numbering: none)
@@ -1174,48 +1183,11 @@ Algorithm 1 implements the construction shown in @fig-pair-strategy.
 
 #pagebreak()
 
-= Appendix B: Measuring Connectivity
-
-== Spectral Gap
-
-The spectral gap summarizes how strongly a pair of fixed-effect dimensions is connected.
-For a pair of fixed effects $(q,r)$, define the normalized cross-tabulation
-
-$ H_(q r) = G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2). $
-
-Let $rho_(q r) = sigma_2(H_(q r))^2$, where $sigma_2$ is the largest nontrivial
-singular value. Equivalently, $rho_(q r)$ is the largest nontrivial eigenvalue of
-$H_(q r)' H_(q r)$. Each connected component automatically has a singular value equal
-to one. This value comes from a component-wide constant that does not change the fitted
-values; it says nothing about the strength of the internal connections, so we discard it. We report
-$1-rho_(q r)$. Values near zero indicate
-weak connectivity, including sparse mobility and near nesting.
-
-We compute the diagnostic after repeatedly removing singleton fixed-effect levels, which
-occur only once in the data. If the factor-pair graph has several connected components,
-we compute the gap within each component and report the smallest one. The parenthetical value in the tables
-is the share of retained observations in the component attaining that gap. For models
-with three or more fixed effects, the statistic describes one factor pair and is not a
-bound on convergence of the full model.
-
-== Worker-Firm Example
-
-In the worker-firm example of Section 4, $G_(W W) = "diag"(2,2,2)$,
-$G_(F F) = "diag"(3,3)$, and $C_(W F) = mat(1, 1; 2, 0; 0, 2)$. Therefore,
-
-$ H_(W F) = G_(W W)^(-1/2) C_(W F) G_(F F)^(-1/2)
-  = 1 / sqrt(6) mat(1, 1; 2, 0; 0, 2), $
-
-and $H_(W F)' H_(W F) = 1 / 6 mat(5, 1; 1, 5)$ has eigenvalues $1$ and
-$2/3$. After discarding the unit eigenvalue, $rho_(W F)=2/3$ and the gap is $1/3$.
-
-#pagebreak()
-
-= Appendix C: Additional Benchmark Results
+= Appendix B: Additional Benchmark Results
 
 We report the detailed AKM timings behind @fig-gap-runtime and results for synthetic and
 real data from the Correia collection. The script `scripts/paper_results.py` generates
-every table in Appendices C and D from recorded benchmark output; none of the numbers are
+every table in Appendices B and C from recorded benchmark output; none of the numbers are
 entered by hand.
 
 == Controlled AKM Benchmarks
@@ -1223,7 +1195,7 @@ entered by hand.
 Panel A reports the exact package-default timings used in the left column of
 @fig-gap-runtime. Panel B reports the other package-default PyFixest LSMR
 configurations, so its factor-pair column repeats Panel A's PyFixest factor-pair
-result. Appendix B defines the gap and explains the sample share shown in parentheses.
+result.
 
 === Worker Mobility
 
@@ -1235,11 +1207,12 @@ result. Appendix B defines the gap and explains the sample share shown in parent
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each regression from
   model setup through coefficient estimation. Each package uses its default settings.
-  Each design has 1 million observations, one covariate, and worker, firm, and year fixed effects. Move probability
-  is the probability that a worker changes firms between adjacent periods. In the Gap
-  (share) column, smaller values mean weaker worker-firm connectivity. We compute the gap
-  after removing fixed-effect levels observed only once. The number in parentheses is
-  the share of remaining observations in the least-connected group of fixed-effect levels. If only $k$ of the $n$
+  Each design has 1 million observations, one covariate, and worker, firm, and year fixed
+  effects. Move probability is the probability that a worker changes firms between
+  adjacent periods. In the $lambda_2$ (share) column, smaller values mean weaker
+  worker-firm connectivity. We compute $lambda_2$ after removing singleton fixed-effect
+  levels. For a disconnected pair graph, we report the smallest component value; the
+  number in parentheses is that component's share of retained observations. If only $k$ of the $n$
   planned runs return an estimate, $t (k/n)$ gives their median time $t$. A dash means
   that no timing is available. `capped (0/n)` means that no run finishes before the
   10,000-iteration limit; @fig-gap-runtime plots the median elapsed time as a lower bound.
@@ -1257,10 +1230,11 @@ result. Appendix B defines the gap and explains the sample share shown in parent
   fixed effects. Move probability is the probability that a worker changes firms between
   adjacent periods. The columns show PyFixest LSMR with no preconditioner, with diagonal
   scaling by fixed-effect group counts, and with factor-pair preconditioning. The
-  factor-pair column repeats Panel A. In the Gap (share) column, smaller values mean
-  weaker worker-firm connectivity. We compute the gap after removing fixed-effect levels
-  observed only once. The number in parentheses is the share of remaining observations
-  in the least-connected group of fixed-effect levels. `capped (0/n)` means that no run finishes
+  factor-pair column repeats Panel A. In the $lambda_2$ (share) column, smaller values
+  mean weaker worker-firm connectivity. We compute $lambda_2$ after removing singleton
+  fixed-effect levels. For a disconnected pair graph, we report the smallest component
+  value; the number in parentheses is that component's share of retained observations.
+  `capped (0/n)` means that no run finishes
   before the 10,000-iteration limit.]
 ]
 
@@ -1278,10 +1252,10 @@ result. Appendix B defines the gap and explains the sample share shown in parent
   model setup through coefficient estimation. Each package uses its default settings.
   Each design has 1 million observations, one covariate, and worker, firm, and year fixed effects. Every worker
   changes firms between adjacent periods; the parameter $rho$ controls how strongly
-  workers sort across firms. In the Gap (share) column, smaller values mean weaker
-  worker-firm connectivity. We compute the gap after removing fixed-effect levels
-  observed only once. The number in parentheses is the share of remaining observations
-  in the least-connected group of fixed-effect levels. If only $k$ of the $n$ planned runs return an estimate, $t (k/n)$ gives
+  workers sort across firms. In the $lambda_2$ (share) column, smaller values mean weaker
+  worker-firm connectivity. We compute $lambda_2$ after removing singleton fixed-effect
+  levels. For a disconnected pair graph, we report the smallest component value; the
+  number in parentheses is that component's share of retained observations. If only $k$ of the $n$ planned runs return an estimate, $t (k/n)$ gives
   their median time $t$. A dash means that no timing is available. `capped (0/n)` means
   that no run finishes before the 10,000-iteration limit; @fig-gap-runtime plots the
   median elapsed time as a lower bound. `failed (0/n)` marks a failure other than
@@ -1299,10 +1273,11 @@ result. Appendix B defines the gap and explains the sample share shown in parent
   fixed effects. Every worker changes firms between adjacent periods; the parameter
   $rho$ controls how strongly workers sort across firms. The columns show PyFixest LSMR
   with no preconditioner, with diagonal scaling by fixed-effect group counts, and with
-  factor-pair preconditioning. The factor-pair column repeats Panel A. In the Gap (share)
-  column, smaller values mean weaker worker-firm connectivity. We compute the gap after
-  removing fixed-effect levels observed only once. The number in parentheses is the
-  share of remaining observations in the least-connected group of fixed-effect levels. `capped (0/n)` means that no
+  factor-pair preconditioning. The factor-pair column repeats Panel A. In the $lambda_2$
+  (share) column, smaller values mean weaker worker-firm connectivity. We compute
+  $lambda_2$ after removing singleton fixed-effect levels. For a disconnected pair graph,
+  we report the smallest component value; the number in parentheses is that component's
+  share of retained observations. `capped (0/n)` means that no
   run finishes before the 10,000-iteration limit.]
 ]
 
@@ -1327,11 +1302,11 @@ generator.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Times are in seconds for OLS regressions using each
   package's defaults. We planned three runs per cell. Each package applies its own
-  default treatment of fixed-effect levels observed only once. Gap measures connectivity
-  between the fixed-effect identifiers `id1` and `id2`. A smaller value means weaker
-  connectivity. We compute the gap after removing fixed-effect levels observed only
-  once. The number in parentheses is the share of remaining observations in the
-  least-connected group of fixed-effect levels. If only $k$ of the three planned runs return an
+  default treatment of fixed-effect levels observed only once. In the $lambda_2$ (share)
+  column, smaller values mean weaker connectivity between `id1` and `id2`. We compute
+  $lambda_2$ after removing singleton fixed-effect levels. For a disconnected pair graph,
+  we report the smallest component value; the number in parentheses is that component's
+  share of retained observations. If only $k$ of the three planned runs return an
   estimate, $t (k/3)$ gives their median time $t$.
   A dash means that no timing is available. `capped (0/3)` means that no run finishes
   before the iteration limit; `failed (0/3)` marks a failure other than reaching that limit.
@@ -1361,27 +1336,27 @@ conditions that controlled data-generating processes only approximate.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Times are in seconds for OLS regressions using each
   package's defaults. We planned three runs per cell. Each package applies its own
-  default treatment of fixed-effect levels observed only once. Gap measures connectivity
-  between the fixed-effect identifiers `id1` and `id2`. A smaller value means weaker
-  connectivity. We compute the gap after removing fixed-effect levels observed only
-  once. The number in parentheses is the share of remaining observations in the
-  least-connected group of fixed-effect levels. If only $k$ of the three planned runs return an
+  default treatment of fixed-effect levels observed only once. In the $lambda_2$ (share)
+  column, smaller values mean weaker connectivity between `id1` and `id2`. We compute
+  $lambda_2$ after removing singleton fixed-effect levels. For a disconnected pair graph,
+  we report the smallest component value; the number in parentheses is that component's
+  share of retained observations. If only $k$ of the three planned runs return an
   estimate, $t (k/3)$ gives their median time $t$.
   A dash means that no timing is available. `capped (0/3)` means that no run finishes
   before the iteration limit; `failed (0/3)` marks a failure other than reaching that
-  limit. A small gap in a
+  limit. A small $lambda_2$ in a
   small component, as for `directors`, need not make the full sample difficult for MAP.]
   ]
 
 No single pairwise statistic captures all the irregular components in the real-data
-collection. The `directors` component attaining the smallest reported gap covers 30
+collection. The `directors` component attaining the smallest reported $lambda_2$ covers 30
 percent of the observations. The no-preconditioner and diagonal LSMR columns await the
-package-default Correia run. The gap remains a diagnostic and does not serve as a
+package-default Correia run. Pairwise $lambda_2$ remains a diagnostic and does not serve as a
 selection rule.
 
 #pagebreak()
 
-= Appendix D: Coefficient Estimates and Memory Use
+= Appendix C: Coefficient Estimates and Memory Use
 
 == Comparing Coefficient Estimates
 
@@ -1392,8 +1367,8 @@ need only agree within the requested tolerances.
 We use the 100K-observation versions of the simple and difficult `fixest` benchmark
 designs. All methods should agree closely on the simple design. In the difficult design,
 some remaining errors shrink much more slowly, so small differences in stopping rules
-are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
-design and 0.00130 in the difficult design. The table compares estimates of one
+are more likely to appear. Worker-firm $lambda_2$ is approximately 0.622 in the simple
+design and $6.50 times 10^(-4)$ in the difficult design. The table compares estimates of one
 regression coefficient across four implementations.
 
 #v(0.4em)
@@ -1443,10 +1418,10 @@ implementations run in isolated processes and report peak RSS through `ru_maxrss
 		compares PyFixest OLS regressions using MAP or factor-pair LSMR. Each regression has
 		one covariate and worker, firm, and year fixed effects. The results cover the simple
 		and difficult designs at 100,000 and 1 million observations; they do not show how
-		memory changes with graph structure. In the Gap (share) column, smaller values mean
-		weaker worker-firm connectivity. We compute the gap after removing fixed-effect levels
-		observed only once. The number in parentheses is the share of remaining observations
-		in the least-connected group of fixed-effect levels.]
+		memory changes with graph structure. In the $lambda_2$ (share) column, smaller values
+		mean weaker worker-firm connectivity. We compute $lambda_2$ after removing singleton
+		fixed-effect levels. For a disconnected pair graph, we report the smallest component
+		value; the number in parentheses is that component's share of retained observations.]
 		]
 
 At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M

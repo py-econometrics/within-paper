@@ -37,6 +37,31 @@ def _raw_trial(
 
 
 class HeadlineFigureCollectionTests(unittest.TestCase):
+    def test_canonical_headline_uses_lambda2_schema(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(document["schema_version"], 2)
+        self.assertEqual(document["headline_figure"]["schema_version"], 2)
+        self.assertTrue(
+            all(
+                "lambda2" in point and "gap" not in point
+                for point in document["headline_figure"]["points"]
+            )
+        )
+
+    def test_headline_loader_rejects_schema_version_one(self) -> None:
+        document = {
+            "schema_version": 1,
+            "headline_figure": {"schema_version": 1, "points": [{"lambda2": 0.4}]},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "paper.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            with (
+                patch.object(make_figures, "PAPER_RESULTS", path),
+                self.assertRaisesRegex(SystemExit, "outdated schema"),
+            ):
+                make_figures._load_points()
+
     def test_registered_akm_designs_are_added_to_the_canonical_table(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         table = document["tables"]["akm_sorting"]
@@ -121,7 +146,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertEqual(records[("default", "fixest")]["status"], "missing")
 
     def test_absent_akm_file_preserves_collected_figure_records(self) -> None:
-        document = {"headline_figure": {"schema_version": 1, "points": [{"status": "complete"}]}}
+        document = {"headline_figure": {"schema_version": 2, "points": [{"status": "complete"}]}}
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(paper_results, "LATEST_RUN", Path(directory)):
                 changed = paper_results._synchronize_headline_figure(document, [])
@@ -135,7 +160,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
             family="mobility",
             view="default",
             backend="rust-map",
-            gap=0.4,
+            lambda2=0.4,
         )
         self.assertEqual(point["status"], "partial")
         self.assertTrue(make_figures._visible_point(point))
@@ -146,7 +171,10 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         defaults = paper_results._akm_appendix_panel(table, panel="defaults")
         lsmr = paper_results._akm_appendix_panel(table, panel="lsmr")
 
-        self.assertEqual(defaults["header"][:2], ["Move probability $delta$", "Gap (share)"])
+        self.assertEqual(
+            defaults["header"][:2],
+            ["Move probability $delta$", "$lambda_2$ (share)"],
+        )
         self.assertEqual(lsmr["header"][2:], ["within-off", "within-diagonal", "within"])
         self.assertEqual(defaults["rows"][0][0], "1")
         self.assertEqual(defaults["rows"][-1][0], "0.001")
@@ -188,21 +216,21 @@ class HeadlineFigurePlotTests(unittest.TestCase):
     @staticmethod
     def _points() -> list[dict[str, object]]:
         points = []
-        gaps = {"mobility": (0.4, 0.01), "sorting": (0.02, 0.002)}
-        for family, (high, low) in gaps.items():
+        lambda2_values = {"mobility": (0.4, 0.01), "sorting": (0.02, 0.002)}
+        for family, (high, low) in lambda2_values.items():
             for view, backends in (
                 ("default", make_figures.CROSS_PACKAGE_BACKENDS),
                 ("matched", make_figures.MECHANISM_BACKENDS),
             ):
                 for backend in backends:
-                    for index, gap in enumerate((high, low)):
+                    for index, lambda2 in enumerate((high, low)):
                         points.append(
                             {
                                 "design": f"akm_{family}_{index + 1}",
                                 "family": family,
                                 "view": view,
                                 "backend": backend,
-                                "gap": gap,
+                                "lambda2": lambda2,
                                 "median_time": index + 1.0,
                                 "n_trials": 3,
                                 "n_success": 3,
@@ -254,7 +282,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.4,
+                "lambda2": 0.4,
                 "median_time": 1.0,
                 "status": "complete",
             },
@@ -262,7 +290,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.1,
+                "lambda2": 0.1,
                 "median_time": 2.0,
                 "status": "partial",
             },
@@ -270,7 +298,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.01,
+                "lambda2": 0.01,
                 "median_time": 5.0,
                 "status": "capped",
             },

@@ -29,9 +29,10 @@ LATEST_RUN = ROOT / "results" / "runs" / "latest"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 EXPECTED_TRIALS = 3
+CONNECTIVITY_HEADER = "$lambda_2$ (share)"
 
 # The headline figure is a presentation of the two controlled AKM benchmark
-# families.  The tables remain the canonical source of the gap calculation;
+# families.  The tables remain the canonical source of the lambda2 calculation;
 # this registry only fixes which package/runtime cells belong in each panel.
 HEADLINE_FIGURE_BACKENDS = {
     "default": ("rust-map", "within", "fixest", "FEM.jl"),
@@ -216,7 +217,7 @@ def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
         rows.append(
             [
                 _akm_parameter_label(design),
-                _table_cell(table, source, "Gap (share)"),
+                _table_cell(table, source, CONNECTIVITY_HEADER),
                 *(_table_cell(table, source, backend) for backend in backends),
             ]
         )
@@ -225,7 +226,7 @@ def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
         "align": "(right, right, right, right, right, right)"
         if panel == "defaults"
         else "(right, right, right, right, right)",
-        "header": [parameter, "Gap (share)", *backends],
+        "header": [parameter, CONNECTIVITY_HEADER, *backends],
         "rows": rows,
     }
 
@@ -393,7 +394,7 @@ def _headline_point(
     family: str,
     view: str,
     backend: str,
-    gap: float | None,
+    lambda2: float | None,
 ) -> dict[str, object]:
     """One structured record for the 2-by-2 headline figure.
 
@@ -408,7 +409,7 @@ def _headline_point(
             "family": family,
             "view": view,
             "backend": backend,
-            "gap": gap,
+            "lambda2": lambda2,
             "median_time": None,
             "n_trials": 0,
             "n_success": 0,
@@ -449,7 +450,7 @@ def _headline_point(
         "family": family,
         "view": view,
         "backend": backend,
-        "gap": gap,
+        "lambda2": lambda2,
         "median_time": elapsed,
         "n_trials": len(candidates),
         "n_success": len(successful),
@@ -474,7 +475,9 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
         for view in ("default", "matched"):
             for source in table["rows"]:
                 design = _row_label(table, source)
-                gap = _numeric_cell(_table_cell(table, source, "Gap (share)"))
+                lambda2 = _numeric_cell(
+                    _table_cell(table, source, CONNECTIVITY_HEADER)
+                )
                 for backend in HEADLINE_FIGURE_BACKENDS[view]:
                     candidates = [
                         row
@@ -494,11 +497,11 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
                             family=family,
                             view=view,
                             backend=backend,
-                            gap=gap,
+                            lambda2=lambda2,
                         )
                     )
 
-    figure = {"schema_version": 1, "points": points}
+    figure = {"schema_version": 2, "points": points}
     if document.get("headline_figure") == figure:
         return 0
     document["headline_figure"] = figure
@@ -701,22 +704,22 @@ def _prose_cell(value: str) -> str:
     return value
 
 
-def _format_hardness(gap: float, share: float) -> str:
-    """Format a gap and component share for Typst."""
-    if gap and abs(gap) < 1e-2:
-        exponent = int(f"{gap:.0e}".split("e")[1])
-        mantissa = gap / (10**exponent)
-        gap_text = f"${mantissa:.2f} times 10^({exponent})$"
-    elif gap >= 1.0:
-        gap_text = f"{gap:.2f}"
+def _format_lambda2(lambda2: float, share: float) -> str:
+    """Format lambda2 and the selected component's observation share."""
+    if lambda2 and abs(lambda2) < 1e-2:
+        exponent = int(f"{lambda2:.0e}".split("e")[1])
+        mantissa = lambda2 / (10**exponent)
+        lambda2_text = f"${mantissa:.2f} times 10^({exponent})$"
+    elif lambda2 >= 1.0:
+        lambda2_text = f"{lambda2:.2f}"
     else:
-        gap_text = f"{gap:.3g}"
-    return f"{gap_text} ({share:.2f})"
+        lambda2_text = f"{lambda2:.3g}"
+    return f"{lambda2_text} ({share:.2f})"
 
 
 def _synchronize_hardness(document: dict) -> int:
     rows = _latest_rows("hardness.csv")
-    # A partial collection must not erase an earlier gap.
+    # A partial collection must not erase an earlier lambda2 value.
     if rows is None:
         return 0
     diagnostics = {
@@ -729,13 +732,13 @@ def _synchronize_hardness(document: dict) -> int:
         diagnostic = diagnostics.get(source_id)
         if diagnostic is None:
             return 0
-        rendered = _format_hardness(
-            float(diagnostic["one_minus_rho"]),
-            float(diagnostic["worst_component_obs_share"]),
+        rendered = _format_lambda2(
+            float(diagnostic["lambda2_qr"]),
+            float(diagnostic["weakest_component_obs_share"]),
         )
-        if _table_cell(table, target_row, "Gap (share)") == rendered:
+        if _table_cell(table, target_row, CONNECTIVITY_HEADER) == rendered:
             return 0
-        _set_table_cell(table, target_row, "Gap (share)", rendered)
+        _set_table_cell(table, target_row, CONNECTIVITY_HEADER, rendered)
         return 1
 
     changed = 0
@@ -806,8 +809,10 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         return 0
 
     mobility_table = document["tables"]["akm_mobility"]
-    gap_by_design = {
-        _row_label(mobility_table, row): _table_cell(mobility_table, row, "Gap (share)")
+    lambda2_by_design = {
+        _row_label(mobility_table, row): _table_cell(
+            mobility_table, row, CONNECTIVITY_HEADER
+        )
         for row in mobility_table["rows"]
     }
 
@@ -837,7 +842,7 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         rendered.append(
             [
                 f"`{design}`",
-                gap_by_design[design],
+                lambda2_by_design[design],
                 *cells(design, 2),
                 *cells(design, 3),
             ]
@@ -976,7 +981,7 @@ def _synchronize_canonical_tables(
 ) -> int:
     """Update runtime cells from current raw CSV files.
 
-    Keep the separately computed gap and component-share values. Replace a runtime only
+    Keep the separately computed lambda2 and component-share values. Replace a runtime only
     when the new output records all expected trials.
     """
     raw = _rows_from_csvs()
