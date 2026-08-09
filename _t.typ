@@ -57,9 +57,9 @@
       built from overlapping factor-pair subproblems. Each subproblem is a signed graph Laplacian and admits
       sparse approximate Cholesky factorization, and we use the resulting operator inside a Krylov solver
       for least squares. On a near-nested ten-million-observation design, the preconditioned solver
-      completes in 4.10s against 62.3s for the fastest MAP implementation; for Poisson models on the same
-      design the times are 5.42s and 439.4s. On dense, well-connected graphs MAP remains faster, and the
-      normalized-Laplacian gap $lambda_2$ is larger. Because the preconditioner depends on
+      completes in 4.45s against 63.5s for the fastest MAP implementation. In the one-million-observation
+      Poisson benchmark, `within` takes 5.43s and `fixest` 439.4s. On dense, well-connected graphs MAP
+      remains faster, and the normalized-Laplacian gap $lambda_2$ is larger. Because the preconditioner depends on
       the fixed effects and the weights but not on the right-hand side, one factorization serves the many
       residualizations that randomization inference and multi-metric readouts require: measured cost per
       right-hand side falls from 0.137s to 0.047s between one and twenty-five columns.
@@ -194,10 +194,10 @@ weight $1 slash sqrt(2)$ on each side so that the squared weights sum to one.
 Large pair systems cannot be inverted densely. Eliminating one side of a bipartite graph is a division by
 level counts, but the Schur complement creates clique fill among the neighbours of each eliminated level.
 We replace these cliques with sparse randomized trees and factor the reduced Laplacian with approximate
-Cholesky methods @gao2025, which makes the local solves sparse and approximate. We use them inside LSMR
-@fong2011, which applies the design operator, its transpose, and $M^(-1)$ without forming $G$. The outer
-iteration refines local-solve error while the preconditioner removes the slow graph directions, and the
-solver returns the solution of the original problem rather than of a modified objective.
+Cholesky methods @gao2025, producing a sparse approximation to each pair inverse. LSMR applies these
+approximations together with the design operator and its transpose, without forming $G$ @fong2011. The
+outer iteration corrects the remaining approximation error, so the algorithm returns the solution of the
+original problem rather than of a modified objective.
 
 = Benchmark evidence
 
@@ -218,29 +218,28 @@ with 10 cores and 16 GB of memory.
       table.header(th[Design], th[$lambda_2$], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[OLS, 10M observations]],
-      [simple (well-connected)], [0.622], [2.30s], [2.54s], [2.09s], [11.0s],
-      [difficult (near-nested)], [$8.35 times 10^(-8)$], [306.2s], [62.3s], [26.9s], [*4.10s*],
+      [simple (well-connected)], [0.622], [2.58s], [2.64s], [2.16s], [11.5s],
+      [difficult (near-nested)], [$8.35 times 10^(-8)$], [337.2s], [63.5s], [27.8s], [*4.45s*],
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[Poisson, 1M observations]],
-      [simple (well-connected)], [-], [7.86s], [4.72s], [5.76s], [8.61s],
-      [difficult (near-nested)], [-], [capped], [439.4s], [129.8s], [*5.42s*],
+      [simple (well-connected)], [-], [7.86s], [4.72s], [5.76s], [9.25s],
+      [difficult (near-nested)], [-], [capped], [439.4s], [129.8s], [*5.43s*],
       table.hline(stroke: 0.75pt + rule),
     )
   ]
 ]
 
-On the simple design the graph is dense, MAP converges in few passes, and `within` is slowest because the
-preconditioner does not repay its setup cost; 76% of its demeaning time is spent on construction. On the
-difficult design the ranking reverses. $lambda_2$ falls to $8.35 times 10^(-8)$, unaccelerated MAP takes
-306.2s and the fastest MAP backend 62.3s, while `within` completes in 4.10s. The setup share falls to 37%,
-which indicates that construction is being amortized within a single fit.
+On the simple design the graph is dense, MAP converges in few passes, and `within` is
+slowest because the preconditioner does not repay its setup cost. The ranking reverses
+on the difficult design, where $lambda_2$ falls to $8.35 times 10^(-8)$: unaccelerated
+MAP takes 337.2s and the fastest MAP backend 63.5s, while `within` completes in 4.45s.
 
 The Poisson rows matter for experiment readouts because platform outcomes are frequently counts of
 bookings, clicks, or sessions. Iteratively reweighted least squares repeats the demeaning step at every
 iteration @correia2020ppmlhdfe, so any change in absorption cost is multiplied by the number of
 iterations. On the difficult design `rust-map` does not converge within its cap and `fixest` takes 439.4s,
-against 5.42s for `within`. A controlled comparison that varies two-sided mobility while holding the rest of
-the data-generating process fixed reproduces the pattern: `within` stays between 0.369s and 0.557s across
+against 5.43s for `within`. A controlled comparison that varies two-sided mobility while holding the rest of
+the data-generating process fixed reproduces the pattern: `within` stays between 0.365s and 0.551s across
 the designs, whereas MAP reaches its 10,000-pass cap at the lowest mobility. Across a broader set of public
 benchmark datasets, accelerated MAP wins on small or compact graphs, and the factor-pair preconditioner
 wins on the larger networks whose hard components cover much of the sample.

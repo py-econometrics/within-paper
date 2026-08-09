@@ -32,10 +32,11 @@ RESULTS = ROOT / "results" / "runs" / "latest"
 FIGURES = ROOT / "figures" / "results"
 PAPER_RESULTS = ROOT / "results" / "paper" / "benchmark_tables.json"
 
-# The left panel compares package defaults. The right panel holds package and
-# accuracy fixed, so it isolates the solver and preconditioner. These are the
-# backend names as the result files spell them; every colour, marker, dash and
-# label is derived from the registry, so nothing is restated here.
+# The left panel compares package defaults. The right panel holds the package,
+# calibrated tolerance, and iteration budget fixed so that it isolates the solver and
+# preconditioner. These are the backend names as the result files spell them; every
+# colour, marker, dash and label is derived from the registry, so nothing is restated
+# here.
 CROSS_PACKAGE_BACKENDS = ("rust-map", "fixest", "FEM.jl", "within")
 
 MECHANISM_BACKENDS = (

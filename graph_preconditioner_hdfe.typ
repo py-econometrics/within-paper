@@ -80,7 +80,7 @@
       Laplacian after a sign flip. A graph Laplacian is the standard matrix representation of
       a weighted graph. The graph structure lets us approximate the Laplacian's inverse using
       sparse matrices. We propose a graph-preconditioned iterative solver with a reusable
-      preconditioner built from small, local factor-pair subproblems, such as worker-firm and
+      preconditioner built from factor-pair subproblems, such as worker-firm and
       worker-year pairs. These subproblems use the graph directly. Benchmarks show that all
       methods are fast on well-connected designs. When connectivity weakens, MAP and
       diagonally preconditioned LSMR slow down. Factor-pair preconditioning remains fast, and
@@ -168,8 +168,8 @@ can outweigh the construction cost. @fig-gap-runtime compares total regression t
 worker-firm connectivity varies, using the top row for worker mobility and the bottom row
 for sorting among movers. Within each row, the left panel compares package defaults,
 whereas the right panel compares solvers within PyFixest. We choose each solver's
-tolerance so that coefficient and residual errors are similar; Section 7 compares run
-time at the accuracy each method actually achieves.
+tolerance using the accuracy comparisons in Section 7 and apply those values throughout
+@fig-gap-runtime.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
@@ -183,11 +183,12 @@ time at the accuracy each method actually achieves.
   the bottom panels hold move probability at one and vary sorting. The left panels
   compare packages at their default settings, including their own treatment of
   fixed-effect levels observed only once. The right panels compare four PyFixest solver
-  configurations, with tolerances chosen to give similar coefficient and residual
-  errors. Filled markers indicate that all three planned fits produced estimates; hollow
-  markers indicate that only one or two did. Lines join the medians in order of $lambda_2$
-  and are not fitted trends. An arrow marks the median elapsed time for fits that reach the
-  iteration limit. Because these fits did not finish, the marked time is a lower bound.
+  configurations at tolerances calibrated in Section 7 to give comparable coefficient
+  and residual errors. Filled markers indicate that all three planned fits produced
+  estimates; hollow markers indicate that only one or two did. Lines join the medians in
+  order of $lambda_2$ and are not fitted trends. An arrow marks the median elapsed time
+  for fits that reach the iteration limit. Because these fits did not finish, the marked
+  time is a lower bound.
   Arrows are not joined to the lines. Fits that end in another error are omitted.]
 ) <fig-gap-runtime>
 
@@ -199,8 +200,7 @@ subproblems are cheaper to construct.
 Sections 2-5 set up fixed-effect absorption and connect MAP convergence to graph
 connectivity; Section 6 develops the factor-pair preconditioner, and Section 7 reports
 the benchmarks. Section 8 describes the software, Section 9 concludes, and the
-appendices give the algorithm, report additional benchmarks, and compare coefficient
-estimates and memory use.
+appendices give the algorithm, report additional benchmarks, and compare memory use.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -499,19 +499,19 @@ links themselves.
 
 == Preconditioners
 
-Unlike MAP, LSMR accepts a preconditioner that can use the pairwise links. MAP's update
-rule is fully determined by the list of fixed-effect dimensions, so the cross-tabulations
-affect an update only through the residual passed from the previous one. We therefore
-replace factor-by-factor MAP demeaning with LSMR @fong2011, an iterative least-squares
-algorithm that improves an initial guess through repeated residual corrections. Because
-changing solvers alone offers little gain on weakly connected designs, a useful speed
-gain also requires a preconditioner.
+Unlike MAP, LSMR accepts a preconditioner that can use the pairwise links. MAP updates
+one fixed-effect dimension at a time, using its group labels and weights. The
+cross-tabulations affect an update only through the residual passed from the previous
+one. We therefore replace factor-by-factor MAP demeaning with LSMR @fong2011, an
+iterative least-squares algorithm that improves an initial guess through repeated
+residual corrections. Because changing solvers alone offers little gain on weakly
+connected designs, a useful speed gain also requires a preconditioner.
 
-LSMR converges quickly when all components of the residual shrink at comparable rates.
-With weak links, sparse mobility, or near nesting, some components shrink quickly while
-others decay much more slowly, leaving a poorly conditioned system. A preconditioner
-rescales $G$ so that these rates become more similar without changing the least-squares
-solution.
+LSMR converges quickly when the data contain comparable amounts of information about
+different combinations of fixed effects. Weak links, sparse mobility, or near nesting
+leave some combinations much less well determined than others, which makes the system
+poorly conditioned. A preconditioner transforms the normal equations to reduce these
+differences without changing the least-squares solution.
 
 The ideal preconditioner is $G^(-1)$.#footnote[As in any model with several fixed
 effects, the level effects are pinned down only up to a normalization: we can add a
@@ -531,9 +531,9 @@ With this ideal preconditioner, LSMR would recover the solution after one
 correction because the inverse solves the system directly. Forming $G^(-1)$, however,
 would require solving the fixed-effect normal equations themselves, so the ideal inverse
 is a benchmark rather than an implementable preconditioner. A feasible preconditioner
-must instead approximate enough of $G^(-1)$ to reduce the components that otherwise
-converge slowly, and the iterations it saves must outweigh the time spent constructing
-and repeatedly applying it.#footnote[LSMR never constructs $M^(-1) G$
+must instead approximate enough of $G^(-1)$ to make poorly determined combinations of
+fixed effects easier for LSMR to resolve, and the iterations it saves must outweigh the
+time spent constructing and repeatedly applying it.#footnote[LSMR never constructs $M^(-1) G$
 or $G$ explicitly. It only multiplies vectors by $D$ and $D'$ and applies $M^(-1)$.]
 
 == From the Block Inverse to the Diagonal Preconditioner
@@ -563,17 +563,17 @@ $ G_2^(-1) = mat(
 
 $ S = G_(F F) - C_(W F)' G_(W W)^(-1) C_(W F). $
 
-The formula shows that every block of $G_2^(-1)$ depends on $C_(W F)$ only through
-$S$; the cross-tabulation enters through matrix products rather than through its own
-inverse. Because $G_(W W)$ is diagonal, applying $G_(W W)^(-1)$ amounts to dividing by
-weighted worker counts. The costly part is $S$, the firm-side mobility system left after
-eliminating the worker effects. Solving this system is expensive for modern worker-firm
-register data: exact factorization creates additional nonzero entries and makes the
-matrix denser, separate connected components require separate normalizations, and weak
-mobility makes some components slow to resolve. $S^(-1)$ therefore accounts for almost
-all the cost of solving the two-factor system. The same calculation extends to three
-factors, where the closed form has more terms but every block of $G^(-1)$ still depends
-jointly on the cross-tabulations $C_(W F), C_(W Y), C_(F Y)$.
+The formula shows that $C_(W F)$ enters through the Schur complement and through matrix
+products with $S^(-1)$; the cross-tabulation itself is never inverted. Because
+$G_(W W)$ is diagonal, applying $G_(W W)^(-1)$ amounts to dividing by weighted worker
+counts. The expensive step is solving the firm-side system $S$. An exact factorization
+can create many additional nonzero entries, so its time and memory requirements depend
+on how many entries are added and on the number and size of the connected components.
+Weak mobility affects iterative methods differently: without a graph-aware
+preconditioner, they can be slow, but the sparser graph can make factorization cheaper
+because it has fewer links. Most of the work in the two-factor problem therefore lies in
+the Schur-complement system. The same calculation extends to three factors, where each
+block of $G^(-1)$ can involve all three cross-tabulations $C_(W F), C_(W Y), C_(F Y)$.
 
 The coarsest approximation to $G^(-1)$ keeps only the diagonal count inverses and drops
 the Schur-complement corrections,
@@ -659,10 +659,11 @@ For a worker-firm pair, the local pair step solves the pair-Gramian system
 
 $ mat(G_(W W), C_(W F); C_(W F)', G_(F F)) x = u, $
 
-where $u$ is the weighted worker-firm part of the current LSMR residual. This block is
-not a graph Laplacian because its off-diagonal entries $C_(W F)$ are non-negative. Let
-$T_(W F) = "diag"(I_W, -I_F)$ flip the sign of the firm entries, so that $T_(W F)^2 =
-I$. Multiplying the pair block by $T_(W F)$ on both sides gives
+where $u$ is obtained by selecting and weighting the worker and firm entries of the
+vector that LSMR passes to the preconditioner. This block is not a graph Laplacian
+because its off-diagonal entries $C_(W F)$ are non-negative. Let $T_(W F) =
+"diag"(I_W, -I_F)$ flip the sign of the firm entries, so that $T_(W F)^2 = I$.
+Multiplying the pair block by $T_(W F)$ on both sides gives
 
 $ L_(W F) = T_(W F) mat(G_(W W), C_(W F); C_(W F)', G_(F F)) T_(W F)
   = mat(G_(W W), -C_(W F); -C_(W F)', G_(F F)), $
@@ -676,7 +677,8 @@ $ mat(G_(W W), C_(W F); C_(W F)', G_(F F))^(-1) = T_(W F) L_(W F)^(-1) T_(W F), 
 where both inverses are read as in Section 6.1. We fix the free constant on
 each connected component by returning the zero-mean solution; the residualized
 variables do not depend on this choice. Solving the Laplacian once therefore yields the
-pair-Gramian solution: we flip the residual, apply $L_(W F)^(-1)$, and flip back.
+pair-Gramian solution: we flip the right-hand side, apply $L_(W F)^(-1)$, and flip the
+result back.
 
 For preconditioning, the local system need not be solved exactly because the outer LSMR
 iteration refines the remaining error. We solve the Laplacian approximately using sparse
@@ -712,9 +714,9 @@ unpreconditioned LSMR run, up to the requested tolerance.
 @fig-pair-strategy summarizes the construction. We first divide the fixed-effect graph
 into overlapping factor pairs and use a sign flip to turn each local Gramian block into
 a graph Laplacian. A sparse approximate Cholesky routine then approximates each pair
-inverse without allowing the matrix to become dense. Finally, we weight the overlapping
-corrections so that shared fixed-effect levels are not counted twice and add them to form
-the Schwarz preconditioner $M^(-1)$.
+inverse while limiting the additional nonzero entries created during factorization.
+Finally, we weight the overlapping corrections so that shared fixed-effect levels are
+not counted twice and add them to form the Schwarz preconditioner $M^(-1)$.
 
 The outer LSMR iteration uses this preconditioner to choose better-scaled updates
 @fong2011 @arridge2014 @yang2024flexible; once constructed, it can be reused to
@@ -940,9 +942,9 @@ of squares. `FixedEffectModels.jl` passes its default tolerance of $10^(-6)$ as 
 LSMR stopping tolerances. `within` defaults to $10^(-8)$ and stops when either the
 estimated least-squares residual is at most $10^(-8)$ times the norm of the variable
 being residualized (the right-hand side), or a scaled measure of the remaining
-first-order-condition error falls below $10^(-8)$. This second measure, called the
-normal-equation residual, is
-$frac(||A^T r||_2, ||A||_F ||r||_2)$, using LSMR's running norm estimates @fong2011.
+first-order-condition error falls below $10^(-8)$. Writing $A = W^(1/2) D$ and
+$r = W^(1/2) (mu - D alpha)$, this second quantity is
+$frac(||A^T r||_2, ||A||_F ||r||_2)$, based on LSMR's running norm estimates @fong2011.
 
 @fig-tolerance compares the methods on a common accuracy scale for mobility designs 1,
 3, and 5, using the same sample for every method. Before timing, we repeatedly remove
@@ -1002,9 +1004,9 @@ one million observations, with the same outcome and covariate in both specificat
   component's share of retained observations.]
 ]]
 
-Setup becomes cheaper as mobility falls: with two fixed effects, its median time declines
-from 0.119 seconds at $delta=1$ to 0.067 seconds at $delta=0.001$, and with three fixed
-effects, it falls from 0.123 to 0.073 seconds. Time spent in LSMR also falls, from 0.323
+Comparing the endpoints, setup is cheaper in the lowest-mobility design than in the
+highest, falling from 0.119 to 0.067 seconds with two fixed effects and from 0.123 to
+0.073 seconds with three. Over the same comparison, time spent in LSMR falls from 0.323
 to 0.057 seconds with two effects and from 0.239 to 0.176 seconds with three. The
 low-mobility worker-firm graph has fewer cross-firm links to store and factorize, so the
 additive runtime in @fig-gap-runtime can decline even as MAP and diagonal LSMR slow down.
@@ -1081,8 +1083,9 @@ IRLS limit.
   `GLFixedEffectModels.jl`. The `within` configuration reuses the first factor-pair
   preconditioner as the weights change across iteratively reweighted least squares
   steps. Each package applies its default rule for removing separated observations,
-  where regressors and fixed effects perfectly predict some zero outcomes. If only $k$
-  of the three planned fits return an estimate, $t (k/3)$ gives their median time $t$.
+  where a combination of regressors and fixed effects can push fitted means for some
+  zero outcomes arbitrarily close to zero. If only $k$ of the three planned fits return
+  an estimate, $t (k/3)$ gives their median time $t$.
   `capped (0/3)` means that no fit finishes within 100 iteratively reweighted least
   squares steps; `failed (0/3)` marks a failure other than reaching that limit.]
   ]
@@ -1200,7 +1203,8 @@ Algorithm 1 implements the construction shown in @fig-pair-strategy.
         #strong[Inputs]
         - Observation-level factor codes for $Q$ fixed-effect dimensions.
         - Diagonal weights $W$ and local solver settings.
-        - Current LSMR residual $r$, indexed by the fixed-effect coefficients.
+        - Vector $p$, with one entry for each fixed-effect coefficient, passed to the
+          preconditioner by the current LSMR iteration.
 
         #strong[Preconditioner setup]
         - Enumerate all unordered factor pairs $(q,r)$ with $q < r$.
@@ -1219,11 +1223,11 @@ Algorithm 1 implements the construction shown in @fig-pair-strategy.
 
         #strong[Application during LSMR]
         - Initialize $z = 0$.
-        - For each subdomain $s$, form $h_s = tilde(D)_s R_s r$.
+        - For each subdomain $s$, form $h_s = tilde(D)_s R_s p$.
         - Compute the approximate local correction $u_s approx A_s h_s$ on the
           zero-mean subspace.
         - Accumulate $z <- z + R_s' tilde(D)_s u_s$.
-        - Return $z = M^(-1) r$.
+        - Return $z = M^(-1) p$.
       ]
     ]
   ]

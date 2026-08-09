@@ -89,7 +89,6 @@ def measure(
                         "runtime_s": elapsed,
                         "n_retained": int(fit._N),
                         "beta_x1": float(fit.coef().loc["x1"]),
-                        "max_eta": None,
                         "converged": True,
                         "capped": False,
                         "error": "",
@@ -103,7 +102,6 @@ def measure(
                         "runtime_s": time.perf_counter() - started,
                         "n_retained": None,
                         "beta_x1": None,
-                        "max_eta": None,
                         **failure_fields(error),
                     }
                 )

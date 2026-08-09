@@ -61,7 +61,7 @@ for repetition in 0:(repetitions - 1)
             backend="FEM.jl", repetition=repetition,
             n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=nobs(fit),
-            beta_x1=Float64(coef(fit)[1]), max_eta=missing,
+            beta_x1=Float64(coef(fit)[1]),
             converged=true, capped=false, error="",
         ))
     catch error_value
@@ -69,7 +69,7 @@ for repetition in 0:(repetitions - 1)
             backend="FEM.jl", repetition=repetition,
             n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=missing,
-            beta_x1=missing, max_eta=missing, converged=false,
+            beta_x1=missing, converged=false,
             capped=occursin("without convergence", sprint(showerror, error_value)),
             error=sprint(showerror, error_value),
         ))

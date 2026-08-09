@@ -341,7 +341,6 @@ class PythonFitTests(unittest.TestCase):
                     "runtime_s": 0.01,
                     "n_retained": retained,
                     "beta_x1": 1.0,
-                    "max_eta": None,
                     "converged": True,
                     "error": "",
                 }]
@@ -377,7 +376,6 @@ class PythonFitTests(unittest.TestCase):
                         "runtime_s": 0.01,
                         "n_retained": 100,
                         "beta_x1": 1.0,
-                        "max_eta": None,
                         "converged": True,
                         "capped": False,
                         "error": "",
@@ -418,7 +416,6 @@ class PythonFitTests(unittest.TestCase):
                         "runtime_s": 0.01,
                         "n_retained": 99,
                         "beta_x1": 1.0,
-                        "max_eta": None,
                         "converged": True,
                         "capped": False,
                         "error": "",

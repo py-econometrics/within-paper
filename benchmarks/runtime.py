@@ -47,7 +47,6 @@ def failed_trials(backend: str, repetitions: int, error: BaseException | str) ->
             "runtime_s": None,
             "n_retained": None,
             "beta_x1": None,
-            "max_eta": None,
             **failure_fields(error),
         }
         for repetition in range(repetitions)
