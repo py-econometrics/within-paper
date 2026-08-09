@@ -273,7 +273,7 @@ higher wages at the same firm, it points toward a firm premium. The more such cr
 comparisons the data contain, especially across otherwise different firms, the easier it
 is to identify worker and firm premia. In the graph, these moves are exactly the edges
 that connect firms. In the Gramian, the same links appear in the worker-firm
-cross-tabulation, turning mobility into a matrix that an algorithm can use.
+cross-tabulation.
 
 = The Graph Structure of the Gramian
 
@@ -397,10 +397,9 @@ $ L_(W F) = mat(augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
 ). $
 
 The same Laplacian construction applies to any pair of fixed effects. These pairwise
-Laplacians contain the information used by the preconditioner in Section 6. MAP, by
-contrast, avoids forming the full Gramian $G$ and uses only the diagonal worker, firm,
-and year blocks directly. The next section explains how this choice makes convergence
-depend on graph connectivity.
+Laplacians are the basis of the preconditioner in Section 6. MAP does not use them
+directly. It alternates among the diagonal worker, firm, and year blocks, while
+cross-factor information passes from one update to the next through the residual.
 
 
 = Alternating Projections and Graph Connectivity
@@ -924,10 +923,9 @@ MAP, `fixest`, and `FixedEffectModels.jl`, and 1,000 for `within`.
 == Amortizing the Preconditioner <sec-amortization>
 
 The accuracy comparison separates solver performance from differences in stopping
-rules. Factor-pair LSMR also has a fixed setup cost: it constructs the pair blocks and
-their approximate factorizations before applying them during the solve. With fixed
-observations, weights, and fixed-effect identifiers, the solver builds these objects once
-and reuses them.
+rules. Factor-pair LSMR also has a fixed setup cost. It constructs the pair blocks and
+their approximate factorizations before starting the LSMR iterations. With fixed
+observations, weights, and fixed-effect identifiers, these objects can be reused.
 
 === Setup Cost Across Connectivity
 
@@ -1034,9 +1032,8 @@ factor-pair blocks encode those links directly.]
 
 = Software
 
-The solver benchmarked in Section 7 is available through the open-source `within`
-project @within. Its computational core is written in Rust. The Rust, Python, and R
-interfaces all call this implementation.
+The open-source `within` project provides the solver benchmarked in Section 7 @within.
+Its computational core is written in Rust, with APIs for Python and R.
 
 #v(0.15em)
 
