@@ -3,7 +3,7 @@
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
-#let miss = text(fill: rgb("#777777"))[--]
+#let miss = text(fill: rgb("#777777"))[-]
 #table(
   columns: (1.20fr, 1.00fr, 0.90fr, 0.96fr, 1.00fr),
   stroke: 0.35pt + table-light-rule,

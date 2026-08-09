@@ -131,7 +131,7 @@ def _table_fragment(name: str, table: dict) -> str:
         "#let table-light-rule = rgb(\"#d8dee8\")",
         "#let table-head-fill = rgb(\"#eef2f7\")",
         "#let th(body) = table.cell(fill: table-head-fill)[#strong(body)]",
-        "#let miss = text(fill: rgb(\"#777777\"))[--]",
+        "#let miss = text(fill: rgb(\"#777777\"))[-]",
         "#table(",
         f"  columns: {table['columns']},",
         "  stroke: 0.35pt + table-light-rule,",
@@ -163,7 +163,10 @@ def _table_fragment(name: str, table: dict) -> str:
             # The first grid slot is already occupied by the row-spanning
             # design cell, so omit the empty marker from subsequent rows.
             row = row[1:]
-        cells = [_display_method_cell(cell) if cell else "" for cell in row]
+        cells = [
+            "-" if cell == "--" else _display_method_cell(cell) if cell else ""
+            for cell in row
+        ]
         rendered_cells = [
             cell if index == 0 and cell.startswith("table.cell(") else f"[{cell}]"
             for index, cell in enumerate(cells)
@@ -276,8 +279,8 @@ def render(_: argparse.Namespace) -> None:
         "result_agreement_difficult_max": _largest_metric(
             agreement_table, agreement_difficult_rows, "Absolute difference"
         ),
-        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
-        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
+        "result_memory_100k_overhead": f"{min(memory_100k):.0f}-{max(memory_100k):.0f} MiB" if memory_100k else "-",
+        "result_memory_1m_overhead": f"{min(memory_1m):.0f}-{max(memory_1m):.0f} MiB" if memory_1m else "-",
     }
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
@@ -600,7 +603,7 @@ def _largest_metric(
         and _numeric_cell(_table_cell(table, row, column)) is not None
     ]
     if not candidates:
-        return "--"
+        return "-"
     return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
 
 
@@ -694,7 +697,7 @@ def _ensure_akm_runtime_rows(document: dict) -> int:
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
     if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
-        return "--"
+        return "-"
     return value
 
 

@@ -29,7 +29,7 @@
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
-#let miss = text(fill: rgb("#777777"))[--]
+#let miss = text(fill: rgb("#777777"))[-]
 #let dg(body) = text(fill: rgb("#2563eb"), body)
 #let cr(body) = text(fill: rgb("#c2410c"), body)
 #import "generated/paper_values.typ": *
@@ -60,16 +60,17 @@
   )[
     #text(size: 9.6pt)[
       #text(weight: "bold")[Abstract.] The Method of Alternating Projections (MAP) is the
-      canonical algorithm for estimating high-dimensional fixed-effect regressions. It is fast when
-      absorbed factors are well connected, but converges slowly on sparse or nearly nested
+      standard algorithm for estimating high-dimensional fixed-effect regressions. It is fast when
+      the fixed-effect dimensions are well connected, but converges slowly on sparse or nearly nested
       fixed-effect graphs, such as matched employer-employee panels where worker-firm mobility
       links separate worker and firm effects. The convergence behavior of MAP depends on the
       mobility pattern linking workers to firms, yet MAP only indirectly makes use of this 
       information by iterating over one fixed effect at a time. That mobility pattern is,
       however, directly encoded in the matrix of worker-firm match counts, which together
-      with the worker and firm count diagonals forms a graph Laplacian after a sign flip
-      and admits sparse approximate Cholesky factorization.
-      We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
+      with the worker and firm count diagonals forms a graph Laplacian - the standard
+      matrix representation of a weighted graph - after a sign flip. This structure lets
+      us approximate its inverse using sparse matrices.
+      We propose a graph-preconditioned iterative solver whose reusable preconditioner is
       built from small, local factor-pair subproblems - worker-firm, worker-year, and
       so on - that use the graph directly. 
       Benchmarks show that all methods are fast on well-connected designs. As
@@ -127,8 +128,9 @@ also govern MAP convergence. These features include worker mobility, sorting, an
 segmentation into disconnected labor markets with thin bridges, such as public- and private-sector
 employment when workers only rarely move between the two sectors.
 
-The graph structure of the fixed effects can be algebraically encoded in the off-diagonal blocks of the fixed-effect 
-Gramian @correia2017. These off-diagonal blocks record co-occurrences among the fixed effects: which workers
+The graph structure of the fixed effects can be encoded in the off-diagonal blocks of the fixed-effect
+Gramian - the weighted cross-product matrix of the fixed-effect dummies @correia2017. These
+off-diagonal blocks record co-occurrences among the fixed effects: which workers
 work at which firms, which physicians practice in which regions, or which families move across counties. 
 
 In this paper, we propose a new preconditioner that directly encodes the co-occurrence
@@ -139,8 +141,8 @@ Gramian: for example, a worker-firm subproblem
 incorporates the observed links between workers and firms. A preconditioner is only
 useful if it approximates the inverse of the co-occurrence Gramian at low cost. We obtain
 such an approximation by exploiting the fact that, after a sign change, each factor-pair
-block is a graph Laplacian, which admits sparse approximate inverses following ideas from
-the Laplacian-solver literature @spielman2014 @gao2025. The preconditioned system is
+block is a graph Laplacian, whose inverse can be approximated efficiently with sparse
+matrix methods @spielman2014 @gao2025. The preconditioned system is
 then solved with a Krylov solver, an iterative method for large linear systems.#footnote[The Julia implementation
 of fixed-effect regression, `FixedEffectModels.jl` @fixedeffectmodels, uses the same
 Krylov solver as we do - LSMR @fong2011 - but only with diagonal
@@ -162,12 +164,13 @@ tolerance frontier reports the achieved-accuracy comparison directly.
   worker mobility; the bottom row holds move probability at one and varies sorting in simulated
   worker-firm-year panels with 1 million observations. The left column uses package
   defaults; the right column fixes the PyFixest code path and uses solver-specific
-  tolerances chosen to target comparable accuracy. Packages apply their own default singleton treatment in
-  the left column. Filled markers report the median from a complete three-fit cell; hollow
-  markers report a returned median from fewer than three fits.
+  tolerances chosen to target comparable accuracy. Packages apply their own default rules
+  for singleton fixed-effect groups, which contain only one observation, in
+  the left column. Filled markers report the median when all three planned fits finish;
+  hollow markers report a median from fewer than three fits.
   Lines join returned medians for each configuration in spectral-gap order; they are not
-  fitted trends. Arrows show the median elapsed time of capped fits as a lower bound and
-  are not connected. Non-cap failures are omitted.]
+  fitted trends. Arrows show, as a lower bound, the median elapsed time of fits that reach
+  the iteration cap; they are not connected. Failures for other reasons are omitted.]
 ) <fig-gap-runtime>
 
 At high connectivity, all implementations finish quickly. As the spectral gap narrows,
@@ -188,35 +191,34 @@ equivalence, memory use, and additional benchmark diagnostics.
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
 transformation". We use these terms interchangeably throughout.]
 
-We focus on the linear model
+We study the linear model
 
 $ y = X beta + D alpha + epsilon, $
 
 where $X$ contains the regressors of interest, $D$ is the fixed-effect design matrix,
-and $alpha$ collects the fixed-effect coefficients. In high-dimensional applications $D$
-may have hundreds of thousands or millions of columns, and forming or inverting the full
-system in $[X quad D]$ might prove computationally infeasible. Fortunately, via the 
-Frisch-Waugh-Lovell (FWL) theorem, we can compute $hat(beta)$ without ever forming $[X quad D]$ or
-inverting its cross product.
+and $alpha$ collects the fixed-effect coefficients. In high-dimensional applications, $D$
+may have hundreds of thousands or millions of columns. Forming $[X quad D]$ or inverting
+its cross product can then be computationally infeasible. The Frisch-Waugh-Lovell (FWL)
+theorem lets us compute $hat(beta)$ without forming $[X quad D]$ or inverting its
+cross product.
 
-FWL reduces the computation of $hat(beta)$ to two steps. In step one, we residualize the
-outcome and each covariate against the fixed effects: we regress $y$ on $D$ and keep
-the residual $tilde(y)$, and we do the same for every column of $X$. Denoting $M_D$ as the
-linear operator that sends a variable to this residual, so that $tilde(y) = M_D y$ and
-$tilde(X) = M_D X$, the coefficient of interest is recovered by regressing the
+FWL reduces the computation of $hat(beta)$ to two steps. First, we regress $y$ on $D$ and
+retain the residual $tilde(y)$. We repeat this operation for every column of $X$. Let
+$M_D$ denote the linear operator that maps a variable to its residual, so that
+$tilde(y) = M_D y$ and $tilde(X) = M_D X$. In the second step, we regress the
 residualized outcome on the residualized covariates,
 
 $ tilde(y) = M_D y, quad tilde(X) = M_D X, quad
   hat(beta) = (tilde(X)' W tilde(X))^(-1) tilde(X)' W tilde(y), $
 
-where $W$ is a diagonal matrix of weights. With one covariate, the procedure consists of
+where $W$ is a diagonal matrix of weights. With one covariate, this amounts to
 three regressions: $y$ on $D$, $x$ on $D$, and $tilde(y)$ on $tilde(x)$. FWL implies that
 the slope in the last regression equals the coefficient on $x$ in the full regression of
 $y$ on $x$ and $D$. 
 
-The residualization step is the weighted least-squares projection of the outcome and
-each covariate in $X$ onto the column space of the fixed-effect dummy matrix $D$. For a
-right-hand side $mu$, either $y$ or one column of $X$, we solve 
+To residualize the outcome and each covariate in $X$, we project them onto the column
+space of the fixed-effect dummy matrix $D$ by weighted least squares. For a variable
+$mu$ to be residualized - either $y$ or one column of $X$ - we solve
 
 $ hat(alpha)_mu = arg min_alpha || D alpha - mu ||_W^2, $ <eq:demean-ls>
 
@@ -226,31 +228,32 @@ condition for @eq:demean-ls,
 $ D' W (D hat(alpha)_mu - mu) = 0, quad "equivalently" quad
   G hat(alpha)_mu = D' W mu, quad G = D' W D, $ <eq:fwl-normal>
 
-determines $hat(alpha)_mu$. Each FWL residualization uses the same coefficient matrix
-$G$; only the right-hand side changes as we move from the outcome to the covariates.
-The cost of residualization therefore depends on the structure of the Gramian $G$. In the next section,
-we illustrate this structure with the AKM worker-firm model and explain
-why fixed-effect designs have a direct graph interpretation. Sections 5--6 then return to the algorithms and show
-how the structure of the Gramian and its associated graph governs MAP convergence, and
-explain how we use it to construct the factor-pair Schwarz preconditioner.
+determines $hat(alpha)_mu$. The coefficient matrix $G$ is the same for each FWL
+residualization; only the variable being residualized changes. The cost of
+residualization therefore depends on the structure of the Gramian $G$, the weighted
+cross-product matrix of the fixed-effect dummies. The next section illustrates this
+structure with the AKM worker-firm model and shows how
+fixed-effect designs map directly to graphs. Sections 5-6 return to the algorithms. They
+show how the Gramian and its associated graph govern MAP convergence and how we use this
+structure to construct the factor-pair Schwarz preconditioner.
 
 = A Running Example: The AKM Model
 
-The AKM model of #cite(<akm1999>, form: "prose") introduces the worker-firm setting used
-throughout the paper. It separates persistent worker heterogeneity from firm wage
-premia using workers who move across firms. We write the AKM regression equation as
+The AKM model of #cite(<akm1999>, form: "prose") provides the worker-firm setting used
+throughout the paper. It uses workers who move across firms to separate persistent
+worker heterogeneity from firm wage premia. We write the AKM regression equation as
 
 $ y_(i t) = alpha_i + psi_(J(i,t)) + phi_t + x'_(i t) beta + epsilon_(i t), $
 
 where $alpha_i$ is a worker fixed effect, $psi_(J(i,t))$ is the fixed effect for the
 firm employing worker $i$ at time $t$, and $phi_t$ is a time fixed effect. 
 
-The AKM specification has a natural graph representation. Workers and firms are nodes in a
-bipartite graph, and each employment spell contributes an edge. Worker moves induce a
-firm-to-firm graph, in which two firms are connected when at least one worker is observed
-at both firms. Although stayers - workers who never change their employer - add observations to existing worker-firm links, they do
-not create bridges between firms. Year effects enter as a third, low-dimensional factor
-observed on the same worker-firm records. @fig-connectivity contrasts a well-connected
+The AKM specification maps naturally to a graph. Workers and firms are nodes in a
+bipartite graph; each employment spell contributes an edge. Worker moves induce a
+firm-to-firm graph: two firms are connected when at least one worker is observed at both
+firms. Stayers - workers who never change their employer - add observations to existing
+worker-firm links but do not create bridges between firms. Year effects enter as a third,
+low-dimensional factor observed on the same worker-firm records. @fig-connectivity contrasts a well-connected
 mobility graph with one that fragments under strong sorting.
 
 #figure(
@@ -260,24 +263,24 @@ mobility graph with one that fragments under strong sorting.
   clusters joined only by narrow bridges.]
 ) <fig-connectivity>
 
-These mobility links matter both for identification and, as we will argue later, for computation.
-In AKM, worker and firm fixed effects are separately identified through movers, who
-provide the comparisons that distinguish worker heterogeneity from firm wage premia. A
-worker observed at only one firm provides no such comparison: a high wage could reflect
-an unusually productive worker, a high-wage firm, or both. Without worker moves, these
-components are not separately identified. Movers observed across firms with different
-wage profiles help attribute wage variation to worker effects or firm premia. If a worker earns high wages across
-several firms, the comparison points toward a worker effect; if many different workers
-earn higher wages at the same firm, it points toward a firm premium. The more such
-cross-firm comparisons the data contain, especially across otherwise different firms,
-the easier it is to identify worker and firm premia. In the graph, these moves are
-exactly the edges that connect firms; additional moves of workers across firms 
-add worker-firm links to the graph. 
+These mobility links matter for identification and computation. In AKM, movers provide
+the comparisons that separately identify worker and firm fixed effects by distinguishing
+worker heterogeneity from firm wage premia. A worker observed at only one firm provides
+no such comparison: a high wage could reflect an unusually productive worker, a
+high-wage firm, or both. Without worker moves, these components are not separately
+identified. Movers observed at firms with different wage profiles help attribute wage
+variation to worker effects or firm premia. If a worker earns high wages across several
+firms, the comparison points toward a worker effect. If many different workers earn
+higher wages at the same firm, it points toward a firm premium. The more such cross-firm
+comparisons the data contain, especially across otherwise different firms, the easier it
+is to identify worker and firm premia. In the graph, these moves are exactly the edges
+that connect firms; additional moves of workers across firms add worker-firm links to the
+graph.
 
 = The Graph Structure of the Gramian
 
-The bipartite graph of worker and firm connections introduced in Section 3 has an algebraic representation in the
-block structure of the Gramian $G = D' W D$ @correia2017.
+The block structure of the Gramian $G = D' W D$ represents the bipartite graph of
+worker and firm connections introduced in Section 3 @correia2017.
 Suppose that the columns of $D$ are ordered as worker levels, firm levels, and year
 levels. Then
 
@@ -292,13 +295,12 @@ contain weighted counts for workers, firms, and years. An observation belongs to
 level of each factor, so these blocks are diagonal; solving them requires only division
 by group counts.
 
-
 The #cr[off-diagonal blocks] are cross-tabulations: the worker-firm block $#cr[$C_(W
 F)$]$ records how often worker $i$ is observed at firm $j$, and the worker-year and
-firm-year blocks have analogous interpretations. 
+firm-year blocks have analogous interpretations.
 
-As a small example, we construct a worker-firm panel and populate its Gramian. For
-simplicity, we ignore any regression weights and set $W = I$.
+The following small worker-firm panel illustrates how to populate its Gramian. We
+ignore regression weights and set $W = I$.
 
 #align(center)[
   #table(
@@ -326,8 +328,8 @@ simplicity, we ignore any regression weights and set $W = I$.
 ) <fig-toy-projection>
 
 @fig-toy-projection plots the worker-firm projection of this panel. Worker $W_1$ has
-employment spells both in $F_1$ and $F_2$ and creates a link between
-the two firms; in AKM terms, $W_1$ is a mover. Worker $W_2$ stays at $F_1$ for two periods, and $W_3$
+employment spells at both $F_1$ and $F_2$ and therefore links
+the two firms. In AKM terms, $W_1$ is a mover. Worker $W_2$ stays at $F_1$ for two periods, while $W_3$
 stays at $F_2$ for two periods. Both are stayers.
 
 The diagonal blocks are count matrices. In this example, each worker
@@ -345,7 +347,7 @@ $ C_(W F) = mat(
   0, 2
 ). $
 
-The first row indicates that worker $W_1$ appears once at firm $F_1$ and once at firm
+The first row shows that worker $W_1$ appears once at firm $F_1$ and once at firm
 $F_2$. Workers $W_2$ and $W_3$ are stayers, appearing twice at $F_1$ and $F_2$,
 respectively. The worker-year block is
 
@@ -363,8 +365,8 @@ $ C_(F Y) = mat(
 ). $
 
 Firm $F_1$ appears twice in year $Y_1$ and once in year $Y_2$; firm $F_2$ has the
-opposite pattern. Combining the diagonal count blocks and the off-diagonal
-cross-tabulation blocks yields the full Gramian.
+opposite pattern. Together, the diagonal count blocks and off-diagonal
+cross-tabulation blocks form the full Gramian.
 
 With column order $(W_1, W_2, W_3, F_1, F_2, Y_1, Y_2)$, the full Gramian is
 
@@ -378,14 +380,14 @@ $ G = mat(augment: #(hline: (3, 5), vline: (3, 5), stroke: 0.4pt + rgb("#b0b8c4"
   1, 1, 1, 1, 2, 0, 3
 ). $
 
-The worker-firm submatrix stores the bipartite graph algebraically. The diagonal entries
+The worker-firm submatrix represents the bipartite graph algebraically. The diagonal entries
 are worker and firm counts, and the entries of $C_(W F)$ are edge multiplicities between
-workers and firms. After flipping the sign of $C_(W F)$, this submatrix is a graph
+workers and firms. Changing the sign of $C_(W F)$ turns this submatrix into a graph
 Laplacian: its off-diagonal entries are non-positive, and every row sums to zero because
 each diagonal count cancels the off-diagonal spell counts in the same row. For a worker,
-the diagonal entry is the number of that worker's employment spells, while the
-off-diagonal entries count how those spells are distributed across firms; firm rows have
-the analogous interpretation with spell counts summed over workers.
+the diagonal entry is the number of employment spells. The off-diagonal entries give
+the number of those spells at each firm. Firm rows have the analogous
+interpretation, with spell counts summed over workers.
 
 
 $ L_(W F) = mat(augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
@@ -396,26 +398,25 @@ $ L_(W F) = mat(augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
   -1, 0, -2, 0, 3
 ). $
 
-The same Laplacian construction applies to any pair of fixed effects, and the preconditioner
-of Section 6 builds on these pairwise Laplacians. Before turning to it, 
-however, we introduce the method of alternating projections, which avoids forming the 
-full Gramian $G$ by working only on the diagonal worker, firm, and year blocks.
+The same Laplacian construction applies to any pair of fixed effects. The preconditioner
+in Section 6 builds on these pairwise Laplacians. Before constructing it, we introduce
+the method of alternating projections, which avoids forming the full Gramian $G$ and works only on
+the diagonal worker, firm, and year blocks.
 
 
 = Alternating Projections and Graph Connectivity
 
 The workhorse algorithm for multi-way fixed effects is the Method of Alternating
 Projections (MAP), also referred to as iterative demeaning or the "zig-zag" algorithm
-@guimaraes2010 @gaure2013. Many packages employ MAP or its variants, frequently combined
-with accelerations @berge2018 @correia2017, such as the Irons-Tuck extrapolation
-used by `fixest` @irons1969 @berge2026fixest. Sections 3 and 4 introduced the
-fixed-effect graph and its algebra; this section turns to MAP itself and shows how that
-graph geometry governs its convergence rate.
+@guimaraes2010 @gaure2013. Many packages use MAP or a variant, often with acceleration
+methods @berge2018 @correia2017. For example, `fixest` uses Irons-Tuck extrapolation
+@irons1969 @berge2026fixest. The fixed-effect graph and its algebra, introduced in
+Sections 3 and 4, determine MAP's convergence rate.
 
 MAP solves the FWL residualization problem by iterating over one fixed effect at a
 time. In the worker-firm-year model, MAP first subtracts worker means
-from the current residual, then firm means from the updated residual, then year means,
-and so on until convergence.
+from the current residual, then firm means from the updated residual, and then year
+means. It repeats this sequence until convergence.
 
 We write the FWL normal equations (see @eq:fwl-normal) in block form with
 $D = [D_W quad D_F quad D_Y]$ as
@@ -435,49 +436,47 @@ $ C_(W F)' alpha_W + G_(F F) alpha_F + C_(F Y) alpha_Y = D_F' W mu, $
 
 $ C_(W Y)' alpha_W + C_(F Y)' alpha_F + G_(Y Y) alpha_Y = D_Y' W mu. $
 
-Each equation can be rearranged to express one block of effects conditional on the
-others. Using $C_(W F) = D_W' W D_F$ and $C_(W Y) = D_W' W D_Y$ to factor $D_W' W$ out
-of the right-hand side, the first equation becomes
+Rearranging each equation expresses one block of effects conditional on the others.
+Substituting $C_(W F) = D_W' W D_F$ and $C_(W Y) = D_W' W D_Y$ into the first
+equation and factoring out $D_W' W$ gives
 
 $ G_(W W) alpha_W = D_W' W (mu - D_F alpha_F - D_Y alpha_Y). $
 
-Because $G_(W W)$ is a diagonal matrix whose entries are workers' total observation
-weights, solving for
-$alpha_W$ divides each worker's weighted partial residual by
-its total observation weight. We apply the same rearrangement to the second equation to
-obtain the firm equation
+Because $G_(W W)$ is diagonal, with entries equal to workers' total observation weights,
+we obtain $alpha_W$ by dividing each worker's weighted partial residual by that worker's
+total observation weight. For firms, the same rearrangement gives
 
 $ G_(F F) alpha_F = D_F' W (mu - D_W alpha_W - D_Y alpha_Y), $
 
 and the year equation is analogous. Because $G_(W W)$, $G_(F F)$, and $G_(Y Y)$
-are all diagonal, each of the three equations is solved by computing a weighted
-group mean in a single pass over observations.
+are all diagonal, we solve each equation by computing a weighted group mean in a single
+pass over observations.
 
-MAP uses this diagonal structure iteratively. Holding the other effects fixed, it updates
-the worker effects from the current partial residual, then repeats the same step for firms
-and years. Each sweep therefore cycles through the fixed-effect dimensions, subtracting the
-weighted group mean of the current partial residual for the factor being updated.
+MAP repeats these diagonal block solves. Holding the other effects fixed, it updates the
+worker effects from the current partial residual, then performs the same step for firms
+and years. One sweep cycles through the fixed-effect dimensions and subtracts the weighted
+group mean of the current partial residual for each factor.
 
 The cross-tabulation blocks $C_(W F)$, $C_(W Y)$, and $C_(F Y)$ enter the algorithm only
 indirectly. For instance, the worker update is computed from the partial residual
 $mu - D_F alpha_F - D_Y alpha_Y$, while the firm update is computed from
-$mu - D_W alpha_W - D_Y alpha_Y$. Worker-firm, worker-year, and firm-year links are thus
-not solved as coupled subproblems; their effect propagates through the residual that one
-block update transmits to the next.
+$mu - D_W alpha_W - D_Y alpha_Y$. MAP therefore does not solve the worker-firm,
+worker-year, and firm-year subproblems jointly. Instead, each block update changes the
+residual used by the next update.
 
-This strategy is effective when the graph is well connected. In a high-mobility
+MAP converges quickly when the graph is well connected. In a high-mobility
 worker-firm panel, many workers move across firms, so that worker and firm effects can
 be compared through many overlapping employment histories. A high wage at one firm can
-then be related to wages earned by the same workers at other firms, and a worker update
-rapidly alters the information available to the next firm update, and vice versa.
+then be related to wages earned by the same workers at other firms. A worker update
+quickly changes the information available to the next firm update, and vice versa.
 
 When mobility is sparse, sorting is strong, or one factor is nearly nested in another,
-MAP slows down. The information that separates worker effects from firm effects travels
-through movers, the edges of the worker-firm graph, and MAP picks it up only
-indirectly, through repeated residual updates. When those edges are few or bunched into
-narrow regions of the graph, each further iteration carries little fresh information. MAP
-still converges, but it may need many sweeps; each sweep is cheap because the diagonal
-block solves reduce to one-pass group means.
+MAP slows down. Movers form the edges of the worker-firm graph and provide the information
+needed to separate worker effects from firm effects. MAP uses this information only
+indirectly, through repeated residual updates. When those edges are few or concentrated
+in narrow regions of the graph, repeated residual updates separate the effects only
+gradually. MAP still converges, but it may need many sweeps. Each sweep is cheap because
+the diagonal block solves reduce to one-pass group means.
 
 We use the pairwise spectral gap $1-rho_(q r)$ as a diagnostic for MAP difficulty.
 Smaller values indicate weaker pairwise connectivity. Appendix B defines the statistic
@@ -487,51 +486,48 @@ and describes how we treat disconnected components.
 
 == Preconditioners
 
-The previous section attributed MAP's slow convergence to thin connections in the
-fixed-effect graph. A solver that receives this connectivity information directly
-should converge faster. MAP has no natural way to accept it: its update rule is fully
-determined by the list of absorbed factors, and the cross-tabulations enter only
-through the residual that one update passes to the next. Krylov solvers, by contrast,
-take an additional input, the preconditioner, and this input is where we place the
-graph structure. We therefore replace factor-by-factor demeaning via MAP with LSMR
-@fong2011, an iterative least-squares algorithm that improves an initial guess through
-repeated residual corrections. The change of solver gains little by itself: a poorly
-conditioned Gramian $G$ slows LSMR just as a poorly connected graph slows MAP. The core
-acceleration stems from building a good preconditioner, which we focus on in the 
-remainder of this section.
+Thin connections in the fixed-effect graph explain MAP's slow convergence. A solver
+should converge faster if it uses this connectivity directly. MAP cannot take such
+information as an input: its update rule is fully determined by the list of fixed-effect
+dimensions, and the cross-tabulations affect one update only through the residual passed
+to the next. Iterative solvers such as LSMR accept an additional input, a preconditioner,
+that can incorporate the graph structure. We therefore replace factor-by-factor demeaning via
+MAP with LSMR @fong2011, an iterative least-squares algorithm that improves an initial
+guess through repeated residual corrections. Switching solvers alone offers little
+gain: weakly connected designs also leave LSMR with components of $G$ that take many
+iterations to remove. The speedup depends on a good preconditioner. The rest of this
+section develops one.
 
-How fast LSMR converges depends on the conditioning of $G$. When $G$ is well
-conditioned, LSMR shrinks every component of the residual at a comparable rate. When
-$G$ is poorly conditioned, LSMR removes some components after a few iterations, whereas
-components that correspond to weak links, sparse mobility, or near nesting in the
-fixed-effect graph shrink much more slowly; the iteration then spends most of its steps
-on these slow components. A preconditioner counteracts this imbalance: it changes the
-coordinates of the linear system so that slow and fast components decay at more similar
-rates, without changing the least-squares solution.
+LSMR converges quickly when $G$ is balanced enough that every component of the residual
+shrinks at a comparable rate. With weak links, sparse mobility, or near nesting, $G$
+becomes unbalanced: LSMR removes some components after a few iterations while others
+shrink much more slowly. This imbalance in $G$ is what we mean by a poorly conditioned
+system. A preconditioner rescales the system so that LSMR reduces the easy and difficult
+components at more similar rates, without changing the least-squares solution.
 
 The ideal preconditioner is $G^(-1)$.#footnote[As in any model with several fixed
 effects, the level effects are pinned down only up to a normalization: we can add a
 constant to every worker effect and subtract it from every firm effect without changing
 the fitted values $D alpha$, and likewise for years. The dummy-coded $G = D' W D$ and the
-smaller blocks inverted below are therefore not invertible until this indeterminacy is
-removed -- one normalization for the worker-firm pair, and a second once year effects are
+smaller blocks inverted below are therefore not invertible until this ambiguity is
+removed - one normalization for the worker-firm pair, and a second once year effects are
 added, as in the Section 4 example. We adopt the standard normalization within each
 connected set and read every inverse below as that of the resulting system. The estimated
 effects depend on the normalization; the residualized outcome and regressors, which are
 all the regression uses, do not.] If $M^(-1) = G^(-1)$, then the
-preconditioned operator is
+matrix seen by LSMR is
 
 $ M^(-1) G = G^(-1) G = I. $ <eq:ideal-preconditioner>
 
-In exact arithmetic, the Krylov iteration would then recover the solution after one
-correction, because the system has no slow directions left to remove. To form
-$G^(-1)$ we would have to solve the fixed-effect normal equations themselves, so the
-identity case serves as a benchmark rather than an implementable preconditioner. A
-useful preconditioner must approximate enough of $G^(-1)$ to remove the slow directions
-of the iteration, while its construction and repeated application must amortize over the
-iterations it saves.#footnote[LSMR never forms $M^(-1) G$
-explicitly, nor $G$ itself. The iteration requires only products with $D$ and $D'$
-and applications of $M^(-1)$, supplied as linear operators.]
+With this ideal preconditioner, LSMR would recover the solution after one
+correction because the inverse solves the system directly. Forming $G^(-1)$, however,
+would require solving the fixed-effect normal equations themselves. The ideal inverse
+is therefore a benchmark, not an implementable preconditioner. A useful preconditioner
+must approximate enough of $G^(-1)$ to reduce the components that otherwise converge
+slowly. The
+time spent constructing and repeatedly applying it must be offset by the iterations it
+saves.#footnote[LSMR never constructs $M^(-1) G$
+or $G$ explicitly. It only multiplies vectors by $D$ and $D'$ and applies $M^(-1)$.]
 
 == From the Block Inverse to the Diagonal Preconditioner
 
@@ -546,9 +542,8 @@ $ G = mat(
 ), $
 
 with diagonal weighted-count blocks $G_(W W), G_(F F), G_(Y Y)$ and off-diagonal
-cross-tabulations $C_(W F), C_(W Y), C_(F Y)$. Block inversion via the Schur complement
-shows how each off-diagonal block enters $G^(-1)$. For the
-two-factor block
+cross-tabulations $C_(W F), C_(W Y), C_(F Y)$. The standard formula for inverting a
+block matrix shows how each off-diagonal block enters $G^(-1)$. For the two-factor block
 
 $ G_2 = mat(G_(W W), C_(W F); C_(W F)', G_(F F)), $
 
@@ -561,69 +556,71 @@ $ G_2^(-1) = mat(
 
 $ S = G_(F F) - C_(W F)' G_(W W)^(-1) C_(W F). $
 
-The formula shows that every block of $G_2^(-1)$ depends on $C_(W F)$ only through the Schur complement
-$S$: the cross-tabulation enters through matrix products, never as its own inverse.
-$G_(W W)$ is diagonal, so $G_(W W)^(-1)$ is a division by weighted worker counts. The Schur complement $S$, by contrast, is the firm-side
-mobility system that remains after eliminating workers. At the scale of modern worker-firm register data, solving this
-system is expensive: exact factorization creates many additional nonzero entries,
-separate connected components require separate normalizations, and weak mobility makes
-the remaining directions slow to resolve. $S^(-1)$ therefore carries almost all the cost of
-the solve. Block inversion via Schur complements generalizes to three factors: the closed form has
-more terms, but every block of $G^(-1)$ still depends jointly on the cross-tabulations
-$C_(W F), C_(W Y), C_(F Y)$.
+The formula shows that every block of $G_2^(-1)$ depends on $C_(W F)$ only through
+$S$; the cross-tabulation enters through matrix products, never as its own inverse.
+$G_(W W)$ is diagonal, so $G_(W W)^(-1)$ is a division by weighted worker counts. The
+matrix $S$ is the Schur complement: it is the firm-side mobility system left after
+eliminating the worker effects. Solving this system is expensive for modern worker-firm
+register data. Exact factorization makes the matrix denser by creating additional
+nonzero entries, separate connected components require separate normalizations, and
+weak mobility makes some components slow to resolve. $S^(-1)$ therefore accounts for
+almost all the cost of the solve. The same block-inverse calculation extends to three
+factors. The closed form has more terms, but every block of $G^(-1)$ still depends
+jointly on the cross-tabulations $C_(W F), C_(W Y), C_(F Y)$.
 
 The coarsest approximation to $G^(-1)$ keeps only the diagonal count inverses and drops
 the Schur-complement corrections,
 
 $ M_("diag")^(-1) = "diag"(G_(W W)^(-1), G_(F F)^(-1), G_(Y Y)^(-1)). $
 
-This preconditioner is a single division by weighted level counts. It is the diagonal
-preconditioner used with LSMR in `FixedEffectModels.jl` @fong2011 @fixedeffectmodels.
-Diagonal scaling encodes how many observations a level carries, but not how that level
-connects to the rest of the labor market. Those counts can already be useful when
-employment is concentrated in a few large firms, such as Novo Nordisk in Denmark
-or Samsung in South Korea, because the size differences alone remove an important source
-of scale variation. What diagonal scaling does not record is whether workers at those
-firms link them broadly to other firms or remain concentrated in a narrow corner of the
-mobility graph.
+Applying this preconditioner requires a single division by weighted level counts. It is
+the diagonal preconditioner used with LSMR in `FixedEffectModels.jl` @fong2011
+@fixedeffectmodels. Diagonal scaling records how many observations a level carries, but
+not how that level connects to the rest of the labor market. Level counts can already be
+useful when employment is concentrated in a few large firms, such as Novo Nordisk in
+Denmark or Samsung in South Korea, because the size differences alone remove an
+important source of scale variation. Diagonal scaling does not record whether workers
+at those firms link them broadly to other firms or remain concentrated in a narrow
+corner of the mobility graph.
 
 == The Factor-Pair Schwarz Approximation
 
-Additive Schwarz preconditioning adds this missing pairwise connectivity without solving
-the full three-factor system @xu1992 @toselli2005. It splits the fixed-effect problem
-into smaller overlapping pair problems. In the AKM case, one problem contains workers
-and firms, another contains workers and years, and a third contains firms and years.
-The worker-firm problem moves residual information along observed employment links; the
-other two pair problems do the same for worker-year and firm-year links. We then combine
-the three pair corrections in the full coefficient space. The preconditioner therefore
-gives the Krylov iteration the main pairwise channels of the Gramian, while the outer
-iteration handles the remaining three-way coupling.
+Additive Schwarz preconditioning approximates a large problem by solving smaller,
+overlapping problems and adding their corrections @xu1992 @toselli2005. Here, the small
+problems retain the pairwise connectivity that diagonal scaling drops. In the AKM case,
+one problem contains workers and firms, another contains workers and years, and a third
+contains firms and years. The worker-firm problem moves residual information along
+observed employment links; the other two pair problems do the same for worker-year and
+firm-year links. We combine the three pair corrections in the full vector of fixed-effect
+coefficients. These corrections let LSMR account directly for the main pairwise links in
+the Gramian, while the outer iteration handles the remaining three-way coupling.
 
-To make the local subproblems concrete, we first consider the worker-firm pair. Its
-local problem is exactly the two-factor block from the Schur calculation,
+Consider the worker-firm pair. Its local problem is the two-factor block from the Schur
+calculation,
 
 $ mat(G_(W W), C_(W F); C_(W F)', G_(F F)). $
 
-@fig-pair-block places this worker-firm pair block beside the single diagonal block
+@fig-pair-block compares this worker-firm pair block with the single diagonal block
 solved by a factor-level MAP update.
 
 #figure(
   image(solver-img("factor_level_vs_pair_block.svg"), width: 88%),
-  caption: [Local operator used by a factor-level MAP update (left) versus the
+  caption: [Matrix used by a factor-level MAP update (left) versus the
   factor-pair Schwarz solve (right), shown on the example worker-firm panel of Section 4.
   The factor-level block is the diagonal $G_(W W) = "diag"(2,2,2)$. The factor-pair
   block adds the firm count block $G_(F F) = "diag"(3,3)$ and the cross-tabulation
   $C_(W F)$ in its off-diagonal positions; the dashed outline marks the worker-firm
-  subdomain on which the local Schwarz solve operates.]
+  part of the coefficient vector covered by the worker-firm pair solve.]
 ) <fig-pair-block>
 
 Its inverse carries $C_(W F)$ through the Schur complement, so the local correction
-holds the worker-firm mobility geometry that diagonal scaling discards. To place this
-correction inside the three-factor problem, let $R_(W F)$ select the worker and firm
-entries from the full coefficient vector $alpha = [alpha_W; alpha_F; alpha_Y]$; its
-transpose $R_(W F)'$ places the resulting correction back into the full vector. The
-diagonal matrix $tilde(D)_(W F)$ contains the weights that split levels across the pair
-problems in which they appear; we call these entries partition-of-unity weights. The exact worker-firm contribution is
+retains the worker-firm mobility geometry that diagonal scaling discards. To use this
+correction in the three-factor problem, let
+$R_(W F)$ select the worker and firm entries from the full coefficient vector $alpha =
+[alpha_W; alpha_F; alpha_Y]$; its transpose $R_(W F)'$ places the resulting correction
+back into the full vector. The diagonal matrix $tilde(D)_(W F)$ weights levels that
+appear in more than one pair problem so their corrections are not counted twice. These
+entries are called partition-of-unity weights. The exact worker-firm contribution is
 
 $ P_(W F)^(-1) =
   R_(W F)' tilde(D)_(W F)
@@ -640,30 +637,29 @@ Schwarz preconditioner is the sum of these three contributions,
 $ P^(-1) = P_(W F)^(-1) + P_(W Y)^(-1) + P_(F Y)^(-1). $
 
 The three terms include the worker-firm, worker-year, and firm-year cross-tabulations
-separately. They do not solve the simultaneous worker-firm-year problem; that remaining
-coupling, together with the error introduced by splitting shared levels across pairs, is
-left to the outer LSMR iteration.
+separately. The simultaneous worker-firm-year coupling remains for the outer LSMR
+iteration, along with the error introduced by splitting shared levels across pairs.
 
 == Approximate Pair Solves via Graph Laplacians
 
 For $P^(-1)$ to serve as the operator $M^(-1)$ inside LSMR, each pair contribution must
-be computed without solving a large dense system. For factor pairs with few levels, we
-invert the pair block directly. In the example worker-firm panel of Section 4, the pair
-block has three worker levels and two firm levels; after the normalization of
-Section 6.1 removes the one free constant, the local solve is a $4 times 4$
-inversion. At the scale of modern worker-firm register data, however,
-a single pair can carry hundreds of thousands of levels per side, and direct inversion
-becomes the same kind of large linear-algebra problem the preconditioner is meant to
-avoid. We instead use the graph-Laplacian structure of the pair block.
+be computed without solving a large dense system. We invert the pair block directly
+when a factor pair has few levels. In the example worker-firm panel of Section 4, the
+pair block has three worker levels and two firm levels; after the normalization of
+Section 6.1 removes the one free constant, the local solve is a $4 times 4$ inversion.
+Direct inversion is impractical at the scale of modern worker-firm register data, where
+a single pair can carry hundreds of thousands of levels per side. It becomes the same
+large linear-algebra problem that the preconditioner is meant to avoid. The pair block's
+graph-Laplacian structure provides an alternative.
 
-For a worker-firm pair, the local Schwarz step solves the pair-Gramian system
+For a worker-firm pair, the local pair step solves the pair-Gramian system
 
 $ mat(G_(W W), C_(W F); C_(W F)', G_(F F)) x = u, $
 
-where $u$ is the weighted worker-firm part of the current Krylov residual. This block is
-not a graph Laplacian, because its off-diagonal entries $C_(W F)$ are non-negative. A
-sign flip removes the obstacle. Let $T_(W F) = "diag"(I_W, -I_F)$ flip the sign of the
-firm entries, so that $T_(W F)^2 = I$. Conjugation by $T_(W F)$ gives
+where $u$ is the weighted worker-firm part of the current LSMR residual. This block is
+not a graph Laplacian because its off-diagonal entries $C_(W F)$ are non-negative. Let
+$T_(W F) = "diag"(I_W, -I_F)$ flip the sign of the firm entries, so that $T_(W F)^2 =
+I$. Multiplying the pair block by $T_(W F)$ on both sides gives
 
 $ L_(W F) = T_(W F) mat(G_(W W), C_(W F); C_(W F)', G_(F F)) T_(W F)
   = mat(G_(W W), -C_(W F); -C_(W F)', G_(F F)), $
@@ -674,83 +670,85 @@ Laplacian solve by the same flip on each side,
 
 $ mat(G_(W W), C_(W F); C_(W F)', G_(F F))^(-1) = T_(W F) L_(W F)^(-1) T_(W F), $
 
-where both inverses are read as in Section 6.1: the solve fixes the free constant on
-each connected component by returning the zero-mean solution, and the residualized
+where both inverses are read as in Section 6.1. The solve fixes the free constant on
+each connected component by returning the zero-mean solution; the residualized
 variables do not depend on this choice. A single Laplacian solve therefore yields the
 pair-Gramian solution: we flip the residual, apply $L_(W F)^(-1)$, and flip back.
 
-For preconditioning, this local solve need not be exact. The outer LSMR iteration
-refines any error left by the preconditioner. We therefore approximate the Laplacian
-solve using sparse approximate Cholesky factorizations from the Laplacian-solver
-literature @spielman2014
-@gao2025. An exact Cholesky factorization of the pair block creates fill-in:
-eliminating a worker inserts entries linking every pair of distinct firms that worker
-visited, and these entries accumulate as the elimination proceeds. In the worst case,
-the cost approaches the order $k^3$ operations and order $k^2$ memory of a dense
-factorization of a $k$-level system. The randomized approximate factorization avoids
-this growth on any graph: its cost is nearly linear in the number of observed
-worker-firm links, that is, linear up to logarithmic factors. After transforming this approximate Laplacian solve back to worker-firm
-coordinates, we write $A_(W F)$ for the resulting approximate pair-Gramian solve.
+For preconditioning, this local solve need not be exact because the outer LSMR iteration
+refines the remaining error. We approximate the Laplacian solve using sparse approximate
+Cholesky factorizations @spielman2014 @gao2025. An exact Cholesky factorization gradually
+turns the sparse pair block into a denser matrix. Eliminating a worker creates new
+nonzero entries linking every pair of firms that worker visited, and these entries
+accumulate as more workers are eliminated. These extra entries are called fill-in;
+storing and updating them can make the exact factorization expensive. In the worst case,
+the calculation requires roughly $k^3$ operations and memory proportional to $k^2$ for
+a $k$-level system, as in a dense factorization. The randomized approximation controls
+this growth. Its cost is roughly proportional to the number of observed worker-firm
+links, with additional factors that grow only logarithmically with problem size. After
+transforming the approximate Laplacian solve
+back to worker-firm coordinates, we write $A_(W F)$ for the resulting approximate
+pair-Gramian solve.
 
-The same construction yields $A_(W Y)$ and $A_(F Y)$ for the other two pairs. We
-substitute these approximate inverses into the Schwarz sum to obtain the implemented
-preconditioner,
+The same construction yields $A_(W Y)$ and $A_(F Y)$ for the other two pairs. Replacing
+the exact pair inverses in the Schwarz sum with these approximations gives the
+implemented preconditioner,
 
 $ M^(-1) = sum_((q, r)) R_(q r)' tilde(D)_(q r) A_(q r) tilde(D)_(q r) R_(q r). $
 
 In the worker-firm-year case each factor receives a diagonal contribution from its two
 pair subdomains and each off-diagonal correction from the corresponding pair.
 
-The approximate pair inverse introduces a second approximation, beyond the pairwise
-splitting. The exact $P^(-1)$ already replaces the full three-factor inverse with pair
-solves; $M^(-1)$ now applies each pair
-solve only approximately, through $A_(q r)$. Both choices shape the preconditioned
-search directions and nothing else: the fitted residuals are unchanged, and LSMR still
-solves the original fixed-effect least-squares problem to the requested tolerance.
+The approximate pair inverse adds a second approximation to the pairwise splitting. The
+exact $P^(-1)$ replaces the full three-factor inverse with exact pair solves; $M^(-1)$
+approximates each of those solves through $A_(q r)$. These two approximations affect only
+how LSMR chooses each update. The fitted residuals are unchanged, and LSMR
+still solves the original fixed-effect least-squares problem to the requested tolerance.
 
 == Implementation Strategy
 
-@fig-pair-strategy summarizes the full construction. We start with the absorbed factors
-and split the fixed-effect graph into overlapping factor pairs. For each pair, the local
-Gramian block is represented as a graph Laplacian after a sign flip; sparse approximate
-Cholesky solves then provide an approximate pair inverse, returned to Gramian
-coordinates. The pair corrections are combined with partition-of-unity weights to form
-the Schwarz preconditioner $M^(-1)$.
+@fig-pair-strategy summarizes the full construction. We divide the fixed-effect graph
+into overlapping factor pairs. For each pair, a sign flip turns the local Gramian block
+into a graph Laplacian. A sparse approximate Cholesky routine then approximates the pair
+inverse without letting the matrix become dense. We weight the overlapping corrections
+so that shared fixed-effect levels are not counted twice, then add them to form the
+Schwarz preconditioner $M^(-1)$.
 
-The outer LSMR iteration uses this preconditioner to shape its search directions
+The outer LSMR iteration uses this preconditioner to choose better-scaled updates
 @fong2011 @arridge2014 @yang2024flexible. Once constructed, the same preconditioner can
-be reused to residualize the outcome and every covariate, and the algorithmic details
-are collected in Appendix A.
+be reused to residualize the outcome and every covariate. Appendix A gives the
+algorithmic details.
 
 #figure(
   image(solver-img("factor_pair_strategy.svg"), width: 70%),
   caption: [Summary of the factor-pair preconditioner. The fixed effects are split into
-  overlapping factor pairs; each pair solve uses the Laplacian representation with
-  approximate Cholesky; the resulting Schwarz preconditioner is then applied inside the
-  outer LSMR iteration.]
+  overlapping pairs. Each pair is rewritten as a graph Laplacian and solved with a sparse
+  Cholesky approximation. The weighted pair corrections form the preconditioner used by
+  the outer LSMR iteration.]
 ) <fig-pair-strategy>
 
 = Benchmarks
 
-Weak connectivity makes MAP's factor-by-factor updates pass information slowly through
-the fixed-effect graph. Factor-pair preconditioning should help most on these graphs and
-may add unnecessary setup cost on well-connected ones. We test this prediction on
-controlled synthetic designs and public benchmark datasets.
+When connectivity is weak, MAP's factor-by-factor updates pass information slowly
+through the fixed-effect graph. Factor-pair preconditioning should help most on these
+graphs, but may add unnecessary setup cost on well-connected ones. We test this
+prediction on controlled synthetic designs and public benchmark datasets.
 
-The main runtime tables use package-level regression APIs, matching the public
-PyFixest benchmark suite, rather than isolated demeaning kernels. Each timing covers the
-full regression workflow: model setup, construction of the fixed-effect representation,
+The main runtime tables use package-level regression APIs, as does the public PyFixest
+benchmark suite, rather than timing the demeaning step alone. Each timing covers the full
+regression workflow: model setup, construction of the fixed-effect representation,
 residualization of the outcome and covariates, and estimation of the coefficient of
-interest. Appendix B verifies that the preconditioned solver matches MAP to numerical
-tolerance and reports the memory cost of storing factor-pair information and additional
-solver diagnostics.
+interest. Appendix B verifies that the preconditioned solver returns the same coefficient
+estimates as MAP up to the requested tolerance. It also reports the memory cost of
+storing factor-pair information and additional solver diagnostics.
 
-For cross-package comparisons, every backend receives the same input data but uses its
-own default handling of singleton or separated observations. Successful fits record the
-retained-observation count; failed attempts record their convergence status and error.
-Any shared control is stated with the relevant table. The comparisons are not constrained
-to a common estimation sample. The single-package mechanism experiments later in the
-paper do use a common prepared sample, because their purpose is to isolate the preconditioner.
+For cross-package comparisons, every software implementation receives the same input
+data but uses its own default rules for singleton fixed-effect levels (levels that occur
+only once) and observations removed because of separation. For successful fits, we
+record the retained-observation count; for failed attempts, we record the convergence
+status and error. Any shared control is stated with the relevant table. The comparisons
+are not constrained to a common estimation sample. The later single-package mechanism
+experiments use a common prepared sample because they isolate the preconditioner.
 
 The runtime tables report the spectral-gap diagnostic $1-rho$ for the relevant factor
 pair. Its definition and limitations are given in Appendix B.
@@ -768,7 +766,7 @@ with no, diagonal, or factor-pair preconditioning, R `fixest`, and
   inset: (x: 5pt, y: 3.6pt),
   align: (left, left, left),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Backend], th[Package], th[Algorithm]),
+  table.header(th[Configuration], th[Package], th[Algorithm]),
   table.hline(stroke: 0.45pt + table-rule),
   [`rust-map`], [PyFixest], [Vanilla Rust MAP, without acceleration.],
   [`within-off`], [PyFixest], [LSMR without preconditioning.],
@@ -792,10 +790,10 @@ family as `fixest`'s accelerated MAP.
 
 == Runtime Benchmarks
 
-The implementations use different convergence criteria, so their nominal tolerances are
-not directly comparable. The first comparisons report package defaults. The
-achieved-precision experiment later in this section evaluates every method against the
-same external error measures.
+The implementations use different rules for deciding when to stop, so their reported
+tolerance settings are not directly comparable. We first compare package defaults. The
+achieved-precision experiment later in this section compares every method using the same
+measures of coefficient and residual error.
 
 The main OLS benchmarks use synthetic AKM-style panels with one million observations,
 one covariate, ten periods, and worker, firm, and year fixed effects. They vary the
@@ -808,10 +806,10 @@ exact package-default AKM timings behind @fig-gap-runtime.
 
 === Worker Mobility
 
-Lower worker mobility leaves fewer workers connecting multiple firms. MAP still updates
-one fixed-effect dimension at a time, so information about firm effects moves more slowly
-through the iteration. The factor-pair preconditioner uses the worker-firm links directly
-and becomes relatively more competitive as mobility falls. The top row of
+Lower worker mobility leaves fewer workers connecting multiple firms. Because MAP updates
+one fixed-effect dimension at a time, information about firm effects moves more slowly
+through the iteration. The factor-pair preconditioner uses the worker-firm links directly,
+so its relative advantage grows as mobility falls. The top row of
 @fig-gap-runtime shows the worker-firm gap falling from $0.41$ to
 $4.82 times 10^(-5)$. Under package defaults, all configurations in the first two designs
 complete within 3.60 seconds. In the remaining designs, PyFixest MAP slows sharply or reaches
@@ -843,9 +841,10 @@ firm, and year fixed effects.
 #include "generated/tables/ols.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
-  times in seconds at package-default settings. An unreported initial timing selects 20
-  measured calls below 1 second, 7 from 1 to 10 seconds, and 3 otherwise. A value $t (k/n)$
-  is the median among $k$ successful calls when fewer than $n$ planned calls converge;
+  times in seconds at package-default settings. An unreported initial timing determines
+  the number of measured calls: 20 if it is below 1 second, 7 if it is between 1 and 10
+  seconds, and 3 otherwise. A value $t (k/n)$ is the median among $k$ successful calls
+  when fewer than $n$ planned calls converge;
   a dash means that no complete result is recorded. `capped (0/n)` and `failed (0/n)`
   identify unsuccessful cells. Both designs have 10M
   observations, one covariate, and worker, firm, and year fixed effects. The Gap (share)
@@ -858,11 +857,11 @@ factor-pair LSMR takes 11.5 seconds because its setup cost is not recovered in o
 On the near-nested design, factor-pair LSMR takes 4.45 seconds, compared with 11.0
 seconds without preconditioning, 27.8 seconds for FEM.jl, 63.5 seconds for `fixest`, and
 337.2 seconds for PyFixest MAP. PyFixest diagonal LSMR reaches its default cap on that
-design. The standalone setup diagnostic separates construction from the subsequent solve.
+design.
 
 === Iterations After Setup
 
-The iteration counts separate construction from the subsequent solves. The table uses
+The iteration-count diagnostic separates construction from subsequent solves and uses
 the 100,000-observation versions of the same simple and difficult designs.
 
 #block(breakable: false)[#text(size: 8.9pt)[
@@ -870,21 +869,21 @@ the 100,000-observation versions of the same simple and difficult designs.
 #include "generated/tables/iterations.typ"
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] MAP is reported in full sweeps over the fixed-effect
-  dimensions. The LSMR columns report Krylov iterations. A MAP sweep and an LSMR
-  iteration are different units and should not be compared across columns. Each LSMR
-  count is the median of three solves with two right-hand sides.]
+  dimensions. The LSMR columns report LSMR iterations. A MAP sweep and an LSMR
+  iteration use different units, so their counts should not be compared across columns.
+  Each LSMR count is the median of three solves with two variables to residualize.]
 ]]
 
 Among the LSMR configurations, the additive preconditioner needs 14 iterations on the
 simple design and 22 on the difficult one. The diagonal count rises from 16 to 180,
 while unpreconditioned LSMR rises from 37 to 249. Once the additive preconditioner has
-been built, the difficult design requires only eight more Krylov iterations than the
+been built, the difficult design requires only eight more LSMR iterations than the
 simple design. The preconditioned solve is short in both cases; setup makes `within`
 unattractive on the simple one-shot regression.
 
 == Runtime and Achieved Precision
 
-The stopping rules attach tolerance to different quantities. PyFixest MAP defaults to
+The methods apply their stopping tolerances to different quantities. PyFixest MAP defaults to
 $10^(-6)$ and stops when every observation-level residual
 changes by less than that amount after a full pass over the fixed-effect dimensions.
 R's `fixest` also defaults to $10^(-6)$, but applies the threshold to successive
@@ -892,14 +891,16 @@ fixed-effect coefficient iterates. It accepts either a small absolute change or 
 scaled relative change, and periodically makes the same comparison for the residual sum
 of squares. `FixedEffectModels.jl` passes its default tolerance of $10^(-6)$ as both
 LSMR stopping tolerances. `within` defaults to $10^(-8)$ and stops when either the
-estimated least-squares residual is at most $10^(-8)$ times the norm of the right-hand
-side, or the scaled normal-equation residual falls below $10^(-8)$. The latter is
+estimated least-squares residual is at most $10^(-8)$ times the norm of the variable
+being residualized (the right-hand side), or a scaled measure of the remaining
+first-order-condition error falls below $10^(-8)$. This second measure, called the
+normal-equation residual, is
 $||A^T r||_2 / (||A||_F ||r||_2)$, using LSMR's running norm estimates @fong2011.
 
 @fig-tolerance compares the methods on a common accuracy scale. It uses mobility
-designs 1, 3, and 5. Before timing, we recursively remove
-singletons once from each one-million-observation design and pass the resulting rows to
-every method. We then vary each package's own tolerance, use a common 10,000-iteration
+designs 1, 3, and 5. Before timing, we repeatedly remove fixed-effect levels that occur
+only once. We do this once for each one-million-observation design and pass the resulting
+rows to every method. We then vary each package's own tolerance, use a common 10,000-iteration
 cap, and time three fits at every setting. The tight reference uses factor-pair LSMR at
 tolerance $10^(-14)$. The package defaults for the iteration cap are 10,000 for PyFixest
 MAP, `fixest`, and `FixedEffectModels.jl`, and 1,000 for `within`.
@@ -907,22 +908,24 @@ MAP, `fixest`, and `FixedEffectModels.jl`, and 1,000 for `within`.
 #figure(
   image(result-img("tolerance_frontier.svg"), width: 97%),
   caption: [Runtime against achieved precision on three AKM mobility designs. Each point
-  is the median of three fits on the same recursively singleton-pruned sample for that
-  design; pruning is completed before the timed fits. Lines vary a package's requested
-  tolerance, while the horizontal axis reports achieved error. The top row measures
-  coefficient error as $abs(hat(beta)-hat(beta)^star) / "SE"(hat(beta)^star)$. The bottom
+  is the median of three fits on the same sample after repeatedly removing singleton
+  fixed-effect levels; this removal is completed before the timed fits. Each line
+  connects results for one package across requested tolerances, while the horizontal
+  axis reports achieved error.
+  The top row measures coefficient error as
+  $abs(hat(beta)-hat(beta)^star) / "SE"(hat(beta)^star)$. The bottom
   row measures final residual error as $frac(||r-r^star||_2, ||r^star||_2)$. Both use the
   tight factor-pair LSMR reference. Error decreases from left to right. Circled points
   use each package's default tolerance. All runs have a 10,000-iteration cap. Settings
   that return no solution have no horizontal coordinate and are omitted; the annotations
-  report these settings.]
+  identify these settings.]
 ) <fig-tolerance>
 
 == Amortizing the Preconditioner <sec-amortization>
 
 The additive method first constructs the factor-pair blocks and their approximate
-factorizations, then applies them during the LSMR solve. Construction is paid once for a
-fixed set of observations, weights, and fixed-effect identifiers.
+factorizations, then applies them during the LSMR solve. For a fixed set of observations,
+weights, and fixed-effect identifiers, construction is needed only once.
 
 === Setup Cost Across Connectivity
 
@@ -944,8 +947,8 @@ Setup is cheaper in the low-mobility designs. With two fixed effects, median set
 from 0.119 seconds at $delta=1$ to 0.067 seconds at $delta=0.001$; with three
 fixed effects, it falls from 0.123 to 0.073 seconds. Solve time falls as well, from 0.323
 to 0.057 seconds with two effects and from 0.239 to 0.176 seconds with three. The
-low-mobility worker-firm graph has fewer cross-firm links to store and factorize. This is
-why the additive runtime in @fig-gap-runtime can decline while MAP and diagonal LSMR
+low-mobility worker-firm graph has fewer cross-firm links to store and factorize. As a
+result, the additive runtime in @fig-gap-runtime can decline while MAP and diagonal LSMR
 slow down.
 
 === Ten Regressions on the Same Fixed Effects
@@ -970,9 +973,9 @@ preconditioner for every regression; the other keeps one preconditioner for all 
 
 Even across ten regressions, the additive preconditioner is slower on the simple design.
 Diagonal preconditioning takes 0.692 seconds. Rebuilding the additive
-preconditioner takes 4.46 seconds, while caching lowers this to 1.83 seconds. Avoiding
-nine constructions is not enough: the cached additive path is still more than twice as slow
-as diagonal preconditioning on this well-connected graph.
+preconditioner takes 4.46 seconds, while caching lowers this to 1.83 seconds. Even after
+avoiding nine constructions, the cached additive path is still more than twice as slow as
+diagonal preconditioning on this well-connected graph.
 
 On the difficult design, diagonal preconditioning takes 50.3 seconds for the ten
 regressions. Rebuilding the additive preconditioner lowers this to
@@ -986,8 +989,8 @@ Faster fixed-effect solves matter especially when an estimator requires several 
 as in generalized linear models fit by iteratively reweighted least squares (IRLS). Each
 IRLS step fits a weighted least squares problem in which the response and covariates are
 demeaned against the fixed effects @correia2020ppmlhdfe @stammann2018. A single GLM fit
-therefore calls the demeaning routine repeatedly. The fixed-effect incidence graph stays
-the same, but the weights change between calls, including in `ppmlhdfe`, Poisson
+therefore calls the demeaning routine repeatedly. The mapping from observations to
+fixed-effect levels stays the same, but the weights change between calls. This pattern arises in `ppmlhdfe`, Poisson
 fixed-effect estimators, and other IRLS-based GLM implementations.
 
 PyFixest currently reuses the preconditioner built during the first weighted demeaning
@@ -996,12 +999,12 @@ preconditioner based on earlier weights. Reuse saves construction time and may r
 more LSMR iterations. Rebuilding may reduce the iteration count but incurs construction
 cost at every step. The table reports the current PyFixest reuse behavior.
 
-The PPML comparison uses the simple-versus-difficult DGPs from the
+The PPML comparison uses the simple and difficult designs from the
 `fixest` benchmark suite @berge2026fixest at $n = 1$M observations, with one covariate
-and worker, firm, and year fixed effects. The compared backends are R `fixest`'s `fepois`,
+and worker, firm, and year fixed effects. The compared implementations are R `fixest`'s `fepois`,
 `GLFixedEffectModels.jl`, and two PyFixest `fepois` paths: the default unpreconditioned
 `rust-map` and `within` with PyFixest's current reuse policy. Packages apply their default
-rules for separated observations, and each backend receives the same 100-iteration outer
+rules for separated observations, and each implementation receives the same 100-iteration outer
 IRLS limit.
 
 #v(0.35em)
@@ -1016,8 +1019,8 @@ IRLS limit.
   `GLFEM.jl` is `GLFixedEffectModels.jl`. The `within` column uses PyFixest's current
   policy of reusing the first factor-pair preconditioner as the IRLS weights change.
   Each package applies its default separation handling. A value $t (k/3)$ is the median
-  among $k$ successful calls; `capped (0/3)` identifies an iteration limit and
-  `failed (0/3)` another error.]
+  among $k$ successful calls; `capped (0/3)` identifies an iteration limit, and
+  `failed (0/3)` identifies another error.]
   ]
 
 #block(breakable: false)[On the simple design, all four paths finish in under ten seconds. `fixest` takes 4.72
@@ -1029,10 +1032,9 @@ factor-pair blocks encode those links directly.]
 
 = Software
 
-The solver studied in this paper is available as open-source software through the
-`within` project @within. The computational core is implemented in Rust and exposed
-through Rust, Python, and R interfaces; each language binding invokes the same underlying
-solver. All three interfaces call the same Rust implementation.
+The `within` project provides the solver studied in this paper as open-source software
+@within. Its computational core is written in Rust. The Rust, Python, and R interfaces
+all call this implementation.
 
 #v(0.15em)
 
@@ -1052,12 +1054,11 @@ solver. All three interfaces call the same Rust implementation.
 )
 ]]
 
-The Rust crate exposes the lower-level solver together with its configuration types. The
-Python and R packages provide solver-level `solve` and `solve_batch` APIs for
-residualizing one or several right-hand sides. The algorithm is also available as a demeaning backend
-for PyFixest @pyfixest.
+The Rust crate exposes the lower-level solver and its configuration types. The Python and
+R packages provide `solve` and `solve_batch` APIs that residualize one or several
+variables. PyFixest also provides the algorithm as a demeaning option @pyfixest.
 
-The following Python example demeans an outcome and two covariates against worker and firm
+The Python example below demeans an outcome and two covariates against worker and firm
 fixed effects, then runs the FWL regression on the demeaned variables:
 
 #text(size: 8.8pt)[```python
@@ -1084,31 +1085,30 @@ beta_hat = np.linalg.lstsq(X_tilde, y_tilde, rcond=None)[0]
 
 = Conclusion
 
-The benchmarks show that solver rankings depend on graph connectivity. MAP is difficult
-to outperform on dense, well-connected graphs because its sweeps are cheap and
-factor-pair construction adds overhead. With low mobility, strong sorting, or
-near-nested effects, MAP passes information slowly and the factor-pair preconditioner is
-often much faster.
+The benchmarks show that solver rankings depend on graph connectivity. On dense,
+well-connected graphs, MAP is difficult to outperform: its sweeps are cheap, while
+constructing the factor pairs adds overhead. When mobility is low, sorting is strong, or
+effects are nearly nested, information passes slowly between updates under MAP and the
+factor-pair preconditioner is often much faster.
 
-Factor-pair construction becomes cheaper in the low-mobility AKM designs and can be paid
-once across regressions that share the same
-sample, fixed effects, and weights. Caching lowers additive runtime on both
-simple and difficult designs, but only the difficult design is faster than diagonal
-preconditioning. There, caching reduces additive setup from 0.434 to 0.040 seconds and
-total time from 1.77 to 1.23 seconds.
+Constructing the factor pairs becomes cheaper in the low-mobility AKM designs. Its cost
+is incurred once for regressions that share the same sample, fixed effects, and weights.
+Caching lowers additive runtime in both simple and difficult designs, but only the
+difficult design is faster than diagonal preconditioning. For that design, caching
+reduces additive setup from 0.434 to 0.040 seconds and total time from 1.77 to 1.23
+seconds.
 
-PPML calls the demeaning routine repeatedly because every IRLS step solves a new weighted
+PPML calls the demeaning routine repeatedly because each IRLS step solves a new weighted
 problem. In our benchmark, PyFixest reuses the first preconditioner as the weights change.
-The results support factor-pair preconditioning when the gap diagnostic is small, when a
-fit is unexpectedly slow, or when an estimator requires several fixed-effect solves.
+Our results support factor-pair preconditioning when the gap diagnostic is small, a fit
+is unexpectedly slow, or an estimator requires several fixed-effect solves.
 
 #set heading(numbering: none)
 #pagebreak()
 
 = Appendix A: Factor-Pair Schwarz Algorithm
 
-Algorithm 1 gives the implementation corresponding to the construction summarized in
-@fig-pair-strategy.
+Algorithm 1 implements the construction shown in @fig-pair-strategy.
 
 #align(center)[
   #block(
@@ -1124,30 +1124,30 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
       #v(0.25em)
       #align(left)[
         #strong[Inputs]
-        - Observation-level factor codes for $Q$ absorbed dimensions.
-        - Diagonal weights $W$ and a local solver configuration.
-        - Krylov residual $r$ in coefficient space.
+        - Observation-level factor codes for $Q$ fixed-effect dimensions.
+        - Diagonal weights $W$ and local solver settings.
+        - Current LSMR residual $r$, indexed by the fixed-effect coefficients.
 
         #strong[Preconditioner setup]
         - Enumerate all unordered factor pairs $(q,r)$ with $q < r$.
         - For each pair, build weighted count blocks $G_(q q)$, $G_(r r)$ and the weighted
           cross-tabulation $C_(q r)$.
         - Split the induced bipartite graph into connected components and create one
-          Schwarz subdomain $s$ per component.
+          local pair problem (a Schwarz subdomain) $s$ per component.
         - If fixed-effect level $j$ appears in $c_j$ subdomains, store the partition
           weight $omega_j = 1 / sqrt(c_j)$.
-        - For each subdomain, sign-flip one side to obtain a local Laplacian, project the
-          local right-hand side off the component constant, and build a zero-mean
-          local solve.
+        - For each subdomain, sign-flip one side to obtain a local Laplacian, remove the
+          constant part that cannot be identified within the component from the local
+          right-hand side, and build a zero-mean solve.
         - Use a Schur-complement local solver: small reduced systems are solved directly,
           while larger reduced symmetric diagonally dominant (SDD) or Laplacian systems
           are solved with randomized approximate Cholesky.
 
-        #strong[Krylov application]
+        #strong[Application during LSMR]
         - Initialize $z = 0$.
         - For each subdomain $s$, form $h_s = tilde(D)_s R_s r$.
         - Compute the approximate local correction $u_s approx A_s h_s$ on the
-          normalized subspace.
+          zero-mean subspace.
         - Accumulate $z <- z + R_s' tilde(D)_s u_s$.
         - Return $z = M^(-1) r$.
       ]
@@ -1160,26 +1160,28 @@ Algorithm 1 gives the implementation corresponding to the construction summarize
 = Appendix B: Benchmarks and Diagnostics
 
 This appendix defines the connectivity diagnostic used in the runtime figures and
-reports additional synthetic and real-data benchmarks, memory use, and numerical
-equivalence. Each table is generated from the recorded benchmark output by
+reports additional synthetic and real-data benchmarks, memory use, and comparisons of
+coefficient estimates. Each table is generated from the recorded benchmark output by
 `scripts/paper_results.py`; none of the numbers are entered by hand.
 
-== Spectral-Gap Diagnostic
+== Connectivity Diagnostic (Spectral Gap)
 
+The spectral gap summarizes how strongly a pair of fixed-effect dimensions is connected.
 For a pair of fixed effects $(q,r)$, define the normalized cross-tabulation
 
 $ H_(q r) = G_(q q)^(-1/2) C_(q r) G_(r r)^(-1/2). $
 
 Let $rho_(q r) = sigma_2(H_(q r))^2$, where $sigma_2$ is the largest nontrivial
 singular value. Equivalently, $rho_(q r)$ is the largest nontrivial eigenvalue of
-$H_(q r)' H_(q r)$. Each connected component has a singular value equal to one; that
-value reflects the component constant rather than the strength of its internal
-connections, so it is discarded. We report $1-rho_(q r)$. Values near zero indicate
+$H_(q r)' H_(q r)$. Each connected component automatically has a singular value equal
+to one. This value comes from a component-wide constant that does not change the fitted
+values; it says nothing about the strength of the internal connections, so we discard it. We report
+$1-rho_(q r)$. Values near zero indicate
 weak connectivity, including sparse mobility and near nesting.
 
-We compute the diagnostic after iterative singleton pruning for the fixed effects in the
-design. If the factor-pair graph has several connected components, we compute the gap
-within each component and report the smallest one. The parenthetical value in the tables
+We compute the diagnostic after repeatedly removing singleton fixed-effect levels, which
+occur only once in the data. If the factor-pair graph has several connected components,
+we compute the gap within each component and report the smallest one. The parenthetical value in the tables
 is the share of retained observations in the component attaining that gap. For models
 with three or more fixed effects, the statistic describes one factor pair and is not a
 bound on convergence of the full model.
@@ -1197,10 +1199,10 @@ $2/3$. After discarding the unit eigenvalue, $rho_(W F)=2/3$ and the gap is $1/3
 
 == Controlled AKM Benchmark Results
 
-Panel A contains the exact package-default timings underlying the left column of
-@fig-gap-runtime. Panel B adds the other package-default PyFixest LSMR configurations;
-its factor-pair column is therefore identical to Panel A's PyFixest factor-pair result.
-Gap (share) is defined in the preceding subsection.
+Panel A reports the exact package-default timings used in the left column of
+@fig-gap-runtime. Panel B reports the other package-default PyFixest LSMR
+configurations, so its factor-pair column repeats Panel A's PyFixest factor-pair
+result. Gap (share) is defined in the preceding subsection.
 
 === Worker Mobility
 
@@ -1268,12 +1270,11 @@ Gap (share) is defined in the preceding subsection.
 === Standard Synthetic Benchmarks: Correia Collection
 
 The controlled AKM benchmarks in Section 7 vary mobility and sorting directly. The
-Correia synthetic cases are public and reproducible.
-
-The Correia HDFE benchmark collection spans a broader set of graph shapes: complete
-bipartite matching, uniform random matching with varying degrees of connectivity,
-assortative matching, and a small path-like design. They provide an independent public
-reference set for comparing the same software backends outside the AKM generator.
+public and reproducible Correia HDFE benchmark collection covers a broader set of graph
+shapes: complete bipartite matching, uniform random matching with varying degrees of
+connectivity, assortative matching, and a small path-like design. It provides an
+independent reference set for comparing the same software implementations outside the AKM
+generator.
 
 #v(0.35em)
 
@@ -1283,11 +1284,11 @@ reference set for comparing the same software backends outside the AKM generator
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
   times in seconds over three calls at package-default settings. Each package applies its
-  default singleton treatment. Gap (share) uses the `id1`-`id2` diagnostic defined
+  default rules for singleton fixed-effect levels. Gap (share) uses the `id1`-`id2` diagnostic defined
   above. A value $t (k/3)$ is the median among $k$
   successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
   `failed (0/3)` distinguish iteration limits from other errors. `synthetic-zigzag` is
-  omitted because the default MAP backends reach their
+  omitted because the default MAP implementations reach their
   10,000-iteration demeaning caps.]
   ]
 
@@ -1300,12 +1301,12 @@ package-default Correia run is complete; the unfilled cells are not used for ran
 === Standard Real-Data Benchmarks: Correia Collection
 
 The Correia collection also includes real benchmark data. Synthetic data sets match the
-overall shape of empirical co-occurrence graphs but smooth away irregularities that
-often drive runtime: a few units that appear far more often than the rest, thin
-connections between otherwise dense groups, many small disconnected pieces, and
-interactions between identifiers that go beyond a single two-way pair. The empirical
-datasets contain these features and therefore test the solvers in conditions that
-controlled DGPs only approximate.
+overall shape of empirical co-occurrence graphs but smooth away several irregularities
+that often drive runtime. These include a few units that appear far more often than the
+rest, thin connections between otherwise dense groups, many small disconnected pieces,
+and interactions between identifiers that go beyond a single two-way pair. The
+empirical datasets contain these features. They therefore test the solvers in
+conditions that controlled data-generating processes only approximate.
 
 #v(0.35em)
 
@@ -1315,7 +1316,7 @@ controlled DGPs only approximate.
   #v(0.25em)
   #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
   times in seconds over three calls at package-default settings. Each package applies its
-  default singleton treatment. Gap (share) uses the `id1`-`id2` diagnostic defined
+  default rules for singleton fixed-effect levels. Gap (share) uses the `id1`-`id2` diagnostic defined
   above. A value $t (k/3)$ is the median among $k$
   successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
   `failed (0/3)` distinguish iteration limits from other errors. A small gap in a small
@@ -1323,11 +1324,11 @@ controlled DGPs only approximate.
   full sample difficult for MAP.]
   ]
 
-The real-data collection includes irregular components that are not captured by one
-pairwise statistic. The `directors` component attaining the smallest reported gap covers
-30 percent of the observations. The no-preconditioner and diagonal LSMR columns await
-the package-default Correia run; the gap remains a diagnostic rather than a selection
-rule.
+No single pairwise statistic captures all the irregular components in the real-data
+collection. The `directors` component attaining the smallest reported gap covers 30
+percent of the observations. The no-preconditioner and diagonal LSMR columns await the
+package-default Correia run. The gap remains a diagnostic and does not serve as a
+selection rule.
 
 #pagebreak()
 
@@ -1335,19 +1336,18 @@ rule.
 
 MAP uses little memory: a sweep needs only the current residuals and per-level group
 sums. A factor-pair preconditioner, by contrast, must retain the pair structure between
-iterations. We therefore measure how much additional memory the preconditioned Krylov
-solver requires relative to MAP.
+iterations. We therefore measure how much additional memory factor-pair LSMR requires
+relative to MAP.
 
 We record peak resident set size (peak RSS), the largest amount of physical memory used
-by the process during a run, on the simple and difficult fixed-effect DGPs. The main
+by the process during a run, on the simple and difficult fixed-effect designs. The main
 storage terms are the data matrix, the fixed-effect encodings, and the reusable
-factor-pair objects. We do not compare `fixest` and `FixedEffectModels.jl` here, because
+factor-pair objects. We do not compare `fixest` and `FixedEffectModels.jl` here because
 peak RSS across languages also reflects R and Julia runtime overhead, data-loading
-choices, garbage collection, and package internals. We compare the preconditioned Rust
-backend with Rust MAP inside the same Python package. The surrounding regression code is
-shared, leaving the demeaning
-strategy as the relevant difference. Both backends run in isolated processes and report
-peak RSS through `ru_maxrss`.
+choices, garbage collection, and package internals. Instead, we compare the
+preconditioned Rust implementation with Rust MAP inside the same Python package. The
+surrounding regression code is shared; only the demeaning strategy differs. Both
+implementations run in isolated processes and report peak RSS through `ru_maxrss`.
 
 #v(0.4em)
 
@@ -1358,7 +1358,7 @@ peak RSS through `ru_maxrss`.
 		#text(size: 8.2pt)[#emph[Note:] Entries are peak resident-set sizes (MiB), measured
 		from isolated Python processes. The table compares PyFixest MAP with PyFixest
 		factor-pair LSMR in full OLS calls with one covariate and worker, firm, and year fixed
-		effects. The two DGPs are representative probes rather than a test of
+		effects. The two designs are representative probes. The table does not test
 		design-specific memory behavior. Gap (share) is defined above.]
 		]
 
@@ -1369,19 +1369,18 @@ co-occurrences, partition weights, and local approximate Cholesky factors.
 
 #pagebreak()
 
-== Numerical Equivalence
+== Coefficient Agreement
 
-Numerical agreement is a separate diagnostic because MAP and LSMR-style routines use
-different convergence checks, residual norms, stopping thresholds, and iteration caps.
-Two correct implementations can therefore return coefficients that agree only up to
-their tolerances.
+We compare the coefficient estimates because MAP and LSMR use different rules for
+deciding when to stop. Even when both methods are implemented correctly, their estimates
+need only agree within the requested tolerances.
 
-We use the 100K-observation simple and difficult data generating processes from the
-`fixest` benchmarks as diagnostic cases. All methods should agree closely on the simple
-design. The difficult design is poorly conditioned, so small differences in stopping
-rules are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
+We use the 100K-observation versions of the simple and difficult `fixest` benchmark
+designs. All methods should agree closely on the simple design. In the difficult design,
+some remaining errors shrink much more slowly, so small differences in stopping rules
+are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
 design and 0.00130 in the difficult design. The coefficient-agreement table compares one
-regression coefficient across the four backends.
+regression coefficient across the four implementations.
 
 #v(0.4em)
 
@@ -1398,8 +1397,8 @@ preconditioning.]
 
 On the simple design, the largest coefficient difference is
 #result_agreement_simple_max. On the difficult design it is
-#result_agreement_difficult_max. The methods use different stopping checks, so exact
-agreement is not expected on the poorly conditioned design.
+#result_agreement_difficult_max. The methods use different stopping checks, so we do not
+expect identical estimates on the difficult design.
 
 #pagebreak()
 
