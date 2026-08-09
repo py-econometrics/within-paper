@@ -231,11 +231,9 @@ $ D' W (D hat(alpha)_mu - mu) = 0, quad "equivalently" quad
 determines $hat(alpha)_mu$. The coefficient matrix $G$ is the same for each FWL
 residualization; only the variable being residualized changes. The cost of
 residualization therefore depends on the structure of the Gramian $G$, the weighted
-cross-product matrix of the fixed-effect dummies. The next section illustrates this
-structure with the AKM worker-firm model and shows how
-fixed-effect designs map directly to graphs. Sections 5-6 return to the algorithms. They
-show how the Gramian and its associated graph govern MAP convergence and how we use this
-structure to construct the factor-pair Schwarz preconditioner.
+cross-product matrix of the fixed-effect dummies. The AKM worker-firm model gives this
+matrix a concrete interpretation. Worker moves link firms through shared workers and
+determine the off-diagonal blocks of $G$.
 
 = A Running Example: The AKM Model
 
@@ -274,8 +272,8 @@ firms, the comparison points toward a worker effect. If many different workers e
 higher wages at the same firm, it points toward a firm premium. The more such cross-firm
 comparisons the data contain, especially across otherwise different firms, the easier it
 is to identify worker and firm premia. In the graph, these moves are exactly the edges
-that connect firms; additional moves of workers across firms add worker-firm links to the
-graph.
+that connect firms. In the Gramian, the same links appear in the worker-firm
+cross-tabulation, turning mobility into a matrix that an algorithm can use.
 
 = The Graph Structure of the Gramian
 
@@ -398,10 +396,11 @@ $ L_(W F) = mat(augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
   -1, 0, -2, 0, 3
 ). $
 
-The same Laplacian construction applies to any pair of fixed effects. The preconditioner
-in Section 6 builds on these pairwise Laplacians. Before constructing it, we introduce
-the method of alternating projections, which avoids forming the full Gramian $G$ and works only on
-the diagonal worker, firm, and year blocks.
+The same Laplacian construction applies to any pair of fixed effects. These pairwise
+Laplacians contain the information used by the preconditioner in Section 6. MAP, by
+contrast, avoids forming the full Gramian $G$ and uses only the diagonal worker, firm,
+and year blocks directly. The next section explains how this choice makes convergence
+depend on graph connectivity.
 
 
 = Alternating Projections and Graph Connectivity
@@ -480,18 +479,19 @@ the diagonal block solves reduce to one-pass group means.
 
 We use the pairwise spectral gap $1-rho_(q r)$ as a diagnostic for MAP difficulty.
 Smaller values indicate weaker pairwise connectivity. Appendix B defines the statistic
-and describes how we treat disconnected components.
+and describes how we treat disconnected components. A faster solver must use the
+pairwise links directly instead of passing their information through one factor update
+at a time.
 
 = The Factor-Pair Schwarz Preconditioner
 
 == Preconditioners
 
-Thin connections in the fixed-effect graph explain MAP's slow convergence. A solver
-should converge faster if it uses this connectivity directly. MAP cannot take such
-information as an input: its update rule is fully determined by the list of fixed-effect
-dimensions, and the cross-tabulations affect one update only through the residual passed
-to the next. Iterative solvers such as LSMR accept an additional input, a preconditioner,
-that can incorporate the graph structure. We therefore replace factor-by-factor demeaning via
+LSMR can use the pairwise links through a preconditioner. MAP cannot take them as an
+input: its update rule is fully determined by the list of fixed-effect dimensions, and
+the cross-tabulations affect one update only through the residual passed to the next.
+Iterative solvers such as LSMR accept an additional input, a preconditioner, that can
+incorporate the graph structure. We therefore replace factor-by-factor demeaning via
 MAP with LSMR @fong2011, an iterative least-squares algorithm that improves an initial
 guess through repeated residual corrections. Switching solvers alone offers little
 gain: weakly connected designs also leave LSMR with components of $G$ that take many
@@ -923,9 +923,11 @@ MAP, `fixest`, and `FixedEffectModels.jl`, and 1,000 for `within`.
 
 == Amortizing the Preconditioner <sec-amortization>
 
-The additive method first constructs the factor-pair blocks and their approximate
-factorizations, then applies them during the LSMR solve. For a fixed set of observations,
-weights, and fixed-effect identifiers, construction is needed only once.
+The accuracy comparison separates solver performance from differences in stopping
+rules. Factor-pair LSMR also has a fixed setup cost: it constructs the pair blocks and
+their approximate factorizations before applying them during the solve. With fixed
+observations, weights, and fixed-effect identifiers, the solver builds these objects once
+and reuses them.
 
 === Setup Cost Across Connectivity
 
@@ -1032,9 +1034,9 @@ factor-pair blocks encode those links directly.]
 
 = Software
 
-The `within` project provides the solver studied in this paper as open-source software
-@within. Its computational core is written in Rust. The Rust, Python, and R interfaces
-all call this implementation.
+The solver benchmarked in Section 7 is available through the open-source `within`
+project @within. Its computational core is written in Rust. The Rust, Python, and R
+interfaces all call this implementation.
 
 #v(0.15em)
 
@@ -1081,11 +1083,16 @@ y_tilde, X_tilde = res.demeaned[:, 0], res.demeaned[:, 1:]
 beta_hat = np.linalg.lstsq(X_tilde, y_tilde, rcond=None)[0]
 ```]
 
+`solve_batch` follows the FWL workflow from Section 2: it residualizes the outcome and
+covariates together and reuses one factor-pair preconditioner across columns. Users do
+not need to construct the Gramian or its pairwise blocks themselves.
+
 #pagebreak()
 
 = Conclusion
 
-The benchmarks show that solver rankings depend on graph connectivity. On dense,
+Graph connectivity links the econometric structure of a fixed-effect model to its
+computational cost. The benchmarks show that it also changes solver rankings. On dense,
 well-connected graphs, MAP is difficult to outperform: its sweeps are cheap, while
 constructing the factor pairs adds overhead. When mobility is low, sorting is strong, or
 effects are nearly nested, information passes slowly between updates under MAP and the
