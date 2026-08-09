@@ -985,18 +985,19 @@ fixed-effect identifiers do not change.
 
 We time construction and the subsequent LSMR work separately on the AKM mobility
 designs, using a two-factor specification with worker and firm effects and a three-factor
-specification that also absorbs year effects. Each cell is the median of five runs at
-one million observations, with the same outcome and covariate in both specifications.
+specification that also absorbs year effects. We plan five runs per cell at one million
+observations, with the same outcome and covariate in both specifications.
 
 #block(breakable: false)[#text(size: 8.8pt)[
 #strong[Factor-pair setup and LSMR times as worker mobility varies.]
 #include "generated/tables/akm_setup_cost.typ"
   #v(0.25em)
   #table-note[Times are in seconds. For each design and
-  specification, the table gives the median setup time and time spent in LSMR from five runs with 1
-  million observations and an LSMR tolerance of $10^(-12)$. The two-fixed-effect
-  specification absorbs worker and firm effects; the three-fixed-effect specification
-  also absorbs year effects. In the $lambda_2$ (share) column, $lambda_2$ is the
+  specification, we plan five runs with 1 million observations and an LSMR tolerance of
+  $10^(-12)$. The table gives the median setup time and time spent in LSMR among the
+  runs that finish; if only $k$ finish, $t (k/5)$ reports their median time $t$. The
+  two-fixed-effect specification absorbs worker and firm effects; the three-fixed-effect
+  specification also absorbs year effects. In the $lambda_2$ (share) column, $lambda_2$ is the
   second-smallest eigenvalue of the normalized Laplacian for the worker-firm graph. We
   compute it after removing fixed-effect levels observed only once; smaller values mean
   weaker connectivity. For a disconnected pair graph, we compute $lambda_2$ in each
@@ -1024,12 +1025,13 @@ for all ten.
 #strong[Ten regressions with rebuilt and cached preconditioners.]
 #include "generated/tables/regression_reuse.typ"
   #v(0.25em)
-  #table-note[For each policy, we sum setup and LSMR times over ten
-  sequential regressions, then take the median across three repetitions. Times are in
-  seconds. Each design has 1 million observations and worker, firm, and year fixed
-  effects. Each regression removes the fixed effects from the common outcome and one of
-  ten covariates at an LSMR tolerance of $10^(-12)$. Speedup divides the diagonal total time by the
-  reported total time.
+  #table-note[For each policy, we add the setup and LSMR times across ten sequential
+  regressions and take the median across three planned repetitions. If only $k$
+  repetitions finish, $t (k/3)$ reports their median time $t$, and the speedup is
+  omitted. Times are in seconds. Each design has 1 million observations and worker,
+  firm, and year fixed effects. Each regression removes the fixed effects from the
+  common outcome and one of ten covariates at an LSMR tolerance of $10^(-12)$. For
+  complete cells, speedup divides the diagonal total time by the reported total time.
   `Additive, rebuilt` constructs a new factor-pair preconditioner for each regression;
   `Additive, cached` reuses one preconditioner for all ten.]
 ]]
@@ -1086,8 +1088,9 @@ IRLS limit.
   where a combination of regressors and fixed effects can push fitted means for some
   zero outcomes arbitrarily close to zero. If only $k$ of the three planned fits return
   an estimate, $t (k/3)$ gives their median time $t$.
-  `capped (0/3)` means that no fit finishes within 100 iteratively reweighted least
-  squares steps; `failed (0/3)` marks a failure other than reaching that limit.]
+  `capped (0/3)` means that no fit finishes before either the package's inner demeaning
+  limit or the common limit of 100 iteratively reweighted least squares steps;
+  `failed (0/3)` marks another failure.]
   ]
 
 #block(breakable: false)[On the simple design, all four paths finish in under ten seconds:

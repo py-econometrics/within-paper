@@ -15,10 +15,20 @@ if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")
 frame <- as.data.frame(read_parquet(data_path))
 formula <- negbin_y ~ x1 | indiv_id + firm_id + year
 fit_once <- function() {
-  fit <- fepois(
-    formula, frame, vcov = "iid", nthreads = threads, glm.iter = outer_maxiter,
-    notes = FALSE, warn = FALSE
+  inner_capped <- FALSE
+  fit <- withCallingHandlers(
+    fepois(
+      formula, frame, vcov = "iid", nthreads = threads, glm.iter = outer_maxiter,
+      notes = FALSE, warn = TRUE
+    ),
+    warning = function(warning) {
+      if (grepl("Absence of convergence", conditionMessage(warning), fixed = TRUE)) {
+        inner_capped <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    }
   )
+  if (inner_capped) stop("fixest PPML inner demeaning returned without convergence")
   if (!isTRUE(fit$convStatus)) stop("fixest PPML model returned without convergence")
   fit
 }

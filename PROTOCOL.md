@@ -47,7 +47,9 @@ isolate a solver choice.
   sample. Matched-solver exercises run through one package path on the same prepared sample.
 - **PPML outer iterations.** PyFixest, R `fixest`, and `GLFixedEffectModels.jl` each
   receive an outer IRLS limit of 100 iterations. This common cap replaces their package
-  defaults; their separation handling and other solver settings remain unchanged.
+  defaults; their separation handling and other solver settings remain unchanged. Each
+  package also retains its own inner demeaning limit, and reaching either limit marks the
+  run as capped.
 - **Weights.** Unweighted (`W = I`) in every benchmark. Weighted solves appear only
   inside PPML, where IRLS sets them.
 - **Covariates.** Every regression has one slope covariate, `x1`.
@@ -213,9 +215,10 @@ Verified at every level that can cap:
 - The MAP diagnostics return `censoring="capped"` with `iterations` equal to the cap.
 - PyFixest raises `ValueError: Demeaning failed after N iterations.`, which the harness
   records as `converged=False` with the message retained.
-- R and Julia warnings or returned convergence flags are converted to the same row
-  fields. If an isolated estimator process exits before writing its rows, the parent
-  writes one failed row for each planned repetition.
+- For PPML, the harness checks PyFixest's returned convergence flag, R `fixest`'s outer
+  flag and inner-demeaning warnings, and Julia's inner and outer status. If an isolated
+  estimator process exits before writing its rows, the parent writes one failed row for
+  each planned repetition.
 
 No path silently reports a capped run as converged.
 

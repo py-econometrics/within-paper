@@ -107,7 +107,12 @@ def setup_across_connectivity() -> list[dict]:
             if successful:
                 setup = median(row["setup_s"] for row in successful)
                 solve = median(row["solve_s"] for row in successful)
-                value = f"{setup:.3f} s setup + {solve:.3f} s solve"
+                returned = (
+                    f" ({len(successful)}/{len(measured)})"
+                    if len(successful) < len(measured)
+                    else ""
+                )
+                value = f"{setup:.3f} s setup + {solve:.3f} s LSMR{returned}"
             elif measured and all(row.get("capped") for row in measured):
                 value = "capped"
             else:
@@ -232,7 +237,14 @@ def repeated_regressions() -> list[dict]:
                 measured.append(row)
             successful = [row for row in measured if row.get("converged")]
             if successful:
-                value = f"{median(row['total_s'] for row in successful):.3f} s"
+                returned = (
+                    f" ({len(successful)}/{len(measured)})"
+                    if len(successful) < len(measured)
+                    else ""
+                )
+                value = (
+                    f"{median(row['total_s'] for row in successful):.3f} s{returned}"
+                )
             elif measured and all(row.get("capped") for row in measured):
                 value = "capped"
             else:

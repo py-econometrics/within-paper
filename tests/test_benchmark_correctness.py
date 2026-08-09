@@ -266,6 +266,17 @@ class PythonFitTests(unittest.TestCase):
             self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
             self.assertFalse(hasattr(fit, "_Y"))
 
+    def test_ppml_rejects_a_returned_nonconverged_fit(self) -> None:
+        from pyfixest.errors import NonConvergenceError
+
+        returned = SimpleNamespace(convergence=False)
+        with (
+            patch.object(ppml_pyfixest, "_demeaner", return_value=object()),
+            patch("pyfixest.fepois", return_value=returned),
+            self.assertRaises(NonConvergenceError),
+        ):
+            fit_ppml(pd.DataFrame(), "rust-map", outer_maxiter=1)
+
     def test_ppml_measure_records_a_failed_warmup(self) -> None:
         error = ValueError("Demeaning failed after 10000 iterations.")
         with patch.object(ppml_pyfixest, "fit_ppml", side_effect=error):
@@ -648,6 +659,38 @@ class PaperResultTests(unittest.TestCase):
             ],
         )
 
+    def test_akm_setup_table_marks_partially_successful_cells(self) -> None:
+        document = {
+            "tables": {
+                "akm_mobility": {
+                    "header": ["Scenario", "$lambda_2$ (share)"],
+                    "rows": [["`akm_mobility_1`", "0.41 (1.00)"]],
+                },
+                "akm_setup_cost": {"rows": []},
+            }
+        }
+        rows = []
+        for n_factors in (2, 3):
+            for repetition in range(5):
+                converged = repetition < 4
+                rows.append(
+                    {
+                        "design": "akm_mobility_1",
+                        "n_factors": str(n_factors),
+                        "setup_s": "0.1" if converged else "",
+                        "solve_s": "0.2" if converged else "",
+                        "converged": str(converged).lower(),
+                        "capped": "false",
+                        "repetition": str(repetition),
+                        "n_planned": "5",
+                    }
+                )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_akm_setup_cost(document)
+
+        rendered = document["tables"]["akm_setup_cost"]["rows"][0]
+        self.assertEqual(rendered[2:], ["0.100s (4/5)", "0.200s (4/5)"] * 2)
+
     def test_reuse_table_reports_speedup_against_diagonal(self) -> None:
         document = {"tables": {"regression_reuse": {"rows": []}}}
         rows = []
@@ -681,6 +724,39 @@ class PaperResultTests(unittest.TestCase):
         self.assertEqual(rendered[5][-1], "4.0x")
         self.assertEqual(rendered[0][0], "simple")
         self.assertEqual(rendered[3][0], "difficult")
+
+    def test_reuse_table_marks_partial_cells_and_omits_speedup(self) -> None:
+        document = {"tables": {"regression_reuse": {"rows": []}}}
+        rows = []
+        for design in ("simple", "difficult"):
+            for policy in ("diagonal", "additive_rebuilt", "additive_cached"):
+                for repetition in range(3):
+                    converged = not (
+                        design == "simple"
+                        and policy == "additive_cached"
+                        and repetition == 2
+                    )
+                    rows.append(
+                        {
+                            "design": design,
+                            "policy": policy,
+                            "setup_s": "1.0" if converged else "",
+                            "solve_s": "2.0" if converged else "",
+                            "total_s": "3.0" if converged else "",
+                            "converged": str(converged).lower(),
+                            "capped": "false",
+                            "repetition": str(repetition),
+                            "n_planned": "3",
+                        }
+                    )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_regression_reuse(document)
+
+        partial = document["tables"]["regression_reuse"]["rows"][2]
+        self.assertEqual(
+            partial[2:5], ["1.00s (2/3)", "2.00s (2/3)", "3.00s (2/3)"]
+        )
+        self.assertEqual(partial[5], "--")
 
     def test_reuse_benchmark_runs_both_ten_regression_designs(self) -> None:
         self.assertEqual(amortization.N_REGRESSIONS, 10)

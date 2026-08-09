@@ -26,8 +26,9 @@ def fit_ppml(
     frame: pd.DataFrame, backend: str, outer_maxiter: int = OUTER_MAXITER
 ):
     import pyfixest as pf
+    from pyfixest.errors import NonConvergenceError
 
-    return pf.fepois(
+    fit = pf.fepois(
         "negbin_y ~ x1 | indiv_id + firm_id + year",
         frame,
         vcov="iid",
@@ -37,6 +38,12 @@ def fit_ppml(
         demeaner=_demeaner(backend),
         iwls_maxiter=outer_maxiter,
     )
+    if not bool(fit.convergence):
+        raise NonConvergenceError(
+            "PyFixest PPML reached the IRLS iteration limit "
+            f"of {outer_maxiter} without converging."
+        )
+    return fit
 
 
 def measure(

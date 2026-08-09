@@ -831,9 +831,14 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         if not successful:
             status = "capped" if all(_row_capped(row) for row in group) else "failed"
             return [status, status]
+        suffix = (
+            f" ({len(successful)}/{len(group)})"
+            if len(successful) < len(group)
+            else ""
+        )
         return [
-            _format_seconds(median(float(row["setup_s"]) for row in successful)),
-            _format_seconds(median(float(row["solve_s"]) for row in successful)),
+            _format_seconds(median(float(row["setup_s"]) for row in successful)) + suffix,
+            _format_seconds(median(float(row["solve_s"]) for row in successful)) + suffix,
         ]
 
     rendered = []
@@ -866,7 +871,7 @@ def _synchronize_regression_reuse(document: dict) -> int:
         ("additive_cached", "Additive, cached"),
     )
     designs = ("simple", "difficult")
-    summaries: dict[tuple[str, str], tuple[float, float, float] | str] = {}
+    summaries: dict[tuple[str, str], tuple[float, float, float, int, int] | str] = {}
     for design in designs:
         for policy, _label in policies:
             group = [
@@ -885,15 +890,23 @@ def _synchronize_regression_reuse(document: dict) -> int:
                     "capped" if all(_row_capped(row) for row in group) else "failed"
                 )
             else:
-                summaries[key] = tuple(
-                    median(float(row[field]) for row in successful)
-                    for field in ("setup_s", "solve_s", "total_s")
+                summaries[key] = (
+                    *(
+                        median(float(row[field]) for row in successful)
+                        for field in ("setup_s", "solve_s", "total_s")
+                    ),
+                    len(successful),
+                    len(group),
                 )
 
     rendered = []
     for design in designs:
         baseline = summaries[(design, "diagonal")]
-        baseline_total = baseline[2] if isinstance(baseline, tuple) else None
+        baseline_total = (
+            baseline[2]
+            if isinstance(baseline, tuple) and baseline[3] == baseline[4]
+            else None
+        )
         for index, (policy, label) in enumerate(policies):
             summary = summaries[(design, policy)]
             design_cell = design if index == 0 else ""
@@ -902,15 +915,20 @@ def _synchronize_regression_reuse(document: dict) -> int:
                     [design_cell, label, summary, summary, summary, "--"]
                 )
                 continue
-            setup, solve, total = summary
-            speedup = f"{baseline_total / total:.1f}x" if baseline_total else "--"
+            setup, solve, total, n_success, n_total = summary
+            suffix = f" ({n_success}/{n_total})" if n_success < n_total else ""
+            speedup = (
+                f"{baseline_total / total:.1f}x"
+                if baseline_total and n_success == n_total
+                else "--"
+            )
             rendered.append(
                 [
                     design_cell,
                     label,
-                    _format_seconds(setup),
-                    _format_seconds(solve),
-                    _format_seconds(total),
+                    _format_seconds(setup) + suffix,
+                    _format_seconds(solve) + suffix,
+                    _format_seconds(total) + suffix,
                     speedup,
                 ]
             )
