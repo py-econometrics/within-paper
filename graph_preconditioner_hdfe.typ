@@ -184,8 +184,9 @@ Section 4 develops the graph structure of the fixed-effect Gramian, and Section 
 connects this structure to the convergence behavior of MAP. Section 6 introduces
 preconditioning and then constructs the factor-pair Schwarz preconditioner.
 Section 7 reports the runtime benchmarks; Section 8 describes the software through which
-the new algorithm is available; and Section 9 concludes. Appendix B reports numerical
-equivalence, memory use, and additional benchmark diagnostics.
+the new algorithm is available; and Section 9 concludes. Appendix A gives the algorithm,
+Appendix B defines the connectivity measure, Appendix C reports additional benchmarks,
+and Appendix D compares coefficient estimates and memory use.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -738,9 +739,8 @@ The main runtime tables use package-level regression APIs, as does the public Py
 benchmark suite, rather than timing the demeaning step alone. Each timing covers the full
 regression workflow: model setup, construction of the fixed-effect representation,
 residualization of the outcome and covariates, and estimation of the coefficient of
-interest. Appendix B verifies that the preconditioned solver returns the same coefficient
-estimates as MAP up to the requested tolerance. It also reports the memory cost of
-storing factor-pair information and additional solver diagnostics.
+interest. Appendix D compares the coefficient estimates returned by the preconditioned
+solver and MAP. It also reports the memory cost of storing factor-pair information.
 
 For cross-package comparisons, every software implementation receives the same input
 data but uses its own default rules for singleton fixed-effect levels (levels that occur
@@ -800,7 +800,7 @@ one covariate, ten periods, and worker, firm, and year fixed effects. They vary 
 worker-firm graph in two ways while holding the rest of the data-generating process
 fixed. The mobility designs progressively reduce the number of workers who change firms.
 The sorting designs hold the move probability at one and increasingly concentrate moves
-within groups of firms. Appendix B reports further
+within groups of firms. Appendix C reports further
 synthetic designs, the empirical HDFE benchmarks assembled by Sergio Correia, and the
 exact package-default AKM timings behind @fig-gap-runtime.
 
@@ -1175,14 +1175,9 @@ Algorithm 1 implements the construction shown in @fig-pair-strategy.
 
 #pagebreak()
 
-= Appendix B: Benchmarks and Diagnostics
+= Appendix B: Measuring Connectivity
 
-This appendix defines the connectivity diagnostic used in the runtime figures and
-reports additional synthetic and real-data benchmarks, memory use, and comparisons of
-coefficient estimates. Each table is generated from the recorded benchmark output by
-`scripts/paper_results.py`; none of the numbers are entered by hand.
-
-== Connectivity Diagnostic (Spectral Gap)
+== Spectral Gap
 
 The spectral gap summarizes how strongly a pair of fixed-effect dimensions is connected.
 For a pair of fixed effects $(q,r)$, define the normalized cross-tabulation
@@ -1204,6 +1199,8 @@ is the share of retained observations in the component attaining that gap. For m
 with three or more fixed effects, the statistic describes one factor pair and is not a
 bound on convergence of the full model.
 
+== Worker-Firm Example
+
 In the worker-firm example of Section 4, $G_(W W) = "diag"(2,2,2)$,
 $G_(F F) = "diag"(3,3)$, and $C_(W F) = mat(1, 1; 2, 0; 0, 2)$. Therefore,
 
@@ -1215,12 +1212,19 @@ $2/3$. After discarding the unit eigenvalue, $rho_(W F)=2/3$ and the gap is $1/3
 
 #pagebreak()
 
-== Controlled AKM Benchmark Results
+= Appendix C: Additional Benchmark Results
+
+We report the detailed AKM timings behind @fig-gap-runtime and results for synthetic and
+real data from the Correia collection. The script `scripts/paper_results.py` generates
+every table in Appendices C and D from recorded benchmark output; none of the numbers are
+entered by hand.
+
+== Controlled AKM Benchmarks
 
 Panel A reports the exact package-default timings used in the left column of
 @fig-gap-runtime. Panel B reports the other package-default PyFixest LSMR
 configurations, so its factor-pair column repeats Panel A's PyFixest factor-pair
-result. Gap (share) is defined in the preceding subsection.
+result. Appendix B defines the gap and explains the sample share shown in parentheses.
 
 === Worker Mobility
 
@@ -1305,9 +1309,9 @@ result. Gap (share) is defined in the preceding subsection.
 
 #pagebreak()
 
-== More Benchmarks
+== Correia Benchmark Collection
 
-=== Standard Synthetic Benchmarks: Correia Collection
+=== Synthetic Designs
 
 The controlled AKM benchmarks in Section 7 vary mobility and sorting directly. The
 public and reproducible Correia HDFE benchmark collection covers a broader set of graph
@@ -1340,9 +1344,7 @@ The synthetic collection covers complete, uniform, assortative, and path-like ma
 patterns. The no-preconditioner and diagonal LSMR results will be added once the
 package-default Correia run is complete; the unfilled cells are not used for rankings.
 
-#pagebreak()
-
-=== Standard Real-Data Benchmarks: Correia Collection
+=== Real Data
 
 The Correia collection also includes real benchmark data. Synthetic data sets match the
 overall shape of empirical co-occurrence graphs but smooth away several irregularities
@@ -1379,6 +1381,40 @@ package-default Correia run. The gap remains a diagnostic and does not serve as 
 selection rule.
 
 #pagebreak()
+
+= Appendix D: Coefficient Estimates and Memory Use
+
+== Comparing Coefficient Estimates
+
+We compare the coefficient estimates because MAP and LSMR use different rules for
+deciding when to stop. Even when both methods are implemented correctly, their estimates
+need only agree within the requested tolerances.
+
+We use the 100K-observation versions of the simple and difficult `fixest` benchmark
+designs. All methods should agree closely on the simple design. In the difficult design,
+some remaining errors shrink much more slowly, so small differences in stopping rules
+are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
+design and 0.00130 in the difficult design. The table compares estimates of one
+regression coefficient across four implementations.
+
+#v(0.4em)
+
+#text(size: 9.2pt)[
+#strong[Coefficient estimates across implementations (100,000 observations, three fixed effects, one covariate).]
+#include "generated/tables/agreement.typ"
+#v(0.25em)
+#text(size: 8.2pt)[#emph[Note:] Each row comes from one OLS regression fitted with the
+package's default settings. $hat(beta)_1$ is the slope coefficient on `x1`. The final
+column reports its absolute difference from the PyFixest MAP estimate. The dash in the
+PyFixest MAP row marks this reference estimate. `within` is PyFixest LSMR with
+factor-pair preconditioning.]
+]
+
+On the simple design, the largest coefficient difference is
+#result_agreement_simple_max. On the difficult design it is
+#result_agreement_difficult_max. The packages use different criteria to decide when their
+iterative algorithms have converged. Small differences between their estimates are
+therefore expected on the difficult design.
 
 == Memory Use
 
@@ -1418,40 +1454,6 @@ At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1
 observations the overhead is #result_memory_1m_overhead, but it remains modest relative
 to the full panel data footprint. The additional storage holds factor-pair
 co-occurrences, partition weights, and local approximate Cholesky factors.
-
-#pagebreak()
-
-== Coefficient Agreement
-
-We compare the coefficient estimates because MAP and LSMR use different rules for
-deciding when to stop. Even when both methods are implemented correctly, their estimates
-need only agree within the requested tolerances.
-
-We use the 100K-observation versions of the simple and difficult `fixest` benchmark
-designs. All methods should agree closely on the simple design. In the difficult design,
-some remaining errors shrink much more slowly, so small differences in stopping rules
-are more likely to appear. The worker-firm gap is approximately 0.857 in the simple
-design and 0.00130 in the difficult design. The coefficient-agreement table compares one
-regression coefficient across the four implementations.
-
-#v(0.4em)
-
-#text(size: 9.2pt)[
-#strong[Coefficient agreement (100,000 observations, three fixed effects, one covariate).]
-#include "generated/tables/agreement.typ"
-#v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] Each row comes from one OLS regression fitted with the
-package's default settings. $hat(beta)_1$ is the slope coefficient on `x1`. The final
-column reports its absolute difference from the PyFixest MAP estimate. The dash in the
-PyFixest MAP row marks this reference estimate. `within` is PyFixest LSMR with
-factor-pair preconditioning.]
-]
-
-On the simple design, the largest coefficient difference is
-#result_agreement_simple_max. On the difficult design it is
-#result_agreement_difficult_max. The packages use different criteria to decide when their
-iterative algorithms have converged. Small differences between their estimates are
-therefore expected on the difficult design.
 
 #pagebreak()
 
