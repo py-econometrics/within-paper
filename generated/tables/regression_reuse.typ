@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, left, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Policy], th[Setup], th[Solve], th[Total], th[Speedup]),
+  table.header(th[Design], th[Policy], th[Setup], th[LSMR], th[Total], th[Speedup]),
   table.hline(stroke: 0.45pt + table-rule),
   [simple], [Diagonal], [0.048s], [0.553s], [0.601s], [1.0x],
   [], [Additive, rebuilt], [2.80s], [1.51s], [4.29s], [0.1x],

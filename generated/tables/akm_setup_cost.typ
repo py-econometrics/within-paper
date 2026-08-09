@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Move probability $delta$], th[$lambda_2$ (share)], th[2 FE setup], th[2 FE solve], th[3 FE setup], th[3 FE solve]),
+  table.header(th[Move probability $delta$], th[$lambda_2$ (share)], th[2 FE setup], th[2 FE LSMR], th[3 FE setup], th[3 FE LSMR]),
   table.hline(stroke: 0.45pt + table-rule),
   [1], [0.232 (1.00)], [0.109s], [0.291s], [0.113s], [0.209s],
   [0.5], [0.0392 (1.00)], [0.115s], [0.255s], [0.118s], [0.234s],

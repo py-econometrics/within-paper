@@ -14,7 +14,7 @@
     </style>
   </defs>
   <rect width="820" height="220" fill="#ffffff"/>
-  <text x="410" y="28" text-anchor="middle" font-size="16" font-weight="700">Local factor-pair solve</text>
+  <text x="410" y="28" text-anchor="middle" font-size="16" font-weight="700">Local factor-pair step</text>
   <text x="410" y="48" text-anchor="middle" font-size="12" class="muted">One selected subdomain, for example worker-firm</text>
 
   <rect x="28" y="78" width="132" height="74" class="box"/>

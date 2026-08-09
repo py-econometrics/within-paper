@@ -165,34 +165,48 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertEqual(point["status"], "partial")
         self.assertTrue(make_figures._visible_point(point))
 
-    def test_appendix_panels_use_default_lsmr_cells_and_generator_parameters(self) -> None:
+    def test_appendix_tables_use_all_runtime_cells_and_generator_parameters(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         table = document["tables"]["akm_mobility"]
-        defaults = paper_results._akm_appendix_panel(table, panel="defaults")
-        lsmr = paper_results._akm_appendix_panel(table, panel="lsmr")
+        rendered = paper_results._akm_appendix_table(table)
 
         self.assertEqual(
-            defaults["header"][:2],
+            rendered["header"][:2],
             ["Move probability $delta$", "$lambda_2$ (share)"],
         )
-        self.assertEqual(lsmr["header"][2:], ["within-off", "within-diagonal", "within"])
-        self.assertEqual(defaults["rows"][0][0], "1")
-        self.assertEqual(defaults["rows"][-1][0], "0.001")
-        self.assertEqual(lsmr["rows"][0][-1], table["rows"][0][5])
-        self.assertEqual(lsmr["rows"][0][2:4], table["rows"][0][3:5])
+        self.assertEqual(
+            rendered["header"][2:],
+            ["rust-map", "within-off", "within-diagonal", "within", "fixest", "FEM.jl"],
+        )
+        self.assertEqual(rendered["rows"][0][0], "1")
+        self.assertEqual(rendered["rows"][-1][0], "0.001")
+        self.assertEqual(rendered["rows"][0][2:], table["rows"][0][2:])
 
-    def test_render_writes_split_akm_panels_without_scenario_ids(self) -> None:
+    def test_render_writes_consolidated_akm_tables_without_scenario_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             generated = Path(directory) / "tables"
             with patch.object(paper_results, "GENERATED_DIR", generated):
                 paper_results.render(None)
-            default_panel = (generated / "akm_mobility_defaults.typ").read_text(encoding="utf-8")
-            lsmr_panel = (generated / "akm_sorting_lsmr.typ").read_text(encoding="utf-8")
+            mobility = (generated / "akm_mobility.typ").read_text(encoding="utf-8")
+            sorting = (generated / "akm_sorting.typ").read_text(encoding="utf-8")
 
-        self.assertIn("Move probability $delta$", default_panel)
-        self.assertIn("Sorting strength $rho$", lsmr_panel)
-        self.assertNotIn("akm_mobility_1", default_panel)
-        self.assertIn("0.543s", default_panel)
+        self.assertIn("Move probability $delta$", mobility)
+        self.assertIn("Sorting strength $rho$", sorting)
+        self.assertNotIn("akm_mobility_1", mobility)
+        self.assertIn("0.543s", mobility)
+        self.assertIn("LSMR #linebreak() diagonal", mobility)
+
+    def test_real_data_paper_table_omits_unfilled_ablation_columns(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        rendered = paper_results._correia_real_paper_table(
+            document["tables"]["correia_real"]
+        )
+
+        self.assertEqual(
+            rendered["header"][2:],
+            ["rust-map", "within", "fixest", "FEM.jl"],
+        )
+        self.assertTrue(all(len(row) == 6 for row in rendered["rows"]))
 
     def test_render_writes_only_manuscript_table_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -203,10 +217,8 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
                 paper_results.render(None)
             expected = {
                 *(f"{name}.typ" for name in paper_results.RENDERED_TABLES),
-                "akm_mobility_defaults.typ",
-                "akm_mobility_lsmr.typ",
-                "akm_sorting_defaults.typ",
-                "akm_sorting_lsmr.typ",
+                "akm_mobility.typ",
+                "akm_sorting.typ",
             }
 
             self.assertEqual({path.name for path in generated.glob("*.typ")}, expected)

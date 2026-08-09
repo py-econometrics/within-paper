@@ -1301,9 +1301,9 @@
         "Scenario",
         "$lambda_2$ (share)",
         "2 FE setup",
-        "2 FE solve",
+        "2 FE LSMR",
         "3 FE setup",
-        "3 FE solve"
+        "3 FE LSMR"
       ],
       "rows": [
         [
@@ -1742,7 +1742,7 @@
         "Design",
         "Policy",
         "Setup",
-        "Solve",
+        "LSMR",
         "Total",
         "Speedup"
       ],

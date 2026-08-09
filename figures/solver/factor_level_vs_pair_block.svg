@@ -5,7 +5,7 @@
   <text x="190" y="36" text-anchor="middle" font-size="14" font-weight="bold" fill="#1f2937">Factor-level solve</text>
   <text x="190" y="54" text-anchor="middle" font-size="10.5" fill="#555">Local operator = diagonal block only</text>
 
-  <text x="610" y="36" text-anchor="middle" font-size="14" font-weight="bold" fill="#1f2937">Factor-pair solve</text>
+  <text x="610" y="36" text-anchor="middle" font-size="14" font-weight="bold" fill="#1f2937">Factor-pair step</text>
   <text x="610" y="54" text-anchor="middle" font-size="10.5" fill="#555">Local operator = factor-pair Gramian block</text>
 
   <!-- "vs" separator -->

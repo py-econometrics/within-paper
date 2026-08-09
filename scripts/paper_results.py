@@ -39,10 +39,8 @@ HEADLINE_FIGURE_BACKENDS = {
     "matched": ("rust-map", "within-off", "within-diagonal", "within-additive"),
 }
 RENDERED_TABLES = (
-    "agreement",
     "akm_setup_cost",
     "correia_real",
-    "correia_synthetic",
     "iterations",
     "memory",
     "ols",
@@ -192,24 +190,19 @@ def _akm_parameter_label(design: str) -> str:
     return f"{value:g}"
 
 
-def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
-    """Project one wide AKM table into a compact appendix panel.
-
-    The source table deliberately remains unchanged: it is the one
-    machine-readable location for the recorded package-default cells.  The
-    two rendered panels merely group those cells by the comparison they answer.
-    """
+def _akm_appendix_table(table: dict) -> dict:
+    """Render one controlled AKM family with all compared configurations."""
     source_name = _row_label(table, table["rows"][0])
     mobility = source_name.startswith("akm_mobility_")
     parameter = "Move probability $delta$" if mobility else "Sorting strength $rho$"
-    if panel == "defaults":
-        backends = ("rust-map", "fixest", "FEM.jl", "within")
-        columns = "(1.15fr, 0.95fr, 0.82fr, 0.70fr, 0.70fr, 0.95fr)"
-    elif panel == "lsmr":
-        backends = ("within-off", "within-diagonal", "within")
-        columns = "(1.20fr, 1.00fr, 0.90fr, 0.96fr, 1.00fr)"
-    else:
-        raise ValueError(f"Unknown AKM appendix panel {panel!r}")
+    backends = (
+        "rust-map",
+        "within-off",
+        "within-diagonal",
+        "within",
+        "fixest",
+        "FEM.jl",
+    )
 
     rows = []
     for source in table["rows"]:
@@ -222,12 +215,28 @@ def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
             ]
         )
     return {
-        "columns": columns,
-        "align": "(right, right, right, right, right, right)"
-        if panel == "defaults"
-        else "(right, right, right, right, right)",
+        "columns": "(1.12fr, 0.92fr, 0.72fr, 0.76fr, 0.78fr, 0.82fr, 0.64fr, 0.64fr)",
+        "align": "(right, right, right, right, right, right, right, right)",
         "header": [parameter, CONNECTIVITY_HEADER, *backends],
         "rows": rows,
+    }
+
+
+def _correia_real_paper_table(table: dict) -> dict:
+    """Drop unfilled ablation columns from the paper's real-data table."""
+    backends = ("rust-map", "within", "fixest", "FEM.jl")
+    return {
+        "columns": "(1.05fr, 0.92fr, 0.80fr, 0.88fr, 0.68fr, 0.68fr)",
+        "align": "(left, right, right, right, right, right)",
+        "header": ["Dataset", CONNECTIVITY_HEADER, *backends],
+        "rows": [
+            [
+                source[0],
+                _table_cell(table, source, CONNECTIVITY_HEADER),
+                *(_table_cell(table, source, backend) for backend in backends),
+            ]
+            for source in table["rows"]
+        ],
     }
 
 
@@ -238,24 +247,23 @@ def render(_: argparse.Namespace) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     targets = {destination / f"{name}.typ" for name in RENDERED_TABLES}
     for family in ("mobility", "sorting"):
-        for panel in ("defaults", "lsmr"):
-            targets.add(destination / f"akm_{family}_{panel}.typ")
+        targets.add(destination / f"akm_{family}.typ")
     for path in destination.glob("*.typ"):
         if path not in targets:
             path.unlink()
     for name in RENDERED_TABLES:
         table = tables[name]
+        if name == "correia_real":
+            table = _correia_real_paper_table(table)
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     for family in ("mobility", "sorting"):
         table = tables[f"akm_{family}"]
-        for panel in ("defaults", "lsmr"):
-            target = destination / f"akm_{family}_{panel}.typ"
-            target.write_text(
-                _table_fragment(target.stem, _akm_appendix_panel(table, panel=panel)),
-                encoding="utf-8",
-            )
+        target = destination / f"akm_{family}.typ"
+        target.write_text(
+            _table_fragment(target.stem, _akm_appendix_table(table)),
+            encoding="utf-8",
+        )
     values = ["// Generated result values; do not edit by hand."]
-    agreement_table = tables["agreement"]
     memory_table = tables["memory"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
@@ -271,15 +279,7 @@ def render(_: argparse.Namespace) -> None:
     memory_1m_rows = _rows_after_marker(memory_table, "#memory-1m")
     memory_100k = memory_overheads(memory_100k_rows)
     memory_1m = memory_overheads(memory_1m_rows)
-    agreement_simple_rows = _rows_after_marker(agreement_table, "#agreement-simple")
-    agreement_difficult_rows = _rows_after_marker(agreement_table, "#agreement-difficult")
     prose_values = {
-        "result_agreement_simple_max": _largest_metric(
-            agreement_table, agreement_simple_rows, "Absolute difference"
-        ),
-        "result_agreement_difficult_max": _largest_metric(
-            agreement_table, agreement_difficult_rows, "Absolute difference"
-        ),
         "result_memory_100k_overhead": f"{min(memory_100k):.0f}-{max(memory_100k):.0f} MiB" if memory_100k else "-",
         "result_memory_1m_overhead": f"{min(memory_1m):.0f}-{max(memory_1m):.0f} MiB" if memory_1m else "-",
     }
