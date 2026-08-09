@@ -17,9 +17,9 @@
   [fixest], [1.00463872], [$1.1 times 10^(-15)$],
   [FEM.jl], [1.00463872], [$2.8 times 10^(-14)$],
   table.hline(stroke: 0.35pt + table-light-rule),
-  table.cell(rowspan: 4)[difficult], [PyFixest #linebreak() MAP], [0.99953355], [--],
-  [PyFixest #linebreak() LSMR #linebreak() factor-pair], [0.99953387], [$3.2 times 10^(-7)$],
-  [fixest], [0.99953387], [$3.2 times 10^(-7)$],
-  [FEM.jl], [0.99953385], [$3.0 times 10^(-7)$],
+  table.cell(rowspan: 4)[difficult], [PyFixest #linebreak() MAP], [0.99953359], [--],
+  [PyFixest #linebreak() LSMR #linebreak() factor-pair], [0.99953387], [$2.8 times 10^(-7)$],
+  [fixest], [0.99953387], [$2.8 times 10^(-7)$],
+  [FEM.jl], [0.99953385], [$2.6 times 10^(-7)$],
   table.hline(stroke: 0.8pt + table-rule),
 )
