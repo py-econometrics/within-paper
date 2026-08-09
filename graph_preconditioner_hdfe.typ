@@ -94,67 +94,70 @@
 
 = Introduction
 
-Fixed-effect regressions are ubiquitous in applied econometrics: according to #cite(<goldsmith2026tracking>, form: "prose"), 
-roughly half of published research in top economics and finance journals mentions
-"fixed effects". They appear throughout all fields of applied economics: labor economists use worker and firm fixed effects to separate worker heterogeneity from firm wage premia; health economists study physician practice styles with individual-physician
-and region fixed effects in mover designs; and education researchers study models with school, student, teacher, or
-student-teacher fixed effects.
+Fixed effects appear in roughly half of the research published in leading economics and
+finance journals, according to #cite(<goldsmith2026tracking>, form: "prose"). Labor
+economists use worker and firm fixed effects to separate worker heterogeneity from firm
+wage premia. Health economists study physician practice styles with individual,
+physician, and region fixed effects in mover designs. Education researchers use school,
+student, teacher, and student-teacher effects.
 
-The standard computational starting point for estimating these regressions efficiently is the Frisch-Waugh-Lovell
-(FWL) theorem @frisch1933 @lovell1963. FWL reduces the fixed-effect estimation problem to "residualizing" the outcome
-and every regressor of interest against the fixed effects, and then to running a
-low-dimensional regression on the residualized variables. 
+The Frisch-Waugh-Lovell (FWL) theorem reduces estimation to two operations: remove the
+variation explained by the fixed effects from the outcome and regressors, then run a
+low-dimensional regression on the residualized variables @frisch1933 @lovell1963. With
+high-dimensional fixed effects, software usually performs the first operation with the
+Method of Alternating Projections (MAP), also known as iterative demeaning or the
+"Zig-Zag" algorithm @guimaraes2010 @gaure2013. Leading packages such as Stata's
+`reghdfe` @reghdfe @correia2017, R's `fixest` @berge2026fixest, and Python's PyFixest
+@pyfixest use MAP or accelerated variants of it.
 
-The workhorse method for these fixed-effect residualizations is the Method of
-Alternating Projections (MAP), also known as iterative demeaning or the "Zig-Zag"
-algorithm @guimaraes2010 @gaure2013. Most leading software implementations of
-fixed-effect regression, such as `reghdfe` in Stata @reghdfe @correia2017, `fixest`
-@berge2026fixest in R, or PyFixest in Python @pyfixest, use MAP or MAP-based variants
-with acceleration.
+MAP handles the fixed-effect dimensions one at a time. It never uses the observed
+worker-firm links directly. In the worker-firm wage model of
+#cite(<akm1999>, form: "prose"), extended here with year effects, MAP subtracts worker
+means, then firm means, then year means. Each update uses only the residual left by the
+previous update; MAP repeats the sequence until changes in the residuals fall below a
+chosen tolerance.
 
-Because the AKM worker-firm model is among the most prominent applications of
-high-dimensional fixed effects, we use a worker-firm-year panel based on
-#cite(<akm1999>, form: "prose") as the running example in this paper. The method of alternating projections cycles 
-through the fixed-effect dimensions one at a time: it first subtracts worker means, then firm means, then year means, 
-and repeats until convergence. The coupling between fixed effects is never used directly; the cross-fixed effects information 
-is transmitted only indirectly through the residual that each step hands to the next. 
-How fast MAP converges therefore depends on how quickly information about this coupling can propagate from one update to the next.
+Yet those links matter for identification and computation @correia2017. They form a
+graph in which movers create paths between firms, while stayers add observations without
+connecting firms. When few workers move between groups of firms, some combinations of
+worker and firm effects become difficult to separate. MAP can then require many
+repetitions before estimates in one group reflect changes in another. The same mobility
+links that identify worker and firm effects thus govern how quickly MAP converges.
 
-Fixed effects and their coupling form a graph structure. In a worker-firm panel, movers create paths between firms, while
-stayers add observations without connecting firms to one another. When this graph is sparse or poorly connected, some fixed-effect 
-directions are nearly collinear, and MAP needs many iterations to propagate information across it before converging. 
-The same graph features that determine whether worker and firm effects are identified
-also govern MAP convergence. These features include worker mobility, sorting, and
-segmentation into disconnected labor markets with thin bridges, such as public- and private-sector
-employment when workers only rarely move between the two sectors.
+The pairwise spectral gap summarizes how strongly this graph is connected. A small gap
+indicates sparse mobility, strong sorting, or near nesting and is associated with slow
+MAP convergence. In models with more than two fixed-effect dimensions, the pairwise gap
+is only a diagnostic; it does not bound convergence of the full model.
 
-The graph structure of the fixed effects can be encoded in the off-diagonal blocks of the fixed-effect
-Gramian - the weighted cross-product matrix of the fixed-effect dummies @correia2017. These
-off-diagonal blocks record co-occurrences among the fixed effects: which workers
-work at which firms, which physicians practice in which regions, or which families move across counties. 
+The same graph appears in the weighted cross-product matrix of the fixed-effect
+indicators, which we call the Gramian @correia2017. Its diagonal blocks count
+observations for each worker, firm, or other fixed-effect level. Its off-diagonal blocks
+count which levels are observed together, such as the number of observations for each
+worker-firm pair. MAP uses the diagonal blocks one at a time and does not use these
+pairwise counts directly.
 
-In this paper, we propose a new preconditioner that directly encodes the co-occurrence
-graph. A preconditioner is a cheap approximation to the system being solved; supplied
-to an iterative solver, it reduces the number of iterations without changing the solution.
-We build ours from local factor-pair subproblems that use the graph structure of the
-Gramian: for example, a worker-firm subproblem
-incorporates the observed links between workers and firms. A preconditioner is only
-useful if it approximates the inverse of the co-occurrence Gramian at low cost. We obtain
-such an approximation by exploiting the fact that, after a sign change, each factor-pair
-block is a graph Laplacian, whose inverse can be approximated efficiently with sparse
-matrix methods @spielman2014 @gao2025. The preconditioned system is
-then solved with a Krylov solver, an iterative method for large linear systems.#footnote[The Julia implementation
-of fixed-effect regression, `FixedEffectModels.jl` @fixedeffectmodels, uses the same
-Krylov solver as we do - LSMR @fong2011 - but only with diagonal
-preconditioning, which ignores the off-diagonal co-occurrence structure entirely; our
-contribution is the preconditioner, not the use of LSMR for the outer iteration.]
+We therefore build a factor-pair graph preconditioner for designs with a small pairwise
+spectral gap, where MAP tends to converge slowly. A preconditioner transforms a linear
+system so that an iterative solver reaches the same solution in fewer steps. Rather than
+handling the fixed-effect dimensions one at a time, our preconditioner builds a local
+problem for every pair, such as worker-firm and worker-year, and uses the observed links
+directly. After a sign change, each pair block is a graph Laplacian, the standard matrix
+representation of a weighted graph. Sparse matrix methods can approximate its inverse at
+low cost @spielman2014 @gao2025. We use a weighted sum of these approximate pair
+solutions as the preconditioner for LSMR.#footnote[`FixedEffectModels.jl` @fixedeffectmodels also uses
+LSMR @fong2011. It applies diagonal preconditioning, which uses fixed-effect counts but
+not the links between fixed-effect dimensions. We instead precondition LSMR with the
+factor-pair graph.]
 
-@fig-gap-runtime shows elapsed time for complete regressions as worker-firm connectivity varies.
-The top row changes worker mobility; the bottom row changes sorting among movers. In
-each row, the left panel compares package defaults, while the right panel compares
-solvers within PyFixest. We choose each solver's tolerance to obtain similar coefficient
-and residual errors. Section 7's
-tolerance frontier reports the achieved-accuracy comparison directly.
+Constructing the factor-pair preconditioner takes time. On a well-connected graph, the
+reduction in iterations may not repay this setup cost because MAP and diagonal
+preconditioning are already fast. As the gap falls, however, the reduction in iterations
+can outweigh the construction cost. @fig-gap-runtime compares total regression times as
+worker-firm connectivity varies. The top row changes worker mobility; the bottom row
+changes sorting among movers. In each row, the left panel compares package defaults and
+the right panel compares solvers within PyFixest. We choose each solver's tolerance so
+that coefficient and residual errors are similar. Section 7 compares run time at the
+accuracy each method actually achieves.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
@@ -173,20 +176,16 @@ tolerance frontier reports the achieved-accuracy comparison directly.
   Arrows are not joined to the lines. Fits that end in another error are omitted.]
 ) <fig-gap-runtime>
 
-At high connectivity, all implementations finish quickly. As the spectral gap narrows,
-MAP and LSMR without factor-pair preconditioning slow down. Factor-pair LSMR remains
-fast and becomes faster in the least-connected mobility designs because the worker-firm
-subproblems are cheaper to construct.
+At high connectivity, all implementations finish quickly. As the spectral gap falls, MAP
+and LSMR without factor-pair preconditioning slow down. Factor-pair LSMR remains fast. In
+the lowest-mobility designs, its run time falls because the worker-firm subproblems are
+cheaper to construct.
 
-The rest of the paper is organized as follows. Section 2 sets up the fixed-effect
-absorption problem, and Section 3 introduces the AKM model as our running example.
-Section 4 develops the graph structure of the fixed-effect Gramian, and Section 5
-connects this structure to the convergence behavior of MAP. Section 6 introduces
-preconditioning and then constructs the factor-pair Schwarz preconditioner.
-Section 7 reports the runtime benchmarks; Section 8 describes the software through which
-the new algorithm is available; and Section 9 concludes. Appendix A gives the algorithm,
-Appendix B defines the connectivity measure, Appendix C reports additional benchmarks,
-and Appendix D compares coefficient estimates and memory use.
+Sections 2-5 set up fixed-effect absorption and connect MAP convergence to graph
+connectivity. Section 6 develops the factor-pair preconditioner, and Section 7 reports the
+benchmarks. Section 8 describes the software; Section 9 concludes. The appendices give
+the algorithm, define the connectivity measure, report additional benchmarks, and
+compare coefficient estimates and memory use.
 
 = Absorbing Fixed Effects#footnote[Researchers employ several names for this operation:
 "absorbing fixed effects", "demeaning", "residualizing", or applying the "within
@@ -453,8 +452,8 @@ pass over observations.
 
 MAP repeats these diagonal block solves. Holding the other effects fixed, it updates the
 worker effects from the current partial residual, then performs the same step for firms
-and years. One sweep cycles through the fixed-effect dimensions and subtracts the weighted
-group mean of the current partial residual for each factor.
+and years. A complete pass cycles through the fixed-effect dimensions and subtracts the
+weighted group mean of the current partial residual for each factor.
 
 The cross-tabulation blocks $C_(W F)$, $C_(W Y)$, and $C_(F Y)$ enter the algorithm only
 indirectly. For instance, the worker update is computed from the partial residual
@@ -474,8 +473,8 @@ MAP slows down. Movers form the edges of the worker-firm graph and provide the i
 needed to separate worker effects from firm effects. MAP uses this information only
 indirectly, through repeated residual updates. When those edges are few or concentrated
 in narrow regions of the graph, repeated residual updates separate the effects only
-gradually. MAP still converges, but it may need many sweeps. Each sweep is cheap because
-the diagonal block solves reduce to one-pass group means.
+gradually. MAP still converges, but it may repeat these updates many times. A complete
+pass is cheap because the diagonal block solves reduce to one-pass group means.
 
 We use the pairwise spectral gap $1-rho_(q r)$ as a diagnostic for MAP difficulty.
 Smaller values indicate weaker pairwise connectivity. Appendix B defines the statistic
@@ -1104,7 +1103,7 @@ not need to construct the Gramian or its pairwise blocks themselves.
 
 Graph connectivity links the econometric structure of a fixed-effect model to its
 computational cost. The benchmarks show that it also changes solver rankings. On dense,
-well-connected graphs, MAP is difficult to outperform: its sweeps are cheap, while
+well-connected graphs, MAP is difficult to outperform because each pass is cheap, while
 constructing the factor pairs adds overhead. When mobility is low, sorting is strong, or
 effects are nearly nested, information passes slowly between updates under MAP and the
 factor-pair preconditioner is often much faster.
@@ -1418,7 +1417,7 @@ therefore expected on the difficult design.
 
 == Memory Use
 
-MAP uses little memory: a sweep needs only the current residuals and per-level group
+MAP uses little memory: a complete pass needs only the current residuals and per-level group
 sums. A factor-pair preconditioner, by contrast, must retain the pair structure between
 iterations. We therefore measure how much additional memory factor-pair LSMR requires
 relative to MAP.

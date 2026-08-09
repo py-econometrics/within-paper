@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[`map` (sweeps)], th[`off`], th[`diagonal`], th[`additive`]),
+  table.header(th[Design], th[`map` (passes)], th[`off`], th[`diagonal`], th[`additive`]),
   table.hline(stroke: 0.45pt + table-rule),
   [simple], [14], [37], [16], [14],
   [difficult], [8159], [249], [180], [22],

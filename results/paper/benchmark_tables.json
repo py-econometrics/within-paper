@@ -1599,7 +1599,7 @@
       "columns": "(1.1fr, 0.85fr, 0.85fr, 0.95fr, 0.95fr)",
       "header": [
         "Design",
-        "`map` (sweeps)",
+        "`map` (passes)",
         "`off`",
         "`diagonal`",
         "`additive`"

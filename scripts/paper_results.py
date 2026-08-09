@@ -916,7 +916,7 @@ def _synchronize_regression_reuse(document: dict) -> int:
 
 
 ITERATION_COLUMNS = (
-    ("rust-map", "map-sweep"),
+    ("rust-map", "map-pass"),
     ("within-off", "lsmr-iteration"),
     ("within-diagonal", "lsmr-iteration"),
     ("within-additive", "lsmr-iteration"),
@@ -926,7 +926,7 @@ ITERATION_COLUMNS = (
 def _synchronize_iterations(document: dict) -> int:
     """Fill the iteration-count table, in each solver's own unit.
 
-    A MAP sweep is a full pass over the absorbed factors; an LSMR iteration is
+    A complete MAP pass visits every absorbed factor; an LSMR iteration is
     one application of the operator and its transpose. The two are never added
     or plotted on one axis, so the table records which unit each column is in
     and the median is taken within a column only.
