@@ -149,28 +149,28 @@ Krylov solver as we do - LSMR @fong2011 - but only with diagonal
 preconditioning, which ignores the off-diagonal co-occurrence structure entirely; our
 contribution is the preconditioner, not the use of LSMR for the outer iteration.]
 
-@fig-gap-runtime shows full-regression runtime as worker-firm connectivity varies.
+@fig-gap-runtime shows elapsed time for complete regressions as worker-firm connectivity varies.
 The top row changes worker mobility; the bottom row changes sorting among movers. In
-each row, the left panel compares package defaults, while the right panel holds the
-PyFixest code path fixed and uses solver-specific tolerances chosen to target comparable
-accuracy while varying the demeaning solver and the LSMR preconditioner. Section 7's
+each row, the left panel compares package defaults, while the right panel compares
+solvers within PyFixest. We choose each solver's tolerance to obtain similar coefficient
+and residual errors. Section 7's
 tolerance frontier reports the achieved-accuracy comparison directly.
 
 #figure(
   image(result-img("gap_runtime.svg"), width: 100%),
-  caption: [Median full-regression runtime against the worker-firm spectral gap, on
-  log-log axes. Smaller gaps mean weaker connectivity, so the horizontal scale decreases
-  from left to right. All four panels use the same horizontal scale. The top row varies
-  worker mobility; the bottom row holds move probability at one and varies sorting in simulated
-  worker-firm-year panels with 1 million observations. The left column uses package
-  defaults; the right column fixes the PyFixest code path and uses solver-specific
-  tolerances chosen to target comparable accuracy. Packages apply their own default rules
-  for singleton fixed-effect groups, which contain only one observation, in
-  the left column. Filled markers report the median when all three planned fits finish;
-  hollow markers report a median from fewer than three fits.
-  Lines join returned medians for each configuration in spectral-gap order; they are not
-  fitted trends. Arrows show, as a lower bound, the median elapsed time of fits that reach
-  the iteration cap; they are not connected. Failures for other reasons are omitted.]
+  caption: [The panels plot median regression time against the worker-firm spectral gap
+  on logarithmic axes. Smaller gaps mean weaker connectivity. All panels use the same
+  reversed horizontal scale, so the gap decreases from left to right. Each simulated
+  worker-firm-year panel has 1 million observations. The top panels vary worker mobility;
+  the bottom panels hold move probability at one and vary sorting. The left panels
+  compare packages at their default settings, including their own treatment of
+  fixed-effect levels observed only once. The right panels compare four PyFixest solver
+  configurations, with tolerances chosen to give similar coefficient and residual
+  errors. Filled markers indicate that all three planned fits produced estimates; hollow
+  markers indicate that only one or two did. Lines join the medians in order of spectral
+  gap and are not fitted trends. An arrow marks the median time for fits that reach the
+  iteration limit. Because these fits did not finish, the marked time is a lower bound.
+  Arrows are not joined to the lines. Fits that end in another error are omitted.]
 ) <fig-gap-runtime>
 
 At high connectivity, all implementations finish quickly. As the spectral gap narrows,
@@ -256,9 +256,9 @@ mobility graph with one that fragments under strong sorting.
 
 #figure(
   image(solver-img("worker_firm_connectivity.svg"), width: 50%),
-  caption: [Worker-firm graph connectivity. When mobility is high, many paths connect
-  firms. With low mobility and strong sorting, the graph breaks into nearly separate
-  clusters joined only by narrow bridges.]
+  caption: [Worker-firm graphs under high and low mobility. High mobility creates many
+  paths between firms. With low mobility and strong sorting, only a few worker moves
+  connect otherwise separate groups of firms.]
 ) <fig-connectivity>
 
 These mobility links matter for identification and computation. In AKM, movers provide
@@ -321,8 +321,8 @@ ignore regression weights and set $W = I$.
 
 #figure(
   image(solver-img("toy_worker_firm_projection.svg"), width: 50%),
-  caption: [Worker-firm projection of the example panel. Worker $W_1$ is a mover; workers
-  $W_2$ and $W_3$ are stayers.]
+  caption: [Worker-firm graph for the example panel. Worker $W_1$ works at both firms and
+  connects them. Worker $W_2$ works only at $F_1$, and worker $W_3$ works only at $F_2$.]
 ) <fig-toy-projection>
 
 @fig-toy-projection plots the worker-firm projection of this panel. Worker $W_1$ has
@@ -604,12 +604,11 @@ solved by a factor-level MAP update.
 
 #figure(
   image(solver-img("factor_level_vs_pair_block.svg"), width: 88%),
-  caption: [Matrix used by a factor-level MAP update (left) versus the
-  factor-pair Schwarz solve (right), shown on the example worker-firm panel of Section 4.
-  The factor-level block is the diagonal $G_(W W) = "diag"(2,2,2)$. The factor-pair
-  block adds the firm count block $G_(F F) = "diag"(3,3)$ and the cross-tabulation
-  $C_(W F)$ in its off-diagonal positions; the dashed outline marks the worker-firm
-  part of the coefficient vector covered by the worker-firm pair solve.]
+  caption: [Matrices used by MAP and the factor-pair preconditioner in the example from
+  Section 4. A MAP worker update (left) uses only the diagonal worker-count matrix
+  $G_(W W) = "diag"(2,2,2)$. The factor-pair update (right) adds the firm-count matrix
+  $G_(F F) = "diag"(3,3)$ and the matrix of worker-firm observation counts $C_(W F)$.
+  The dashed outline marks the worker and firm coefficients that are updated together.]
 ) <fig-pair-block>
 
 Its inverse carries $C_(W F)$ through the Schur complement, so the local correction
@@ -720,10 +719,12 @@ algorithmic details.
 
 #figure(
   image(solver-img("factor_pair_strategy.svg"), width: 70%),
-  caption: [Summary of the factor-pair preconditioner. The fixed effects are split into
-  overlapping pairs. Each pair is rewritten as a graph Laplacian and solved with a sparse
-  Cholesky approximation. The weighted pair corrections form the preconditioner used by
-  the outer LSMR iteration.]
+  caption: [Construction of the factor-pair preconditioner. Each local problem combines
+  two fixed-effect dimensions and retains their observed links. A sign change turns its
+  matrix into a graph Laplacian, the standard matrix representation of a weighted graph.
+  Sparse approximate Cholesky solves each local system while limiting the extra nonzero
+  entries created during factorization, which saves memory and computation. The weighted
+  sum of these local solutions serves as the preconditioner for LSMR.]
 ) <fig-pair-strategy>
 
 = Benchmarks
@@ -836,19 +837,21 @@ one @berge2026fixest. Both contain 10 million observations, one covariate, and w
 firm, and year fixed effects.
 
 #block(breakable: false)[#text(size: 8.8pt)[
-#strong[Simple and difficult `fixest` designs (10M observations, 3 FE).]
+#strong[Simple and difficult `fixest` designs (10 million observations, three fixed effects).]
 #include "generated/tables/ols.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
-  times in seconds at package-default settings. An unreported initial timing determines
-  the number of measured calls: 20 if it is below 1 second, 7 if it is between 1 and 10
-  seconds, and 3 otherwise. A value $t (k/n)$ is the median among $k$ successful calls
-  when fewer than $n$ planned calls converge;
-  a dash means that no complete result is recorded. `capped (0/n)` and `failed (0/n)`
-  identify unsuccessful cells. Both designs have 10M
-  observations, one covariate, and worker, firm, and year fixed effects. The Gap (share)
-  column uses the diagnostic defined in Appendix B, measured on the same 10M design as the
-  reported timings.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each OLS regression from
+  model setup through coefficient estimation. Each package uses its default settings. A
+  preliminary run sets the number of measured runs: 20 if it takes less than 1 second, 7
+  if it takes 1 to 10 seconds, and 3 if it takes longer. When
+  only $k$ of $n$ planned runs return an estimate, $t (k/n)$ reports their median time
+  $t$. A dash means that no timing is available.
+  `capped (0/n)` means that no run finishes before the iteration limit; `failed (0/n)`
+  marks a failure other than reaching that limit. Both designs have 10 million
+  observations, one covariate, and worker, firm, and year fixed effects. In the Gap
+  (share) column, a smaller gap means weaker worker-firm connectivity. We compute the gap
+  after removing fixed-effect levels observed only once. The number in parentheses is
+  the share of remaining observations in the least-connected group of fixed-effect levels.]
 ]]
 
 On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
@@ -864,13 +867,15 @@ The iteration-count diagnostic separates construction from subsequent solves and
 the 100,000-observation versions of the same simple and difficult designs.
 
 #block(breakable: false)[#text(size: 8.9pt)[
-#strong[Iterations on the simple and difficult designs (100K observations).]
+#strong[Iterations on the simple and difficult designs (100,000 observations).]
 #include "generated/tables/iterations.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] MAP is reported in full sweeps over the fixed-effect
-  dimensions. The LSMR columns report LSMR iterations. A MAP sweep and an LSMR
-  iteration use different units, so their counts should not be compared across columns.
-  Each LSMR count is the median of three solves with two variables to residualize.]
+  #text(size: 8.2pt)[#emph[Note:] The MAP column counts complete passes over all
+  fixed-effect dimensions. The other columns count LSMR iterations: `off` uses no
+  preconditioner, `diagonal` scales by fixed-effect group counts, and `additive` uses the
+  factor-pair preconditioner. A MAP pass and an LSMR iteration perform different work, so
+  their counts are not directly comparable. Each count is the median of three runs; each
+  run removes the fixed effects from one outcome and one covariate.]
 ]]
 
 Among the LSMR configurations, the additive preconditioner needs 14 iterations on the
@@ -906,18 +911,17 @@ MAP, `fixest`, and `FixedEffectModels.jl`, and 1,000 for `within`.
 
 #figure(
   image(result-img("tolerance_frontier.svg"), width: 97%),
-  caption: [Runtime against achieved precision on three AKM mobility designs. Each point
-  is the median of three fits on the same sample after repeatedly removing singleton
-  fixed-effect levels; this removal is completed before the timed fits. Each line
-  connects results for one package across requested tolerances, while the horizontal
-  axis reports achieved error.
-  The top row measures coefficient error as
+  caption: [Elapsed time and achieved accuracy on three AKM mobility designs. Each
+  marker is the median of three fits on the same sample. Before timing, we remove
+  fixed-effect levels observed only once and use the remaining observations for every
+  method. Each line connects results for one method across requested tolerances. The top
+  row measures coefficient error as
   $abs(hat(beta)-hat(beta)^star) / "SE"(hat(beta)^star)$. The bottom
-  row measures final residual error as $frac(||r-r^star||_2, ||r^star||_2)$. Both use the
-  tight factor-pair LSMR reference. Error decreases from left to right. Circled points
-  use each package's default tolerance. All runs have a 10,000-iteration cap. Settings
-  that return no solution have no horizontal coordinate and are omitted; the annotations
-  identify these settings.]
+  row measures residual error as $frac(||r-r^star||_2, ||r^star||_2)$. The reference
+  coefficient $hat(beta)^star$ and residual $r^star$ come from factor-pair LSMR at
+  tolerance $10^(-14)$. Error decreases from left to right. Circled markers use each
+  package's default tolerance. Every fit is limited to 10,000 iterations. Settings that
+  return no estimate are omitted and named in the annotations.]
 ) <fig-tolerance>
 
 == Amortizing the Preconditioner <sec-amortization>
@@ -935,12 +939,17 @@ also absorbs year effects. Each cell is the median of five standalone solves at 
 million observations, with the same outcome and covariate used in both specifications.
 
 #block(breakable: false)[#text(size: 8.8pt)[
-#strong[Additive setup and solve time across AKM connectivity.]
+#strong[Factor-pair setup and solve time across AKM connectivity.]
 #include "generated/tables/akm_setup_cost.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Times are seconds. Each cell is the median of five runs
-  at tolerance $10^(-12)$. The two-factor specification absorbs worker and firm effects;
-  the three-factor specification adds year effects. Gap (share) is defined in Appendix B.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds. For each design and
+  specification, the table gives the median setup and solve time from five runs with 1
+  million observations and an LSMR tolerance of $10^(-12)$. The two-fixed-effect
+  specification absorbs worker and firm effects; the three-fixed-effect specification
+  also absorbs year effects. In the Gap (share) column, smaller values mean weaker
+  worker-firm connectivity. We compute the gap after removing fixed-effect levels
+  observed only once. The number in parentheses is the share of remaining observations
+  in the least-connected group of fixed-effect levels.]
 ]]
 
 Setup is cheaper in the low-mobility designs. With two fixed effects, median setup declines
@@ -963,12 +972,14 @@ preconditioner for every regression; the other keeps one preconditioner for all 
 #strong[Ten regressions with rebuilt and cached preconditioners.]
 #include "generated/tables/regression_reuse.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Medians over three repetitions for each design at 1M
-  observations, with worker, firm, and year fixed effects. Each regression
-  residualizes the common outcome and one covariate at tolerance $10^(-12)$. Setup and
-  solve columns sum time across all ten calls. Speedup is relative to diagonal
-  preconditioning. Diagonal and rebuilt additive construct a solver for every call;
-  cached additive constructs one solver.]
+  #text(size: 8.2pt)[#emph[Note:] For each policy, we sum setup and solve times over ten
+  sequential regressions, then take the median across three repetitions. Times are in
+  seconds. Each design has 1 million observations and worker, firm, and year fixed
+  effects. Each regression removes the fixed effects from the common outcome and one of
+  ten covariates at an LSMR tolerance of $10^(-12)$. Speedup divides the diagonal total time by the
+  reported total time.
+  `Additive, rebuilt` constructs a new factor-pair preconditioner for each regression;
+  `Additive, cached` reuses one preconditioner for all ten.]
 ]]
 
 Even across ten regressions, the additive preconditioner is slower on the simple design.
@@ -1010,17 +1021,20 @@ IRLS limit.
 #v(0.35em)
 
 #text(size: 8.8pt)[
-#strong[Poisson benchmarks (1M observations, one covariate).]
+#strong[Poisson benchmarks (1 million observations, one covariate).]
 #include "generated/tables/ppml.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full `fepois` wall-clock times in
-  seconds over three calls at $n = 1$M with one covariate and three fixed effects.
-  `fixest` is R `fixest::fepois`; `rust-map` and `within` use PyFixest `fepois`; and
-  `GLFEM.jl` is `GLFixedEffectModels.jl`. The `within` column uses PyFixest's current
-  policy of reusing the first factor-pair preconditioner as the IRLS weights change.
-  Each package applies its default separation handling. A value $t (k/3)$ is the median
-  among $k$ successful calls; `capped (0/3)` identifies an iteration limit, and
-  `failed (0/3)` identifies another error.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds for Poisson fixed-effect
+  regressions with 1 million observations, one
+  covariate, and worker, firm, and year fixed effects. `fixest` is R `fixest::fepois`;
+  `rust-map` and `within` use PyFixest `fepois`; and `GLFEM.jl` is
+  `GLFixedEffectModels.jl`. The `within` configuration reuses the first factor-pair
+  preconditioner as the weights change across iteratively reweighted least squares
+  steps. Each package applies its default rule for removing separated observations,
+  where regressors and fixed effects perfectly predict some zero outcomes. If only $k$
+  of the three planned fits return an estimate, $t (k/3)$ gives their median time $t$.
+  `capped (0/3)` means that no fit finishes within 100 iteratively reweighted least
+  squares steps; `failed (0/3)` marks a failure other than reaching that limit.]
   ]
 
 #block(breakable: false)[On the simple design, all four paths finish in under ten seconds. `fixest` takes 4.72
@@ -1216,14 +1230,17 @@ result. Gap (share) is defined in the preceding subsection.
 #strong[Mobility benchmark: package defaults (Panel A).]
 #include "generated/tables/akm_mobility_defaults.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
-  in seconds at package-default settings. The panel has 1M observations, one covariate,
-  and worker, firm, and year fixed effects. Move probability is the probability of a
-  worker changing firms between adjacent periods. A value $t (k/n)$ is the median among
-  $k$ successful calls when fewer than $n$ planned calls converge; a dash means that no
-  complete result is recorded. `capped (0/n)` identifies fits that did not converge before
-  the 10,000-iteration limit; @fig-gap-runtime plots their median elapsed times as
-  unconnected lower bounds. `failed (0/n)` identifies other errors.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each regression from
+  model setup through coefficient estimation. Each package uses its default settings.
+  Each design has 1 million observations, one covariate, and worker, firm, and year fixed effects. Move probability
+  is the probability that a worker changes firms between adjacent periods. In the Gap
+  (share) column, smaller values mean weaker worker-firm connectivity. We compute the gap
+  after removing fixed-effect levels observed only once. The number in parentheses is
+  the share of remaining observations in the least-connected group of fixed-effect levels. If only $k$ of the $n$
+  planned runs return an estimate, $t (k/n)$ gives their median time $t$. A dash means
+  that no timing is available. `capped (0/n)` means that no run finishes before the
+  10,000-iteration limit; @fig-gap-runtime plots the median elapsed time as a lower bound.
+  `failed (0/n)` marks a failure other than reaching that limit.]
 ]
 
 #v(0.35em)
@@ -1232,8 +1249,16 @@ result. Gap (share) is defined in the preceding subsection.
 #strong[Mobility benchmark: PyFixest LSMR configurations (Panel B).]
 #include "generated/tables/akm_mobility_lsmr.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] This panel uses the same package-default timing cells
-  as Panel A and isolates the three PyFixest LSMR preconditioners.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each regression from
+  model setup through coefficient estimation. Each mobility design has 1 million observations, one covariate, and worker, firm, and year
+  fixed effects. Move probability is the probability that a worker changes firms between
+  adjacent periods. The columns show PyFixest LSMR with no preconditioner, with diagonal
+  scaling by fixed-effect group counts, and with factor-pair preconditioning. The
+  factor-pair column repeats Panel A. In the Gap (share) column, smaller values mean
+  weaker worker-firm connectivity. We compute the gap after removing fixed-effect levels
+  observed only once. The number in parentheses is the share of remaining observations
+  in the least-connected group of fixed-effect levels. `capped (0/n)` means that no run finishes
+  before the 10,000-iteration limit.]
 ]
 
 #pagebreak()
@@ -1246,15 +1271,18 @@ result. Gap (share) is defined in the preceding subsection.
 #strong[Sorting benchmark: package defaults (Panel A).]
 #include "generated/tables/akm_sorting_defaults.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full-regression wall-clock times
-  in seconds at package-default settings. The panel has 1M observations, one covariate,
-  and worker, firm, and year fixed effects. Every worker changes firms between adjacent
-  periods; sorting strength is the generator's $rho$ parameter. A value $t (k/n)$ is the
-  median among $k$ successful calls when fewer than
-  $n$ planned calls converge; a dash means that no complete result is recorded.
-  `capped (0/n)` identifies fits that did not converge before the 10,000-iteration limit;
-  @fig-gap-runtime plots their median elapsed times as unconnected lower bounds.
-  `failed (0/n)` identifies other errors.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each regression from
+  model setup through coefficient estimation. Each package uses its default settings.
+  Each design has 1 million observations, one covariate, and worker, firm, and year fixed effects. Every worker
+  changes firms between adjacent periods; the parameter $rho$ controls how strongly
+  workers sort across firms. In the Gap (share) column, smaller values mean weaker
+  worker-firm connectivity. We compute the gap after removing fixed-effect levels
+  observed only once. The number in parentheses is the share of remaining observations
+  in the least-connected group of fixed-effect levels. If only $k$ of the $n$ planned runs return an estimate, $t (k/n)$ gives
+  their median time $t$. A dash means that no timing is available. `capped (0/n)` means
+  that no run finishes before the 10,000-iteration limit; @fig-gap-runtime plots the
+  median elapsed time as a lower bound. `failed (0/n)` marks a failure other than
+  reaching that limit.]
 ]
 
 #v(0.35em)
@@ -1263,8 +1291,16 @@ result. Gap (share) is defined in the preceding subsection.
 #strong[Sorting benchmark: PyFixest LSMR configurations (Panel B).]
 #include "generated/tables/akm_sorting_lsmr.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] This panel uses the same package-default timing cells
-  as Panel A and isolates the three PyFixest LSMR preconditioners.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds and cover each regression from
+  model setup through coefficient estimation. Each sorting design has 1 million observations, one covariate, and worker, firm, and year
+  fixed effects. Every worker changes firms between adjacent periods; the parameter
+  $rho$ controls how strongly workers sort across firms. The columns show PyFixest LSMR
+  with no preconditioner, with diagonal scaling by fixed-effect group counts, and with
+  factor-pair preconditioning. The factor-pair column repeats Panel A. In the Gap (share)
+  column, smaller values mean weaker worker-firm connectivity. We compute the gap after
+  removing fixed-effect levels observed only once. The number in parentheses is the
+  share of remaining observations in the least-connected group of fixed-effect levels. `capped (0/n)` means that no
+  run finishes before the 10,000-iteration limit.]
 ]
 
 #pagebreak()
@@ -1286,14 +1322,18 @@ generator.
 #strong[Correia synthetic benchmarks.]
 #include "generated/tables/correia_synthetic.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
-  times in seconds over three calls at package-default settings. Each package applies its
-  default rules for singleton fixed-effect levels. Gap (share) uses the `id1`-`id2` diagnostic defined
-  above. A value $t (k/3)$ is the median among $k$
-  successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
-  `failed (0/3)` distinguish iteration limits from other errors. `synthetic-zigzag` is
-  omitted because the default MAP implementations reach their
-  10,000-iteration demeaning caps.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds for OLS regressions using each
+  package's defaults. We planned three runs per cell. Each package applies its own
+  default treatment of fixed-effect levels observed only once. Gap measures connectivity
+  between the fixed-effect identifiers `id1` and `id2`. A smaller value means weaker
+  connectivity. We compute the gap after removing fixed-effect levels observed only
+  once. The number in parentheses is the share of remaining observations in the
+  least-connected group of fixed-effect levels. If only $k$ of the three planned runs return an
+  estimate, $t (k/3)$ gives their median time $t$.
+  A dash means that no timing is available. `capped (0/3)` means that no run finishes
+  before the iteration limit; `failed (0/3)` marks a failure other than reaching that limit.
+  `synthetic-zigzag` is omitted because the default MAP implementations reach the
+  10,000-iteration limit.]
   ]
 
 The synthetic collection covers complete, uniform, assortative, and path-like matching
@@ -1318,14 +1358,18 @@ conditions that controlled data-generating processes only approximate.
 #strong[Correia real-data benchmarks.]
 #include "generated/tables/correia_real.typ"
   #v(0.25em)
-  #text(size: 8.2pt)[#emph[Note:] Entries are median full OLS regression wall-clock
-  times in seconds over three calls at package-default settings. Each package applies its
-  default rules for singleton fixed-effect levels. Gap (share) uses the `id1`-`id2` diagnostic defined
-  above. A value $t (k/3)$ is the median among $k$
-  successful calls; a dash means that no complete result is recorded. `capped (0/3)` and
-  `failed (0/3)` distinguish iteration limits from other errors. A small gap in a small
-  component, as for `directors`, need not make the
-  full sample difficult for MAP.]
+  #text(size: 8.2pt)[#emph[Note:] Times are in seconds for OLS regressions using each
+  package's defaults. We planned three runs per cell. Each package applies its own
+  default treatment of fixed-effect levels observed only once. Gap measures connectivity
+  between the fixed-effect identifiers `id1` and `id2`. A smaller value means weaker
+  connectivity. We compute the gap after removing fixed-effect levels observed only
+  once. The number in parentheses is the share of remaining observations in the
+  least-connected group of fixed-effect levels. If only $k$ of the three planned runs return an
+  estimate, $t (k/3)$ gives their median time $t$.
+  A dash means that no timing is available. `capped (0/3)` means that no run finishes
+  before the iteration limit; `failed (0/3)` marks a failure other than reaching that
+  limit. A small gap in a
+  small component, as for `directors`, need not make the full sample difficult for MAP.]
   ]
 
 No single pairwise statistic captures all the irregular components in the real-data
@@ -1356,14 +1400,18 @@ implementations run in isolated processes and report peak RSS through `ru_maxrss
 #v(0.4em)
 
 #text(size: 8.9pt)[
-#strong[Memory footprint (3 FE, one covariate).]
+#strong[Memory footprint (three fixed effects, one covariate).]
 #include "generated/tables/memory.typ"
 		#v(0.25em)
-		#text(size: 8.2pt)[#emph[Note:] Entries are peak resident-set sizes (MiB), measured
-		from isolated Python processes. The table compares PyFixest MAP with PyFixest
-		factor-pair LSMR in full OLS calls with one covariate and worker, firm, and year fixed
-		effects. The two designs are representative probes. The table does not test
-		design-specific memory behavior. Gap (share) is defined above.]
+		#text(size: 8.2pt)[#emph[Note:] For each regression, we record the largest amount of
+		physical memory used by an isolated Python process, in MiB ($2^20$ bytes). The table
+		compares PyFixest OLS regressions using MAP or factor-pair LSMR. Each regression has
+		one covariate and worker, firm, and year fixed effects. The results cover the simple
+		and difficult designs at 100,000 and 1 million observations; they do not show how
+		memory changes with graph structure. In the Gap (share) column, smaller values mean
+		weaker worker-firm connectivity. We compute the gap after removing fixed-effect levels
+		observed only once. The number in parentheses is the share of remaining observations
+		in the least-connected group of fixed-effect levels.]
 		]
 
 At 100K observations, the preconditioner adds #result_memory_100k_overhead. At 1M
@@ -1389,20 +1437,21 @@ regression coefficient across the four implementations.
 #v(0.4em)
 
 #text(size: 9.2pt)[
-#strong[Coefficient agreement (100K observations, 3 FE, one covariate).]
+#strong[Coefficient agreement (100,000 observations, three fixed effects, one covariate).]
 #include "generated/tables/agreement.typ"
 #v(0.25em)
-#text(size: 8.2pt)[#emph[Note:] Each entry is one full OLS regression call at
-package-default settings. $hat(beta)_1$ is the slope coefficient on `x1`; the final
-column is $abs(hat(beta)_1-hat(beta)_(1, "rust-map"))$. The dash in the `rust-map` row
-marks the reference estimate. `within` is PyFixest LSMR with factor-pair
-preconditioning.]
+#text(size: 8.2pt)[#emph[Note:] Each row comes from one OLS regression fitted with the
+package's default settings. $hat(beta)_1$ is the slope coefficient on `x1`. The final
+column reports its absolute difference from the PyFixest MAP estimate. The dash in the
+PyFixest MAP row marks this reference estimate. `within` is PyFixest LSMR with
+factor-pair preconditioning.]
 ]
 
 On the simple design, the largest coefficient difference is
 #result_agreement_simple_max. On the difficult design it is
-#result_agreement_difficult_max. The methods use different stopping checks, so we do not
-expect identical estimates on the difficult design.
+#result_agreement_difficult_max. The packages use different criteria to decide when their
+iterative algorithms have converged. Small differences between their estimates are
+therefore expected on the difficult design.
 
 #pagebreak()
 
