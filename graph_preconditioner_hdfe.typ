@@ -819,7 +819,7 @@ therefore grow as mobility and worker-firm $lambda_2$ fall; across the designs,
 $lambda_2$ declines from $0.232$ to $2.41 times 10^(-5)$. Under package defaults, all
 configurations in the first two designs complete within 3.60 seconds, but PyFixest MAP
 then slows sharply or reaches its cap, and LSMR without preconditioning reaches its cap.
-Factor-pair LSMR instead falls from 0.543 seconds in the first design to 0.365 seconds in
+Factor-pair LSMR instead falls from 0.554 seconds in the first design to 0.373 seconds in
 the last (top row of @fig-gap-runtime).
 
 === Sorting Among Movers
@@ -828,11 +828,11 @@ Every worker changes firms between adjacent periods in these designs, but the so
 parameter $rho$ controls how strongly workers are matched to similar firms; larger
 values concentrate moves within groups and weaken the links between them. As $rho$
 rises from $0$ to $150,000$, worker-firm $lambda_2$ falls from $0.222$ to
-$2.13 times 10^(-4)$. MAP rises from 0.368 seconds at $rho=0$ to 60.1 seconds at
+$2.13 times 10^(-4)$. MAP rises from 0.411 seconds at $rho=0$ to 53.9 seconds at
 $rho=10,000$ and then reaches its default cap at $rho=150,000$; LSMR without
 preconditioning reaches its default cap in the last four designs. Diagonal LSMR rises
-from 0.367 to 1.73 seconds, whereas factor-pair LSMR remains below 1.1 seconds and takes
-0.651 seconds at $rho=150,000$; it is faster than diagonal LSMR in the three
+from 0.362 to 1.58 seconds, whereas factor-pair LSMR remains below 1 second and takes
+0.623 seconds at $rho=150,000$; it is faster than diagonal LSMR in the three
 least-connected designs (bottom row of @fig-gap-runtime).
 
 === When Preconditioner Setup Dominates
@@ -863,11 +863,11 @@ firm, and year fixed effects.
   observations.]
 ]]
 
-On the dense design, all methods except factor-pair LSMR finish in 2.16 to 2.69 seconds;
-factor-pair LSMR takes 11.5 seconds because its setup cost is not recovered in one fit.
-On the near-nested design, factor-pair LSMR takes 4.45 seconds, compared with 11.0
-seconds without preconditioning, 27.8 seconds for FEM.jl, 63.5 seconds for `fixest`, and
-337.2 seconds for PyFixest MAP, while PyFixest diagonal LSMR reaches its default cap.
+On the dense design, all methods except factor-pair LSMR finish in 2.08 to 2.72 seconds;
+factor-pair LSMR takes 11.2 seconds because its setup cost is not recovered in one fit.
+On the near-nested design, factor-pair LSMR takes 4.63 seconds, compared with 10.2
+seconds without preconditioning, 27.0 seconds for FEM.jl, 62.2 seconds for `fixest`, and
+326.2 seconds for PyFixest MAP, while PyFixest diagonal LSMR reaches its default cap.
 
 === Iterations After Setup
 
@@ -916,14 +916,14 @@ check whether the controlled comparisons carry over to these less regular graphs
   retained observations.]
 ]]
 
-On `credit` and `soccer`, PyFixest MAP takes 0.198 and 0.034 seconds, compared with 0.213
-and 0.056 seconds for factor-pair LSMR, so the preconditioner's setup cost does not pay
-on these easy datasets. On the more difficult graphs, factor-pair LSMR takes 0.398
-seconds on `enron` and 0.238 seconds on `schools`, compared with 2.95 and 5.79 seconds
+On `credit` and `soccer`, PyFixest MAP takes 0.193 and 0.026 seconds, compared with 0.242
+and 0.065 seconds for factor-pair LSMR, so the preconditioner's setup cost does not pay
+on these easy datasets. On the more difficult graphs, factor-pair LSMR takes 0.402
+seconds on `enron` and 0.266 seconds on `schools`, compared with 2.95 and 5.98 seconds
 for PyFixest MAP. On `github`, `patents`, `workers`, and
 `directors`, PyFixest MAP reaches its iteration cap while factor-pair LSMR finishes in
-0.284 to 0.384 seconds. Accelerated MAP can still be competitive, however; `fixest`
-takes 0.280 seconds on `directors`, slightly less than factor-pair LSMR's 0.339 seconds.
+0.279 to 0.388 seconds. Accelerated MAP can still be competitive, however; `fixest`
+takes 0.283 seconds on `directors`, slightly less than factor-pair LSMR's 0.327 seconds.
 
 Pairwise $lambda_2$ does not by itself explain every real-data result. For `directors`,
 the component with the smallest reported value contains only 30 percent of the retained
@@ -1006,9 +1006,9 @@ observations, with the same outcome and covariate in both specifications.
 ]]
 
 Comparing the endpoints, setup is cheaper in the lowest-mobility design than in the
-highest, falling from 0.119 to 0.067 seconds with two fixed effects and from 0.123 to
-0.073 seconds with three. Over the same comparison, time spent in LSMR falls from 0.323
-to 0.057 seconds with two effects and from 0.239 to 0.176 seconds with three. The
+highest, falling from 0.109 to 0.028 seconds with two fixed effects and from 0.113 to
+0.032 seconds with three. Over the same comparison, time spent in LSMR falls from 0.291
+to 0.045 seconds with two effects and from 0.209 to 0.149 seconds with three. The
 low-mobility worker-firm graph has fewer cross-firm links to store and factorize, so the
 additive runtime in @fig-gap-runtime can decline even as MAP and diagonal LSMR slow down.
 
@@ -1037,16 +1037,16 @@ for all ten.
 ]]
 
 Across ten regressions, the additive preconditioner remains slower on the simple design:
-diagonal preconditioning takes 0.692 seconds, compared with 4.46 seconds when the
-additive preconditioner is rebuilt and 1.83 seconds when it is cached. Caching avoids
+diagonal preconditioning takes 0.601 seconds, compared with 4.29 seconds when the
+additive preconditioner is rebuilt and 1.79 seconds when it is cached. Caching avoids
 nine constructions, but the additive configuration remains more than twice as slow as
 diagonal preconditioning on this well-connected graph.
 
-On the difficult design, diagonal preconditioning takes 50.3 seconds for the ten
-regressions, whereas rebuilding the additive preconditioner lowers the total to 1.77
-seconds and caching lowers it further to 1.23 seconds. Caching reduces additive setup
-time from 0.434 to 0.040 seconds; time spent in LSMR is 1.34 seconds with rebuilding and
-1.19 seconds with caching.
+On the difficult design, diagonal preconditioning takes 43.6 seconds for the ten
+regressions, whereas rebuilding the additive preconditioner lowers the total to 1.58
+seconds and caching lowers it further to 1.30 seconds. Caching reduces additive setup
+time from 0.379 to 0.040 seconds; time spent in LSMR is 1.20 seconds with rebuilding and
+1.26 seconds with caching.
 
 == Poisson and Other GLMs
 
@@ -1094,9 +1094,9 @@ IRLS limit.
   ]
 
 #block(breakable: false)[On the simple design, all four paths finish in under ten seconds:
-`fixest` takes 4.72 seconds, `GLFEM.jl` 5.76, `rust-map` 7.86, and `within` 9.25. On the
+`fixest` takes 4.63 seconds, `GLFEM.jl` 5.71, `rust-map` 7.95, and `within` 9.74. On the
 difficult design, `rust-map` does not converge within the iteration cap; `GLFEM.jl`
-takes 129.8 seconds, `fixest` 439.4, and `within` 5.43. Sparse worker-firm coupling slows
+takes 129.8 seconds, `fixest` 439.3, and `within` 5.52. Sparse worker-firm coupling slows
 MAP, whereas factor-pair LSMR handles the worker-firm blocks jointly.]
 
 = Software
@@ -1170,8 +1170,8 @@ finishes in less than 0.4 seconds.
 Constructing the factor pairs becomes cheaper in the low-mobility AKM designs, and
 regressions that share the same sample, fixed effects, and weights incur this cost only
 once. Caching lowers additive runtime in both designs, although it beats diagonal
-preconditioning only on the difficult design: there, setup falls from 0.434 to 0.040
-seconds and total time from 1.77 to 1.23 seconds.
+preconditioning only on the difficult design: there, setup falls from 0.379 to 0.040
+seconds and total time from 1.58 to 1.30 seconds.
 
 PPML repeatedly calls the demeaning routine because each IRLS step solves a new weighted
 problem, and PyFixest reuses the first preconditioner as the weights change in our

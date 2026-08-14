@@ -193,7 +193,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertIn("Move probability $delta$", mobility)
         self.assertIn("Sorting strength $rho$", sorting)
         self.assertNotIn("akm_mobility_1", mobility)
-        self.assertIn("0.543s", mobility)
+        self.assertIn("0.554s", mobility)
         self.assertIn("LSMR #linebreak() diagonal", mobility)
 
     def test_real_data_paper_table_omits_unfilled_ablation_columns(self) -> None:

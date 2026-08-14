@@ -57,8 +57,8 @@
       built from overlapping factor-pair subproblems. Each subproblem is a signed graph Laplacian and admits
       sparse approximate Cholesky factorization, and we use the resulting operator inside a Krylov solver
       for least squares. On a near-nested ten-million-observation design, the preconditioned solver
-      completes in 4.45s against 63.5s for the fastest MAP implementation. In the one-million-observation
-      Poisson benchmark, `within` takes 5.43s and `fixest` 439.4s. On dense, well-connected graphs MAP
+      completes in 4.63s against 62.2s for the fastest MAP implementation. In the one-million-observation
+      Poisson benchmark, `within` takes 5.52s and `fixest` 439.3s. On dense, well-connected graphs MAP
       remains faster, and the normalized-Laplacian gap $lambda_2$ is larger. Because the preconditioner depends on
       the fixed effects and the weights but not on the right-hand side, one factorization serves the many
       residualizations that randomization inference and multi-metric readouts require: measured cost per
@@ -210,12 +210,12 @@ with 10 cores and 16 GB of memory.
       table.header(th[Design], th[$lambda_2$], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[OLS, 10M observations]],
-      [simple (well-connected)], [0.622], [2.58s], [2.64s], [2.16s], [11.5s],
-      [difficult (near-nested)], [$8.35 times 10^(-8)$], [337.2s], [63.5s], [27.8s], [*4.45s*],
+      [simple (well-connected)], [0.622], [2.35s], [2.52s], [2.08s], [11.2s],
+      [difficult (near-nested)], [$8.35 times 10^(-8)$], [326.2s], [62.2s], [27.0s], [*4.63s*],
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[Poisson, 1M observations]],
-      [simple (well-connected)], [-], [7.86s], [4.72s], [5.76s], [9.25s],
-      [difficult (near-nested)], [-], [capped], [439.4s], [129.8s], [*5.43s*],
+      [simple (well-connected)], [-], [7.95s], [4.63s], [5.71s], [9.74s],
+      [difficult (near-nested)], [-], [capped], [439.3s], [129.8s], [*5.52s*],
       table.hline(stroke: 0.75pt + rule),
     )
   ]
@@ -224,14 +224,14 @@ with 10 cores and 16 GB of memory.
 On the simple design the graph is dense, MAP converges in few passes, and `within` is
 slowest because the preconditioner does not repay its setup cost. The ranking reverses
 on the difficult design, where $lambda_2$ falls to $8.35 times 10^(-8)$: unaccelerated
-MAP takes 337.2s and the fastest MAP backend 63.5s, while `within` completes in 4.45s.
+MAP takes 326.2s and the fastest MAP backend 62.2s, while `within` completes in 4.63s.
 
 The Poisson rows matter for experiment readouts because platform outcomes are frequently counts of
 bookings, clicks, or sessions. Iteratively reweighted least squares repeats the demeaning step at every
 iteration @correia2020ppmlhdfe, so any change in absorption cost is multiplied by the number of
-iterations. On the difficult design `rust-map` does not converge within its cap and `fixest` takes 439.4s,
-against 5.43s for `within`. A controlled comparison that varies two-sided mobility while holding the rest of
-the data-generating process fixed reproduces the pattern: `within` stays between 0.365s and 0.551s across
+iterations. On the difficult design `rust-map` does not converge within its cap and `fixest` takes 439.3s,
+against 5.52s for `within`. A controlled comparison that varies two-sided mobility while holding the rest of
+the data-generating process fixed reproduces the pattern: `within` stays between 0.373s and 0.554s across
 the designs, whereas MAP reaches its 10,000-pass cap at the lowest mobility. Across a broader set of public
 benchmark datasets, accelerated MAP wins on small or compact graphs, and the factor-pair preconditioner
 wins on the larger networks whose hard components cover much of the sample.
@@ -269,9 +269,9 @@ of the preconditioned solver as $K$ grows. We have not benchmarked a full random
 against MAP end to end, and we present the extrapolation as an implication of the measured split rather
 than as a measured result.
 
-In a 100,000-observation numerical check the largest slope difference from MAP is $3.2 times 10^(-7)$;
+In a 100,000-observation numerical check the largest slope difference from MAP is $2.8 times 10^(-7)$;
 comparisons use fitted values and residuals, because fixed-effect coefficients themselves depend on
-normalization. The preconditioned solver uses more memory, with an incremental peak-RSS cost of 128-268
+normalization. The preconditioned solver uses more memory, with an incremental peak-RSS cost of 178-242
 MiB at one million observations.
 
 = Practical guidance and software
