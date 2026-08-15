@@ -14,7 +14,7 @@
   table.hline(stroke: 0.45pt + table-rule),
   table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],
   [simple (well-connected)], [0.622 (1.00)], [354 MiB], [411 MiB],
-  [difficult (near-nested)], [$8.35 times 10^(-6)$ (1.00)], [357 MiB], [383 MiB],
+  [difficult (near-nested)], [$6.51 times 10^(-4)$ (1.00)], [357 MiB], [383 MiB],
   table.hline(stroke: 0.35pt + table-light-rule),
   table.cell(colspan: 4, fill: table-head-fill)[#emph[1M observations]],
   [simple (well-connected)], [0.622 (1.00)], [758 MiB], [1,000 MiB],

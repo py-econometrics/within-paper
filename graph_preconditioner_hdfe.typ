@@ -1,5 +1,5 @@
 #set document(
-  title: "Graph-Preconditioned Estimation of High-Dimensional Fixed-Effect Models",
+  title: "Graph Preconditioning for High-Dimensional Fixed Effects Regression",
   author: "Alexander Fischer and Kristof Schröder",
 )
 #set page(
@@ -55,7 +55,7 @@
   #text(size: 10.5pt)[Alexander Fischer#footnote[trivago] and Kristof Schröder#footnote[appliedAI Institute for Europe gGmbH]]
 
   #v(0.4em)
-  #text(size: 9.5pt)[Draft: August 8, 2026]
+  #text(size: 9.5pt)[August 2026]
 ]
 
 #v(0.9em)
@@ -69,19 +69,25 @@
     radius: 4pt,
   )[
     #text(size: 9.6pt)[
-      #text(weight: "bold")[Abstract.] Most software absorbs high-dimensional fixed effects
-      with the Method of Alternating Projections (MAP). A MAP pass is cheap, but it updates one
-      fixed-effect dimension at a time. In matched employer-employee data, sparse worker
-      mobility can therefore make information travel slowly between groups of firms. We
-      propose an alternative preconditioner for LSMR that uses the observed links between
-      pairs of fixed effects. The worker-firm block of the fixed-effect cross product records
-      worker-firm match counts; after a sign change, it is a weighted graph Laplacian. Sparse
-      approximate Cholesky methods give inexpensive local corrections for this graph. We
-      combine the pair corrections in an additive Schwarz preconditioner that can be reused
-      across the outcome and covariates. In benchmarks, MAP and factor-pair LSMR are both fast
-      on well-connected designs. As worker-firm connectivity weakens, MAP and diagonally
-      preconditioned LSMR require substantially more time, while factor-pair LSMR remains
-      fast. Its setup also becomes cheaper on the sparsest mobility graphs.
+      #text(weight: "bold")[Abstract.] The Method of Alternating Projections (MAP) is the
+      canonical algorithm for estimating high-dimensional fixed-effect regressions. It is fast
+      when absorbed factors are well connected, but converges slowly on sparse or nearly nested
+      fixed-effect graphs, such as matched employer-employee panels where worker-firm mobility
+      links separate worker and firm effects. The convergence behavior of MAP depends on the
+      mobility pattern linking workers to firms, yet MAP only indirectly makes use of this
+      information by iterating over one fixed effect at a time. That mobility pattern is,
+      however, directly encoded in the matrix of worker-firm match counts, which together
+      with the worker and firm count diagonals forms a graph Laplacian after a sign flip
+      and admits sparse approximate Cholesky factorization.
+      We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
+      built from small, local factor-pair subproblems - worker-firm, worker-year, and
+      so on - that use the graph directly.
+      Benchmarks show that all methods are fast on well-connected designs. As
+      connectivity weakens, MAP and diagonally preconditioned LSMR slow down, while
+      factor-pair preconditioning remains fast and its runtime falls because the graph
+      preconditioner is cheaper to construct on sparser graphs. On a near-nested design with
+      10 million observations, factor-pair LSMR completes in 4.63 seconds, compared with
+      62.2 seconds for the fastest MAP implementation.
     ]
   ]
 ]
@@ -135,11 +141,11 @@ be the weighted graph Laplacian and $Delta_(q r)$ its degree matrix. Then
 $ S_(q r) = Delta_(q r)^(-1/2) L_(q r) Delta_(q r)^(-1/2), quad
   "Gap"_(q r) = lambda_2(S_(q r)). $
 
-Edge weights equal the number of observed co-occurrences. A larger Gap means that the two
-fixed-effect dimensions are more strongly connected. We remove singleton levels before
-computing it. If the remaining graph is disconnected, we use the component containing
-the most observations and report its observation share. Unless stated otherwise, Gap
-refers to the worker-firm graph.
+Edge weights are observed co-occurrence counts, and a larger Gap indicates stronger
+connectivity between the two fixed-effect dimensions. Our empirical results report the
+worker-firm Gap.#footnote[We compute the Gap after iterative singleton removal. If the
+remaining graph is disconnected, we use the component containing the most retained
+observations and report its observation share; Section 7 gives the full convention.]
 
 The fixed-effect cross product, or Gramian, contains this graph @correia2017. Its diagonal
 blocks are worker, firm, and year observation counts. Its off-diagonal blocks are match
@@ -249,7 +255,7 @@ as a third, low-dimensional factor on the same records, and @fig-connectivity co
 a well-connected mobility graph with one that fragments under strong sorting.
 
 #figure(
-  image(solver-img("worker_firm_connectivity.svg"), width: 50%),
+  image(solver-img("worker_firm_connectivity.svg"), width: 64%),
   caption: [Worker-firm graphs under high and low mobility. High mobility creates many
   paths between firms. With low mobility and strong sorting, only a few worker moves
   connect otherwise separate groups of firms.]
@@ -269,10 +275,13 @@ Suppose that the columns of $D$ are ordered as worker levels, firm levels, and y
 levels. Then
 
 $ G = mat(
-  G_(W W), C_(W F), C_(W Y);
-  C_(W F)', G_(F F), C_(F Y);
-  C_(W Y)', C_(F Y)', G_(Y Y)
+  dg(G_(W W)), cr(C_(W F)), cr(C_(W Y));
+  cr(C_(W F)'), dg(G_(F F)), cr(C_(F Y));
+  cr(C_(W Y)'), cr(C_(F Y)'), dg(G_(Y Y))
 ). $
+
+Blue marks diagonal count blocks, while orange marks off-diagonal match-count blocks in
+the equations and diagrams below.
 
 The #dg[diagonal blocks] $#dg[$G_(W W)$]$, $#dg[$G_(F F)$]$, and $#dg[$G_(Y Y)$]$
 contain weighted counts for workers, firms, and years. An observation belongs to one
@@ -317,13 +326,13 @@ Worker $W_1$ supplies the only link between $F_1$ and $F_2$ in
 The diagonal blocks are count matrices. In this example, each worker
 is observed twice, each firm three times, and each year three times, so
 
-$ G_(W W) = mat(2, 0, 0; 0, 2, 0; 0, 0, 2), quad
-  G_(F F) = mat(3, 0; 0, 3), quad
-  G_(Y Y) = mat(3, 0; 0, 3). $
+$ dg(G_(W W)) = mat(2, 0, 0; 0, 2, 0; 0, 0, 2), quad
+  dg(G_(F F)) = mat(3, 0; 0, 3), quad
+  dg(G_(Y Y)) = mat(3, 0; 0, 3). $
 
 The off-diagonal blocks are cross-tabulations between factors. The worker-firm block is
 
-$ C_(W F) = mat(
+$ cr(C_(W F)) = mat(
   1, 1;
   2, 0;
   0, 2
@@ -332,12 +341,12 @@ $ C_(W F) = mat(
 The first row records the mover's two matches; the remaining rows record the two
 stayers. The other cross-tabulations are
 
-$ C_(W Y) = mat(
+$ cr(C_(W Y)) = mat(
   1, 1;
   1, 1;
   1, 1
 ), quad
-  C_(F Y) = mat(
+  cr(C_(F Y)) = mat(
   2, 1;
   1, 2
 ). $
@@ -347,13 +356,13 @@ Together, the count and cross-tabulation blocks form the full Gramian.
 With column order $(W_1, W_2, W_3, F_1, F_2, Y_1, Y_2)$, the full Gramian is
 
 $ G = mat(augment: #(hline: (3, 5), vline: (3, 5), stroke: 0.4pt + rgb("#b0b8c4")),
-  2, 0, 0, 1, 1, 1, 1;
-  0, 2, 0, 2, 0, 1, 1;
-  0, 0, 2, 0, 2, 1, 1;
-  1, 2, 0, 3, 0, 2, 1;
-  1, 0, 2, 0, 3, 1, 2;
-  1, 1, 1, 2, 1, 3, 0;
-  1, 1, 1, 1, 2, 0, 3
+  dg(2), dg(0), dg(0), cr(1), cr(1), cr(1), cr(1);
+  dg(0), dg(2), dg(0), cr(2), cr(0), cr(1), cr(1);
+  dg(0), dg(0), dg(2), cr(0), cr(2), cr(1), cr(1);
+  cr(1), cr(2), cr(0), dg(3), dg(0), cr(2), cr(1);
+  cr(1), cr(0), cr(2), dg(0), dg(3), cr(1), cr(2);
+  cr(1), cr(1), cr(1), cr(2), cr(1), dg(3), dg(0);
+  cr(1), cr(1), cr(1), cr(1), cr(2), dg(0), dg(3)
 ). $
 
 The worker-firm submatrix contains worker and firm counts on its diagonal and match counts
@@ -363,11 +372,11 @@ match counts. The result is the weighted graph Laplacian
 
 
 $ L_(W F) = mat(augment: #(hline: 3, vline: 3, stroke: 0.4pt + rgb("#b0b8c4")),
-  2, 0, 0, -1, -1;
-  0, 2, 0, -2, 0;
-  0, 0, 2, 0, -2;
-  -1, -2, 0, 3, 0;
-  -1, 0, -2, 0, 3
+  dg(2), dg(0), dg(0), cr(-1), cr(-1);
+  dg(0), dg(2), dg(0), cr(-2), cr(0);
+  dg(0), dg(0), dg(2), cr(0), cr(-2);
+  cr(-1), cr(-2), cr(0), dg(3), dg(0);
+  cr(-1), cr(0), cr(-2), dg(0), dg(3)
 ). $
 
 Every factor pair has a Laplacian of this form. Section 6 uses these matrices in the
@@ -389,16 +398,16 @@ means. Repeating this pass eventually removes all three sets of means.
 With $D = [D_W quad D_F quad D_Y]$, the FWL normal equations in @eq:fwl-normal are
 
 $ mat(
-  G_(W W), C_(W F), C_(W Y);
-  C_(W F)', G_(F F), C_(F Y);
-  C_(W Y)', C_(F Y)', G_(Y Y)
+  dg(G_(W W)), cr(C_(W F)), cr(C_(W Y));
+  cr(C_(W F)'), dg(G_(F F)), cr(C_(F Y));
+  cr(C_(W Y)'), cr(C_(F Y)'), dg(G_(Y Y))
 ) mat(alpha_W; alpha_F; alpha_Y)
 = mat(D_W' W mu; D_F' W mu; D_Y' W mu). $
 
 The worker update holds the current firm and year effects fixed. The worker row of this
 system can be written as
 
-$ G_(W W) alpha_W = D_W' W (mu - D_F alpha_F - D_Y alpha_Y). $
+$ dg(G_(W W)) alpha_W = D_W' W (mu - D_F alpha_F - D_Y alpha_Y). $
 
 The diagonal entries of $G_(W W)$ are workers' total observation weights. Dividing the
 right-hand side by those counts gives the weighted worker means. Firm and year updates
@@ -420,15 +429,16 @@ convergence rate of the full model.
 
 = The Factor-Pair Schwarz Preconditioner
 
-== Preconditioners
+== LSMR and Preconditioners
 
-LSMR @fong2011 allows each residual correction to use a preconditioner. Weak links,
-sparse mobility, or near nesting make some combinations of fixed effects much less well
-determined than others. Changing from MAP to LSMR does little to remove that imbalance;
-the preconditioner must rescale the system while preserving its least-squares solution.
+LSMR solves the fixed-effect least-squares problem in @eq:demean-ls by multiplying
+vectors by $D$ and $D'$ rather than forming the Gramian. A preconditioner uses a cheap
+approximation to $G^(-1)$ to rescale the search directions. LSMR still checks convergence
+against the original least-squares problem, so the approximation changes the number of
+iterations rather than the residualized variables reached at convergence.
 
-The inverse Gramian $G^(-1)$ shows the target. If $M^(-1) = G^(-1)$, LSMR sees the
-identity matrix,#footnote[As in any model with several fixed
+The exact inverse $G^(-1)$ provides a useful benchmark. If $M^(-1) = G^(-1)$, the
+preconditioned normal equation is the identity,#footnote[As in any model with several fixed
 effects, the level effects are pinned down only up to a normalization: we can add a
 constant to every worker effect and subtract it from every firm effect without changing
 the fitted values $D alpha$, and likewise for years. The dummy-coded $G = D' W D$ and the
@@ -441,76 +451,100 @@ all the regression uses, do not.]
 
 $ M^(-1) G = G^(-1) G = I. $ <eq:ideal-preconditioner>
 
-Under this choice, one correction would suffice. Computing the full inverse costs as much as the original
+One correction would then suffice, but computing $G^(-1)$ costs as much as the original
 fixed-effect problem. A useful approximation must capture the poorly determined
-directions and save enough iterations to cover its construction and application costs.#footnote[
+directions while remaining cheap to construct and apply.#footnote[
 LSMR never constructs $M^(-1) G$ or $G$ explicitly. It multiplies vectors by $D$ and
 $D'$ and applies $M^(-1)$.]
 
-== From the Block Inverse to the Diagonal Preconditioner
+== Diagonal Preconditioning
 
-The block inverse identifies the information lost by diagonal scaling. For the
-worker-firm-year model,
+The simplest approximation drops every cross-factor block and inverts only the group
+counts,
+
+$ M_("diag")^(-1) = "diag"(dg(G_(W W)^(-1)), dg(G_(F F)^(-1)),
+  dg(G_(Y Y)^(-1))). $
+
+Each block is diagonal, so applying $M_("diag")^(-1)$ amounts to dividing worker, firm,
+and year entries by their total observation weights. `FixedEffectModels.jl` uses this
+preconditioner @fong2011 @fixedeffectmodels.
+
+Count scaling is cheap and can work well on a well-connected graph. It gives the same
+scale factor to two equally large firms even if one shares workers broadly and the other
+belongs to a nearly isolated group. LSMR continues to update against the original system,
+so the omitted match-count terms return through later matrix-vector products. A weak
+diagonal approximation therefore increases the number of outer iterations without
+changing the least-squares target.
+
+#figure(
+  image(solver-img("diagonal_lsmr_strategy.svg"), width: 70%),
+  caption: [Diagonal preconditioning within LSMR. Worker, firm, and year counts are
+  computed once and reused for the outcome and covariates. At each iteration, the
+  preconditioner divides factor-level entries by their total observation weights. LSMR
+  continues to check the original fixed-effect least-squares problem, so diagonal scaling
+  affects convergence speed rather than the residualized variables reached at
+  convergence.]
+) <fig-diagonal-strategy>
+
+== What Diagonal Scaling Omits
+
+The block inverse makes the omitted terms explicit. #dg[Blue] marks count-only terms
+used by diagonal preconditioning; #cr[orange] marks terms that depend on cross-factor
+links. For the worker-firm-year model,
 
 $ G = mat(
-  G_(W W), C_(W F), C_(W Y);
-  C_(W F)', G_(F F), C_(F Y);
-  C_(W Y)', C_(F Y)', G_(Y Y)
+  dg(G_(W W)), cr(C_(W F)), cr(C_(W Y));
+  cr(C_(W F)'), dg(G_(F F)), cr(C_(F Y));
+  cr(C_(W Y)'), cr(C_(F Y)'), dg(G_(Y Y))
 ), $
 
-has diagonal weighted-count blocks and off-diagonal match-count blocks. Focus on the
+has diagonal weighted-count blocks and off-diagonal match-count blocks. Consider the
 worker-firm part,
 
-$ G_(W F) = mat(G_(W W), C_(W F); C_(W F)', G_(F F)). $
+$ G_(W F) = mat(
+  dg(G_(W W)), cr(C_(W F));
+  cr(C_(W F)'), dg(G_(F F))
+). $
 
 Its inverse is
 
 $ G_(W F)^(-1) = mat(
-  G_(W W)^(-1) + G_(W W)^(-1) C_(W F) S^(-1) C_(W F)' G_(W W)^(-1), -G_(W W)^(-1) C_(W F) S^(-1);
-  -S^(-1) C_(W F)' G_(W W)^(-1), S^(-1)
+  dg(G_(W W)^(-1)) + cr(G_(W W)^(-1) C_(W F) S^(-1) C_(W F)' G_(W W)^(-1)), cr(-G_(W W)^(-1) C_(W F) S^(-1));
+  cr(-S^(-1) C_(W F)' G_(W W)^(-1)), cr(S^(-1))
 ). $
 
-$ S = G_(F F) - C_(W F)' G_(W W)^(-1) C_(W F). $
+$ cr(S) = dg(G_(F F)) - cr(C_(W F)' G_(W W)^(-1) C_(W F)). $
 
-The diagonal inverse divides by worker counts. Worker-firm match counts enter through the
-Schur complement $S$, a firm-side system that compares firms after accounting for their
-shared workers. This is the expensive part. Exact factorization can add many nonzero
-entries, with time and memory determined by the connected-component sizes and the amount
-of fill-in. Sparse mobility can make an unpreconditioned iteration slow while making the
-local factorization cheaper because there are fewer links. With three factors, the full
-inverse can contain all three pairwise cross-tabulations.
-
-Diagonal preconditioning drops the Schur-complement corrections and keeps only the count
-inverses,
-
-$ M_("diag")^(-1) = "diag"(G_(W W)^(-1), G_(F F)^(-1), G_(Y Y)^(-1)). $
-
-This is the preconditioner used in `FixedEffectModels.jl` @fong2011
-@fixedeffectmodels. It corrects differences in
-group size. It cannot distinguish a firm linked to many employers from an equally large
-firm whose workers remain in one part of the mobility graph.
+The $G_(W W)^(-1)$ term gives the worker-count correction used by diagonal
+preconditioning. The remaining terms depend on the Schur complement $S$, which compares
+firms after accounting for their shared workers and couples the worker and firm
+corrections. Factoring $S$ is expensive: exact elimination can add many nonzero entries,
+with time and memory determined by component size and fill-in. Sparse mobility can make
+diagonally preconditioned LSMR slow while making a local factorization cheaper because
+there are fewer links. With three factors, the full inverse can involve all three
+pairwise cross-tabulations.
 
 == The Factor-Pair Schwarz Approximation
 
-Additive Schwarz preconditioning adds corrections from smaller, overlapping problems
-@xu1992 @toselli2005. For the AKM model, the subproblems are worker-firm, worker-year, and
-firm-year. Each retains its match-count block, while the outer LSMR iteration handles the
-remaining three-way coupling.
+The omitted match-count terms suggest a richer approximation based on smaller,
+overlapping problems. Additive Schwarz preconditioning adds corrections for the
+worker-firm, worker-year, and firm-year pairs @xu1992 @toselli2005. Each local problem
+retains its match-count block, while the outer LSMR iteration handles the remaining
+three-way coupling and any error in the local correction.
 
 The worker-firm local problem is
 
-$ mat(G_(W W), C_(W F); C_(W F)', G_(F F)). $
+$ mat(dg(G_(W W)), cr(C_(W F)); cr(C_(W F)'), dg(G_(F F))). $
 
-@fig-pair-block compares this worker-firm pair block with the single diagonal block
-solved by a factor-level MAP update.
+@fig-pair-block compares the count-only worker-firm block used by diagonal
+preconditioning with the factor-pair block.
 
 #figure(
-  image(solver-img("factor_level_vs_pair_block.svg"), width: 88%),
-  caption: [Matrices used by MAP and the factor-pair preconditioner in the example from
-  Section 4. A MAP worker update (left) uses only the diagonal worker-count matrix
-  $G_(W W) = "diag"(2,2,2)$. The factor-pair update (right) adds the firm-count matrix
-  $G_(F F) = "diag"(3,3)$ and the matrix of worker-firm observation counts $C_(W F)$.
-  The dashed outline marks the worker and firm coefficients that are updated together.]
+  image(solver-img("factor_level_vs_pair_block.svg"), width: 84%),
+  caption: [Count-only and factor-pair corrections for the example from Section 4. The
+  diagonal preconditioner (left) treats the blue worker and firm count blocks separately.
+  The factor-pair correction (right) retains those blocks and adds the orange
+  worker-firm observation counts $C_(W F)$.]
 ) <fig-pair-block>
 
 Its inverse retains the worker-firm links through the Schur complement. To place this
@@ -523,7 +557,7 @@ corrections are not counted twice. The exact worker-firm contribution is
 
 $ P_(W F)^(-1) =
   R_(W F)' tilde(D)_(W F)
-  mat(G_(W W), C_(W F); C_(W F)', G_(F F))^(-1)
+  mat(dg(G_(W W)), cr(C_(W F)); cr(C_(W F)'), dg(G_(F F)))^(-1)
   tilde(D)_(W F) R_(W F). $
 
 The worker-year and firm-year terms have the same form. Each level belongs to two pair
@@ -544,19 +578,21 @@ graph-Laplacian structure.
 
 For a worker-firm pair, the local pair step solves the pair-Gramian system
 
-$ mat(G_(W W), C_(W F); C_(W F)', G_(F F)) x = u, $
+$ mat(dg(G_(W W)), cr(C_(W F)); cr(C_(W F)'), dg(G_(F F))) x = u, $
 
 where $u$ contains the selected and weighted worker and firm entries of the LSMR vector.
 The match counts $C_(W F)$ are non-negative, so this matrix is not yet a Laplacian. Let
 $T_(W F) = "diag"(I_W, -I_F)$ flip the firm signs. Multiplication on both sides gives
 
-$ L_(W F) = T_(W F) mat(G_(W W), C_(W F); C_(W F)', G_(F F)) T_(W F)
-  = mat(G_(W W), -C_(W F); -C_(W F)', G_(F F)), $
+$ L_(W F) = T_(W F)
+  mat(dg(G_(W W)), cr(C_(W F)); cr(C_(W F)'), dg(G_(F F))) T_(W F)
+  = mat(dg(G_(W W)), cr(-C_(W F)); cr(-C_(W F)'), dg(G_(F F))), $
 
 a weighted bipartite graph Laplacian with non-positive off-diagonals and zero row sums.
 Since $T_(W F)^2 = I$, the same sign change maps its inverse back to the pair Gramian,
 
-$ mat(G_(W W), C_(W F); C_(W F)', G_(F F))^(-1) = T_(W F) L_(W F)^(-1) T_(W F), $
+$ mat(dg(G_(W W)), cr(C_(W F)); cr(C_(W F)'), dg(G_(F F)))^(-1)
+  = T_(W F) L_(W F)^(-1) T_(W F), $
 
 where the inverses use the normalization from Section 6.1. The implementation returns
 the zero-mean solution within each connected component. This choice fixes the free
@@ -583,24 +619,24 @@ unpreconditioned LSMR run, up to the requested tolerance.
 
 == Implementation Strategy
 
-@fig-pair-strategy summarizes the implementation. Each factor pair becomes a graph
-Laplacian after the sign change. Sparse approximate Cholesky supplies the local inverse,
-and partition-of-unity weights prevent shared levels from being counted twice in the
-Schwarz sum.
+@fig-pair-strategy retains the outer LSMR loop from @fig-diagonal-strategy and replaces
+the count-based correction with three factor-pair corrections. After the sign change,
+sparse approximate Cholesky provides a local inverse for each pair graph;
+partition-of-unity weights then combine the corrections without counting shared levels
+twice.
 
-LSMR uses the sum to scale its updates @fong2011 @arridge2014 @yang2024flexible. The same
-preconditioner can residualize the outcome and every covariate when the observations,
-weights, and fixed-effect identifiers are unchanged. The `within` source implements this
-setup-and-apply sequence @within.
+LSMR applies this sum while solving the original least-squares problem @fong2011
+@arridge2014 @yang2024flexible. When observations, weights, and fixed-effect identifiers
+are unchanged, the pair factorizations can be reused for the outcome and every covariate.
+The `within` source implements this setup-and-apply sequence @within.
 
 #figure(
   image(solver-img("factor_pair_strategy.svg"), width: 70%),
-  caption: [Construction of the factor-pair preconditioner. Each local problem combines
-  two fixed-effect dimensions and retains their observed links. A sign change turns its
-  matrix into a graph Laplacian, the standard matrix representation of a weighted graph.
-  Sparse approximate Cholesky solves each local system while limiting the extra nonzero
-  entries created during factorization, which saves memory and computation. The weighted
-  sum of these local solutions is the preconditioner for LSMR.]
+  caption: [Factor-pair preconditioning within LSMR. Each local problem combines two
+  fixed-effect dimensions and retains their observed links. A sign change turns the pair
+  matrix into a graph Laplacian, and sparse approximate Cholesky supplies its local
+  correction. Partition-of-unity weights combine the corrections before they enter the
+  same outer LSMR iteration shown in @fig-diagonal-strategy.]
 ) <fig-pair-strategy>
 
 = Benchmarks
@@ -769,9 +805,11 @@ preconditioner's setup cost.
 MAP implementations compare changes in residuals or fixed-effect coefficients, while
 LSMR uses its estimated least-squares residual and first-order-condition error @fong2011.
 Their numerical tolerances are therefore not a common measure of accuracy. For example,
-`within` stops when either its relative residual or the scaled normal-equation error
-$||A^T r||_2/(||A||_F ||r||_2)$ meets the requested threshold, where
-$A=W^(1/2)D$ and $r=W^(1/2)(mu-D alpha)$.
+`within` stops when either its relative residual or its scaled normal-equation error meets
+the requested threshold. We compute the latter as
+
+$ frac(||A^T r||_2, ||A||_F ||r||_2), quad
+  A = W^(1/2) D, quad r = W^(1/2) (mu - D alpha). $
 
 @fig-tolerance places the methods on a common accuracy scale for mobility designs 1, 3,
 and 5. Every method receives the same singleton-pruned sample and a common

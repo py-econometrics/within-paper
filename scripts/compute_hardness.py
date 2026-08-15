@@ -53,6 +53,7 @@ def _top_two_singular_values(matrix: sp.csr_matrix) -> np.ndarray:
         tol=1e-10,
         maxiter=200_000,
         return_singular_vectors=False,
+        solver="propack",
     )
 
 
@@ -135,6 +136,7 @@ def _datasets():
 
 def main() -> None:
     rows = []
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     for name, kind, raw, fixed_effects in _datasets():
         started = time.perf_counter()
         frame, dropped = drop_singletons(raw, fixed_effects)
@@ -147,13 +149,13 @@ def main() -> None:
                     "fe_a": left, "fe_b": right, **asdict(result),
                 }
             )
+        # Preserve completed diagnostics if a later large component is interrupted.
+        pd.DataFrame(rows).to_csv(OUTPUT, index=False)
         print(
             f"compute-hardness / Jochmans-Weidner Gap / {name}: "
             f"{time.perf_counter() - started:.3f} s",
             flush=True,
         )
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(OUTPUT, index=False)
 
 
 if __name__ == "__main__":

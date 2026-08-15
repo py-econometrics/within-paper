@@ -3,68 +3,73 @@
     <style>
       text { font-family: Arial, sans-serif; fill: #2f3437; }
       .muted { fill: #68727a; }
+      .panel { fill: #fbfcfd; stroke: #e3e7eb; stroke-width: 1.2; }
       .worker { fill: #f3d8f1; stroke: #a84aa0; stroke-width: 2; }
       .firm { fill: #dce8fb; stroke: #4f78b8; stroke-width: 2; }
       .edge { stroke: #89939b; stroke-width: 1.7; opacity: 0.9; }
       .bridge { stroke: #c84f4f; stroke-width: 3.2; }
-      .cluster { fill: none; stroke: #d6dce1; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .cluster { fill: #ffffff; fill-opacity: 0.55; stroke: #cdd4da; stroke-width: 1.4; stroke-dasharray: 7 5; }
     </style>
   </defs>
   <rect width="820" height="330" fill="#ffffff"/>
+  <rect x="12" y="8" width="390" height="314" rx="14" class="panel"/>
+  <rect x="418" y="8" width="390" height="314" rx="14" class="panel"/>
 
-  <text x="205" y="34" text-anchor="middle" font-size="17" font-weight="700">High mobility</text>
-  <text x="205" y="55" text-anchor="middle" font-size="12" class="muted">Movers connect many firms</text>
-  <text x="615" y="34" text-anchor="middle" font-size="17" font-weight="700">Low mobility and sorting</text>
-  <text x="615" y="55" text-anchor="middle" font-size="12" class="muted">Most workers stay inside local clusters</text>
+  <text x="207" y="34" text-anchor="middle" font-size="17" font-weight="700">High mobility</text>
+  <text x="207" y="54" text-anchor="middle" font-size="12" class="muted">Movers connect many firms</text>
+  <text x="613" y="34" text-anchor="middle" font-size="17" font-weight="700">Low mobility and sorting</text>
+  <text x="613" y="54" text-anchor="middle" font-size="12" class="muted">Most workers stay within local clusters</text>
 
-  <!-- High mobility panel -->
-  <g transform="translate(36 76)">
-    <text x="70" y="0" text-anchor="middle" font-size="12" class="muted">Workers</text>
-    <text x="300" y="0" text-anchor="middle" font-size="12" class="muted">Firms</text>
-    <line x1="70" y1="40" x2="300" y2="28" class="edge"/>
-    <line x1="70" y1="40" x2="300" y2="92" class="edge"/>
-    <line x1="70" y1="92" x2="300" y2="28" class="edge"/>
-    <line x1="70" y1="92" x2="300" y2="156" class="edge"/>
-    <line x1="70" y1="144" x2="300" y2="92" class="edge"/>
-    <line x1="70" y1="144" x2="300" y2="220" class="edge"/>
-    <line x1="70" y1="196" x2="300" y2="28" class="edge"/>
-    <line x1="70" y1="196" x2="300" y2="156" class="edge"/>
-    <line x1="70" y1="248" x2="300" y2="92" class="edge"/>
-    <line x1="70" y1="248" x2="300" y2="220" class="edge"/>
+  <!-- High-mobility panel -->
+  <g transform="translate(31 82)">
+    <text x="72" y="0" text-anchor="middle" font-size="12" class="muted">Workers</text>
+    <text x="306" y="0" text-anchor="middle" font-size="12" class="muted">Firms</text>
 
-    <circle cx="70" cy="40" r="20" class="worker"/><text x="70" y="45" text-anchor="middle" font-size="12" font-weight="700">W1</text>
-    <circle cx="70" cy="92" r="20" class="worker"/><text x="70" y="97" text-anchor="middle" font-size="12" font-weight="700">W2</text>
-    <circle cx="70" cy="144" r="20" class="worker"/><text x="70" y="149" text-anchor="middle" font-size="12" font-weight="700">W3</text>
-    <circle cx="70" cy="196" r="20" class="worker"/><text x="70" y="201" text-anchor="middle" font-size="12" font-weight="700">W4</text>
-    <circle cx="70" cy="248" r="20" class="worker"/><text x="70" y="253" text-anchor="middle" font-size="12" font-weight="700">W5</text>
+    <line x1="72" y1="28" x2="306" y2="27" class="edge"/>
+    <line x1="72" y1="28" x2="306" y2="89" class="edge"/>
+    <line x1="72" y1="75" x2="306" y2="27" class="edge"/>
+    <line x1="72" y1="75" x2="306" y2="151" class="edge"/>
+    <line x1="72" y1="122" x2="306" y2="89" class="edge"/>
+    <line x1="72" y1="122" x2="306" y2="213" class="edge"/>
+    <line x1="72" y1="169" x2="306" y2="27" class="edge"/>
+    <line x1="72" y1="169" x2="306" y2="151" class="edge"/>
+    <line x1="72" y1="216" x2="306" y2="89" class="edge"/>
+    <line x1="72" y1="216" x2="306" y2="213" class="edge"/>
 
-    <circle cx="300" cy="28" r="22" class="firm"/><text x="300" y="33" text-anchor="middle" font-size="12" font-weight="700">F1</text>
-    <circle cx="300" cy="92" r="22" class="firm"/><text x="300" y="97" text-anchor="middle" font-size="12" font-weight="700">F2</text>
-    <circle cx="300" cy="156" r="22" class="firm"/><text x="300" y="161" text-anchor="middle" font-size="12" font-weight="700">F3</text>
-    <circle cx="300" cy="220" r="22" class="firm"/><text x="300" y="225" text-anchor="middle" font-size="12" font-weight="700">F4</text>
+    <circle cx="72" cy="28" r="19" class="worker"/><text x="72" y="33" text-anchor="middle" font-size="12" font-weight="700">W1</text>
+    <circle cx="72" cy="75" r="19" class="worker"/><text x="72" y="80" text-anchor="middle" font-size="12" font-weight="700">W2</text>
+    <circle cx="72" cy="122" r="19" class="worker"/><text x="72" y="127" text-anchor="middle" font-size="12" font-weight="700">W3</text>
+    <circle cx="72" cy="169" r="19" class="worker"/><text x="72" y="174" text-anchor="middle" font-size="12" font-weight="700">W4</text>
+    <circle cx="72" cy="216" r="19" class="worker"/><text x="72" y="221" text-anchor="middle" font-size="12" font-weight="700">W5</text>
+
+    <circle cx="306" cy="27" r="21" class="firm"/><text x="306" y="32" text-anchor="middle" font-size="12" font-weight="700">F1</text>
+    <circle cx="306" cy="89" r="21" class="firm"/><text x="306" y="94" text-anchor="middle" font-size="12" font-weight="700">F2</text>
+    <circle cx="306" cy="151" r="21" class="firm"/><text x="306" y="156" text-anchor="middle" font-size="12" font-weight="700">F3</text>
+    <circle cx="306" cy="213" r="21" class="firm"/><text x="306" y="218" text-anchor="middle" font-size="12" font-weight="700">F4</text>
   </g>
 
-  <!-- Low mobility panel -->
-  <g transform="translate(446 76)">
-    <text x="70" y="0" text-anchor="middle" font-size="12" class="muted">Workers</text>
-    <text x="300" y="0" text-anchor="middle" font-size="12" class="muted">Firms</text>
-    <rect x="16" y="12" width="332" height="105" rx="12" class="cluster"/>
-    <rect x="16" y="153" width="332" height="105" rx="12" class="cluster"/>
+  <!-- Low-mobility panel -->
+  <g transform="translate(437 82)">
+    <text x="72" y="0" text-anchor="middle" font-size="12" class="muted">Workers</text>
+    <text x="306" y="0" text-anchor="middle" font-size="12" class="muted">Firms</text>
 
-    <line x1="70" y1="40" x2="300" y2="44" class="edge"/>
-    <line x1="70" y1="82" x2="300" y2="44" class="edge"/>
-    <line x1="70" y1="182" x2="300" y2="190" class="edge"/>
-    <line x1="70" y1="224" x2="300" y2="190" class="edge"/>
-    <line x1="70" y1="108" x2="300" y2="190" class="bridge"/>
+    <rect x="18" y="10" width="335" height="101" rx="12" class="cluster"/>
+    <rect x="18" y="126" width="335" height="112" rx="12" class="cluster"/>
 
-    <circle cx="70" cy="40" r="20" class="worker"/><text x="70" y="45" text-anchor="middle" font-size="12" font-weight="700">W1</text>
-    <circle cx="70" cy="82" r="20" class="worker"/><text x="70" y="87" text-anchor="middle" font-size="12" font-weight="700">W2</text>
-    <circle cx="70" cy="108" r="20" class="worker"/><text x="70" y="113" text-anchor="middle" font-size="12" font-weight="700">W3</text>
-    <circle cx="70" cy="182" r="20" class="worker"/><text x="70" y="187" text-anchor="middle" font-size="12" font-weight="700">W4</text>
-    <circle cx="70" cy="224" r="20" class="worker"/><text x="70" y="229" text-anchor="middle" font-size="12" font-weight="700">W5</text>
+    <line x1="72" y1="31" x2="306" y2="51" class="edge"/>
+    <line x1="72" y1="74" x2="306" y2="51" class="edge"/>
+    <line x1="72" y1="163" x2="306" y2="187" class="edge"/>
+    <line x1="72" y1="207" x2="306" y2="187" class="edge"/>
+    <line x1="72" y1="105" x2="306" y2="187" class="bridge"/>
 
-    <circle cx="300" cy="44" r="22" class="firm"/><text x="300" y="49" text-anchor="middle" font-size="12" font-weight="700">F1</text>
-    <circle cx="300" cy="190" r="22" class="firm"/><text x="300" y="195" text-anchor="middle" font-size="12" font-weight="700">F2</text>
-    <text x="206" y="137" text-anchor="middle" font-size="11" fill="#c84f4f">thin bridge</text>
+    <circle cx="72" cy="31" r="19" class="worker"/><text x="72" y="36" text-anchor="middle" font-size="12" font-weight="700">W1</text>
+    <circle cx="72" cy="74" r="19" class="worker"/><text x="72" y="79" text-anchor="middle" font-size="12" font-weight="700">W2</text>
+    <circle cx="72" cy="105" r="19" class="worker"/><text x="72" y="110" text-anchor="middle" font-size="12" font-weight="700">W3</text>
+    <circle cx="72" cy="163" r="19" class="worker"/><text x="72" y="168" text-anchor="middle" font-size="12" font-weight="700">W4</text>
+    <circle cx="72" cy="207" r="19" class="worker"/><text x="72" y="212" text-anchor="middle" font-size="12" font-weight="700">W5</text>
+
+    <circle cx="306" cy="51" r="21" class="firm"/><text x="306" y="56" text-anchor="middle" font-size="12" font-weight="700">F1</text>
+    <circle cx="306" cy="187" r="21" class="firm"/><text x="306" y="192" text-anchor="middle" font-size="12" font-weight="700">F2</text>
+    <text x="212" y="131" text-anchor="middle" font-size="11" fill="#c84f4f">thin bridge</text>
   </g>
 </svg>
