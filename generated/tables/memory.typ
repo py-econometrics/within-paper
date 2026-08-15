@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[$lambda_2$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Design], th[Gap $lambda_2$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
   table.hline(stroke: 0.45pt + table-rule),
   table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],
   [simple (well-connected)], [0.622 (1.00)], [354 MiB], [411 MiB],

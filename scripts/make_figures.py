@@ -55,10 +55,10 @@ def _load_points() -> list[dict]:
         )
     document = json.loads(path.read_text(encoding="utf-8"))
     figure = document.get("headline_figure", {})
-    if document.get("schema_version") != 2 or figure.get("schema_version") != 2:
+    if document.get("schema_version") != 3 or figure.get("schema_version") != 3:
         raise SystemExit(
             "The canonical paper results use an outdated schema. "
-            "Migrate the connectivity fields to lambda2 before rendering."
+            "Migrate the connectivity fields to the version 3 Gap schema before rendering."
         )
     records = figure.get("points", [])
     if not records:
@@ -259,7 +259,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
     fig.text(
         0.535,
         0.035,
-        "Worker-firm normalized-Laplacian gap  $\\lambda_{2,WF}$  "
+        "Worker-firm Gap  $\\lambda_{2,WF}$  "
         "(weaker connectivity to the right)",
         ha="center",
         fontsize=9,

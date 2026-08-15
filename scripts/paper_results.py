@@ -29,7 +29,8 @@ LATEST_RUN = ROOT / "results" / "runs" / "latest"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 EXPECTED_TRIALS = 3
-CONNECTIVITY_HEADER = "$lambda_2$ (share)"
+CONNECTIVITY_HEADER = "Gap $lambda_2$ (share)"
+LEGACY_CONNECTIVITY_HEADER = "$lambda_2$ (share)"
 
 # The headline figure is a presentation of the two controlled AKM benchmark
 # families.  The tables remain the canonical source of the lambda2 calculation;
@@ -395,12 +396,13 @@ def _headline_point(
     view: str,
     backend: str,
     lambda2: float | None,
+    component_obs_share: float | None,
 ) -> dict[str, object]:
     """One structured record for the 2-by-2 headline figure.
 
     The plot must distinguish a returned median from an iteration cap.  A
     capped run has no successful fit, but its elapsed wall time is informative:
-    it is a lower bound on the time required to finish the requested solve.
+    it is a lower bound on the time required to finish the requested regression.
     Non-cap failures have no comparable timing and are left out of the plot.
     """
     if not candidates:
@@ -410,6 +412,7 @@ def _headline_point(
             "view": view,
             "backend": backend,
             "lambda2": lambda2,
+            "component_obs_share": component_obs_share,
             "median_time": None,
             "n_trials": 0,
             "n_success": 0,
@@ -451,6 +454,7 @@ def _headline_point(
         "view": view,
         "backend": backend,
         "lambda2": lambda2,
+        "component_obs_share": component_obs_share,
         "median_time": elapsed,
         "n_trials": len(candidates),
         "n_success": len(successful),
@@ -467,7 +471,34 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
     treating absence as a new set of failures would erase a valid paper figure.
     """
     if not _latest("akm.csv").exists():
-        return 0
+        figure = document.get("headline_figure", {})
+        changed = int(figure.get("schema_version") != 3)
+        figure["schema_version"] = 3
+        for point in figure.get("points", []):
+            table = document.get("tables", {}).get(f"akm_{point.get('family')}")
+            if table is None:
+                continue
+            source = next(
+                (
+                    row
+                    for row in table["rows"]
+                    if _row_label(table, row) == point.get("design")
+                ),
+                None,
+            )
+            if source is None:
+                continue
+            cell = _table_cell(table, source, CONNECTIVITY_HEADER)
+            values = {
+                "lambda2": _numeric_cell(cell),
+                "component_obs_share": _component_share_cell(cell),
+            }
+            for key, value in values.items():
+                if point.get(key) != value:
+                    point[key] = value
+                    changed += 1
+        document["headline_figure"] = figure
+        return changed
 
     points: list[dict[str, object]] = []
     for family in ("mobility", "sorting"):
@@ -476,6 +507,9 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
             for source in table["rows"]:
                 design = _row_label(table, source)
                 lambda2 = _numeric_cell(
+                    _table_cell(table, source, CONNECTIVITY_HEADER)
+                )
+                component_obs_share = _component_share_cell(
                     _table_cell(table, source, CONNECTIVITY_HEADER)
                 )
                 for backend in HEADLINE_FIGURE_BACKENDS[view]:
@@ -498,10 +532,11 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
                             view=view,
                             backend=backend,
                             lambda2=lambda2,
+                            component_obs_share=component_obs_share,
                         )
                     )
 
-    figure = {"schema_version": 2, "points": points}
+    figure = {"schema_version": 3, "points": points}
     if document.get("headline_figure") == figure:
         return 0
     document["headline_figure"] = figure
@@ -584,6 +619,12 @@ def _numeric_cell(value: str) -> float | None:
     if match is None:
         return None
     return float(match.group().replace(",", ""))
+
+
+def _component_share_cell(value: str) -> float | None:
+    """Read the selected component's observation share from a Gap table cell."""
+    match = re.search(r"\((\d(?:\.\d+)?)\)\s*$", value)
+    return float(match.group(1)) if match is not None else None
 
 
 def _largest_metric(
@@ -697,6 +738,17 @@ def _ensure_akm_runtime_rows(document: dict) -> int:
     return changed
 
 
+def _migrate_connectivity_headers(document: dict) -> int:
+    """Rename the paper-facing Gap column without changing its stored cells."""
+    changed = 0
+    for table in document["tables"].values():
+        for index, header in enumerate(table.get("header", [])):
+            if header == LEGACY_CONNECTIVITY_HEADER:
+                table["header"][index] = CONNECTIVITY_HEADER
+                changed += 1
+    return changed
+
+
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
     if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
@@ -705,7 +757,7 @@ def _prose_cell(value: str) -> str:
 
 
 def _format_lambda2(lambda2: float, share: float) -> str:
-    """Format lambda2 and the selected component's observation share."""
+    """Format the Gap and the selected component's observation share."""
     if lambda2 and abs(lambda2) < 1e-2:
         exponent = int(f"{lambda2:.0e}".split("e")[1])
         mantissa = lambda2 / (10**exponent)
@@ -719,7 +771,7 @@ def _format_lambda2(lambda2: float, share: float) -> str:
 
 def _synchronize_hardness(document: dict) -> int:
     rows = _latest_rows("hardness.csv")
-    # A partial collection must not erase an earlier lambda2 value.
+    # A partial collection must not erase an earlier Gap value.
     if rows is None:
         return 0
     diagnostics = {
@@ -734,7 +786,7 @@ def _synchronize_hardness(document: dict) -> int:
             return 0
         rendered = _format_lambda2(
             float(diagnostic["lambda2_qr"]),
-            float(diagnostic["weakest_component_obs_share"]),
+            float(diagnostic["largest_component_obs_share"]),
         )
         if _table_cell(table, target_row, CONNECTIVITY_HEADER) == rendered:
             return 0
@@ -999,14 +1051,19 @@ def _synchronize_canonical_tables(
 ) -> int:
     """Update runtime cells from current raw CSV files.
 
-    Keep the separately computed lambda2 and component-share values. Replace a runtime only
+    Keep the separately computed Gap and component-share values. Replace a runtime only
     when the new output records all expected trials.
     """
     raw = _rows_from_csvs()
     _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
-    changed = _ensure_akm_runtime_rows(document)
+    changed = 0
+    if document.get("schema_version") != 3:
+        document["schema_version"] = 3
+        changed += 1
+    changed += _migrate_connectivity_headers(document)
+    changed += _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
         "correia_synthetic", "correia_real",

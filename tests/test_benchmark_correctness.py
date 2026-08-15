@@ -181,40 +181,58 @@ class HardnessTests(unittest.TestCase):
             1.0 - np.sqrt(2.0 / 3.0),
         )
 
+    def test_singular_value_formula_matches_normalized_laplacian(self) -> None:
+        block = sp.csr_matrix(np.array([[1, 1], [2, 0], [0, 2]]))
+        adjacency = sp.bmat([[None, block], [block.T, None]], format="csr")
+        degrees = np.asarray(adjacency.sum(axis=1)).ravel()
+        normalized_laplacian = (
+            sp.eye(adjacency.shape[0])
+            - sp.diags(1 / np.sqrt(degrees))
+            @ adjacency
+            @ sp.diags(1 / np.sqrt(degrees))
+        )
+        expected = np.linalg.eigvalsh(normalized_laplacian.toarray())[1]
+        self.assertAlmostEqual(compute_hardness._component_lambda2(block), expected)
+
     def test_star_and_two_node_components_use_laplacian_values(self) -> None:
         star = sp.csr_matrix(np.array([[2, 1, 3]]))
         edge = sp.csr_matrix(np.array([[4]]))
         self.assertEqual(compute_hardness._component_lambda2(star), 1.0)
         self.assertEqual(compute_hardness._component_lambda2(edge), 2.0)
 
-    def test_multiple_components_select_the_smallest_lambda2(self) -> None:
-        q = np.array([0, 0, 1, 1, 2, 2, 3, 3, 3])
-        r = np.array([0, 1, 0, 0, 1, 1, 2, 3, 4])
+    def test_multiple_components_select_the_largest_by_observations(self) -> None:
+        q = np.array([0] * 7 + [1, 1, 2, 2, 3, 3])
+        r = np.array([0, 0, 1, 1, 2, 2, 2, 3, 4, 3, 3, 4, 4])
         result = compute_hardness.pair_hardness(q, r)
         self.assertEqual(result.n_components, 2)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0)
+        self.assertAlmostEqual(result.largest_component_obs_share, 7.0 / 13.0)
+        self.assertEqual(result.largest_component_n_obs, 7)
+        self.assertEqual(result.largest_component_n_q_levels, 1)
+        self.assertEqual(result.largest_component_n_r_levels, 3)
+
+    def test_equal_size_components_select_the_smaller_gap(self) -> None:
+        q = np.array([0] * 6 + [1, 1, 2, 2, 3, 3])
+        r = np.array([0, 0, 1, 1, 2, 2, 3, 4, 3, 3, 4, 4])
+        result = compute_hardness.pair_hardness(q, r)
         self.assertAlmostEqual(result.lambda2_qr, 1.0 - np.sqrt(2.0 / 3.0))
-        self.assertAlmostEqual(result.weakest_component_obs_share, 2.0 / 3.0)
-        self.assertEqual(result.weakest_component_n_obs, 6)
-        self.assertEqual(result.weakest_component_n_q_levels, 3)
-        self.assertEqual(result.weakest_component_n_r_levels, 2)
+        self.assertEqual(result.largest_component_n_q_levels, 3)
+        self.assertEqual(result.largest_component_n_r_levels, 2)
 
-    def test_sparse_calculation_falls_back_from_propack_to_arpack(self) -> None:
-        calls = []
+    def test_equal_size_equal_gap_components_use_stable_component_order(self) -> None:
+        q = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+        r = np.array([0, 0, 1, 1, 2, 3, 4, 4])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0)
+        self.assertEqual(result.largest_component_n_q_levels, 1)
+        self.assertEqual(result.largest_component_n_r_levels, 2)
 
-        def fake_svds(*args, solver, **kwargs):
-            calls.append(solver)
-            if solver == "propack":
-                raise RuntimeError("not available")
-            return np.array([0.5, 1.0])
-
-        block = sp.eye(100, format="csr")
-        with (
-            patch.object(compute_hardness, "DENSE_MAX_ENTRIES", 0),
-            patch.object(compute_hardness, "svds", side_effect=fake_svds),
-        ):
-            self.assertAlmostEqual(compute_hardness._component_lambda2(block), 0.5)
-        self.assertEqual(calls, ["propack", "arpack"])
-
+    def test_connected_graph_reports_full_observation_share(self) -> None:
+        q = np.array([0, 0, 1, 1])
+        r = np.array([0, 1, 0, 1])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertEqual(result.n_components, 1)
+        self.assertEqual(result.largest_component_obs_share, 1.0)
 
 class PythonFitTests(unittest.TestCase):
     @classmethod
@@ -604,7 +622,7 @@ class PaperResultTests(unittest.TestCase):
                 "fe_a": "indiv_id",
                 "fe_b": "firm_id",
                 "lambda2_qr": "0.25",
-                "weakest_component_obs_share": "1.0",
+                "largest_component_obs_share": "1.0",
             }
         ]
         with patch.object(paper_results, "_latest_rows", return_value=rows):
@@ -625,7 +643,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "$lambda_2$ (share)"],
+                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
                 },
                 "akm_setup_cost": {"rows": []},
@@ -663,7 +681,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "$lambda_2$ (share)"],
+                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]],
                 },
                 "akm_setup_cost": {"rows": []},

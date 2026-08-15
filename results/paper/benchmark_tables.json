@@ -3,6 +3,7 @@
     "points": [
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -15,6 +16,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -27,6 +29,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -39,6 +42,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -51,6 +55,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -63,6 +68,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -75,6 +81,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -87,6 +94,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -99,6 +107,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -111,6 +120,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -123,6 +133,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -135,6 +146,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -147,9 +159,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 57.99867891600297,
         "n_capped": 0,
         "n_success": 3,
@@ -159,9 +172,10 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 0.4088731669980916,
         "n_capped": 0,
         "n_success": 3,
@@ -171,9 +185,10 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 5.86,
         "n_capped": 0,
         "n_success": 3,
@@ -183,9 +198,10 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 2.941521917,
         "n_capped": 0,
         "n_success": 3,
@@ -195,9 +211,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 84.06838937500288,
         "n_capped": 3,
         "n_success": 0,
@@ -207,9 +224,10 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 0.4033230410059332,
         "n_capped": 0,
         "n_success": 3,
@@ -219,9 +237,10 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 6.535,
         "n_capped": 0,
         "n_success": 3,
@@ -231,9 +250,10 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 3.378207083,
         "n_capped": 0,
         "n_success": 3,
@@ -243,9 +263,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 84.38233908300026,
         "n_capped": 3,
         "n_success": 0,
@@ -255,9 +276,10 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 0.3727441249939147,
         "n_capped": 0,
         "n_success": 3,
@@ -267,9 +289,10 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 7.252,
         "n_capped": 0,
         "n_success": 3,
@@ -279,9 +302,10 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 4.292007709,
         "n_capped": 0,
         "n_success": 3,
@@ -291,6 +315,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -303,6 +328,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -315,6 +341,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -327,6 +354,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_1",
         "family": "mobility",
         "lambda2": 0.232,
@@ -339,6 +367,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -351,6 +380,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -363,6 +393,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -375,6 +406,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_mobility_2",
         "family": "mobility",
         "lambda2": 0.0392,
@@ -387,6 +419,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -399,6 +432,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -411,6 +445,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -423,6 +458,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 0.87,
         "design": "akm_mobility_3",
         "family": "mobility",
         "lambda2": 0.00184,
@@ -435,9 +471,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 83.1282928340006,
         "n_capped": 3,
         "n_success": 0,
@@ -447,9 +484,10 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 30.59503745799884,
         "n_capped": 0,
         "n_success": 3,
@@ -459,9 +497,10 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 2.4414965830001165,
         "n_capped": 0,
         "n_success": 3,
@@ -471,9 +510,10 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 0.61,
         "design": "akm_mobility_4",
         "family": "mobility",
-        "lambda2": 0.000535,
+        "lambda2": 0.000533,
         "median_time": 0.4838291250052862,
         "n_capped": 0,
         "n_success": 3,
@@ -483,9 +523,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 84.10406599999988,
         "n_capped": 3,
         "n_success": 0,
@@ -495,9 +536,10 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 42.93654466700536,
         "n_capped": 3,
         "n_success": 0,
@@ -507,9 +549,10 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 3.5151322090023314,
         "n_capped": 0,
         "n_success": 3,
@@ -519,9 +562,10 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 0.52,
         "design": "akm_mobility_5",
         "family": "mobility",
-        "lambda2": 0.000055,
+        "lambda2": 5.5100000000000004e-05,
         "median_time": 0.4690233340006671,
         "n_capped": 0,
         "n_success": 3,
@@ -531,9 +575,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 81.92704587501066,
         "n_capped": 3,
         "n_success": 0,
@@ -543,9 +588,10 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 43.809170000007725,
         "n_capped": 3,
         "n_success": 0,
@@ -555,9 +601,10 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 6.459024124997086,
         "n_capped": 0,
         "n_success": 3,
@@ -567,9 +614,10 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 0.29,
         "design": "akm_mobility_6",
         "family": "mobility",
-        "lambda2": 0.000024100000000000003,
+        "lambda2": 2.4100000000000003e-05,
         "median_time": 0.4088993339973967,
         "n_capped": 0,
         "n_success": 3,
@@ -579,6 +627,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -591,6 +640,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -603,6 +653,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -615,6 +666,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -627,9 +679,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 1.3533575830006157,
         "n_capped": 0,
         "n_success": 3,
@@ -639,9 +692,10 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 0.9502484170006936,
         "n_capped": 0,
         "n_success": 3,
@@ -651,9 +705,10 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 0.857,
         "n_capped": 0,
         "n_success": 3,
@@ -663,9 +718,10 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 0.524771667,
         "n_capped": 0,
         "n_success": 3,
@@ -675,6 +731,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -687,6 +744,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -699,6 +757,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -711,6 +770,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -723,9 +783,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 35.569439709004655,
         "n_capped": 0,
         "n_success": 3,
@@ -735,9 +796,10 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 0.7870032499995432,
         "n_capped": 0,
         "n_success": 3,
@@ -747,9 +809,10 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 2.9,
         "n_capped": 0,
         "n_success": 3,
@@ -759,9 +822,10 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 1.394684208,
         "n_capped": 0,
         "n_success": 3,
@@ -771,6 +835,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -783,6 +848,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -795,6 +861,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -807,6 +874,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -819,6 +887,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -831,6 +900,7 @@
       },
       {
         "backend": "within",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -843,6 +913,7 @@
       },
       {
         "backend": "fixest",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -855,6 +926,7 @@
       },
       {
         "backend": "FEM.jl",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -867,6 +939,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -879,6 +952,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -891,6 +965,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -903,6 +978,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_1",
         "family": "sorting",
         "lambda2": 0.222,
@@ -915,9 +991,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 2.19445179199829,
         "n_capped": 0,
         "n_success": 3,
@@ -927,9 +1004,10 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 3.149472582997987,
         "n_capped": 0,
         "n_success": 3,
@@ -939,9 +1017,10 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 0.4817810410022503,
         "n_capped": 0,
         "n_success": 3,
@@ -951,9 +1030,10 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_2",
         "family": "sorting",
-        "lambda2": 0.0333,
+        "lambda2": 0.0332,
         "median_time": 1.1271085830012453,
         "n_capped": 0,
         "n_success": 3,
@@ -963,6 +1043,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -975,6 +1056,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -987,6 +1069,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -999,6 +1082,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_3",
         "family": "sorting",
         "lambda2": 0.00149,
@@ -1011,9 +1095,10 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 61.44951408300403,
         "n_capped": 3,
         "n_success": 0,
@@ -1023,9 +1108,10 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 13.579149042001518,
         "n_capped": 0,
         "n_success": 3,
@@ -1035,9 +1121,10 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 1.3143107079959009,
         "n_capped": 0,
         "n_success": 3,
@@ -1047,9 +1134,10 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_4",
         "family": "sorting",
-        "lambda2": 0.000655,
+        "lambda2": 0.000657,
         "median_time": 0.90893958399829,
         "n_capped": 0,
         "n_success": 3,
@@ -1059,6 +1147,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -1071,6 +1160,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -1083,6 +1173,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -1095,6 +1186,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_5",
         "family": "sorting",
         "lambda2": 0.00041200000000000004,
@@ -1107,6 +1199,7 @@
       },
       {
         "backend": "rust-map",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -1119,6 +1212,7 @@
       },
       {
         "backend": "within-off",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -1131,6 +1225,7 @@
       },
       {
         "backend": "within-diagonal",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -1143,6 +1238,7 @@
       },
       {
         "backend": "within-additive",
+        "component_obs_share": 1.0,
         "design": "akm_sorting_6",
         "family": "sorting",
         "lambda2": 0.000213,
@@ -1154,9 +1250,9 @@
         "view": "matched"
       }
     ],
-    "schema_version": 2
+    "schema_version": 3
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "tables": {
     "agreement": {
       "align": "(left, left, right, right)",
@@ -1223,7 +1319,7 @@
       "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Scenario",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1264,7 +1360,7 @@
         ],
         [
           "`akm_mobility_4`",
-          "$5.35 times 10^(-4)$ (0.61)",
+          "$5.33 times 10^(-4)$ (0.61)",
           "58.0s",
           "capped (0/3)",
           "1.34s",
@@ -1274,7 +1370,7 @@
         ],
         [
           "`akm_mobility_5`",
-          "$5.50 times 10^(-5)$ (0.52)",
+          "$5.51 times 10^(-5)$ (0.52)",
           "capped (0/3)",
           "capped (0/3)",
           "2.18s",
@@ -1299,7 +1395,7 @@
       "columns": "(1.25fr, 1.05fr, 0.8fr, 0.8fr, 0.8fr, 0.8fr)",
       "header": [
         "Scenario",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "2 FE setup",
         "2 FE LSMR",
         "3 FE setup",
@@ -1361,7 +1457,7 @@
       "columns": "(1.15fr, 0.95fr, 0.72fr, 0.72fr, 0.78fr, 0.82fr, 0.70fr, 0.70fr)",
       "header": [
         "Scenario",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1382,7 +1478,7 @@
         ],
         [
           "`akm_sorting_2`",
-          "0.0333 (1.00)",
+          "0.0332 (1.00)",
           "1.35s",
           "2.04s",
           "0.427s",
@@ -1402,7 +1498,7 @@
         ],
         [
           "`akm_sorting_4`",
-          "$6.55 times 10^(-4)$ (1.00)",
+          "$6.57 times 10^(-4)$ (1.00)",
           "35.6s",
           "capped (0/3)",
           "1.05s",
@@ -1437,7 +1533,7 @@
       "columns": "(1.05fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1458,7 +1554,7 @@
         ],
         [
           "`soccer`",
-          "0.667 (1.00)",
+          "0.666 (1.00)",
           "0.026s",
           "0.056s",
           "0.032s",
@@ -1533,7 +1629,7 @@
       "columns": "(1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1544,7 +1640,7 @@
       "rows": [
         [
           "`synthetic-complete`",
-          "1.00 (1.00)",
+          "1 (1.00)",
           "0.109s",
           "0.114s",
           "0.128s",
@@ -1584,7 +1680,7 @@
         ],
         [
           "`synthetic-assortative`",
-          "$6.65 times 10^(-4)$ (0.70)",
+          "$6.67 times 10^(-4)$ (0.70)",
           "13.0s",
           "1.25s",
           "1.03s",
@@ -1626,7 +1722,7 @@
       "columns": "(1.25fr, 1.0fr, 0.85fr, 0.85fr)",
       "header": [
         "Design",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within`"
       ],
@@ -1674,7 +1770,7 @@
       "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Design",
-        "$lambda_2$ (share)",
+        "Gap $lambda_2$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1799,4 +1895,3 @@
     }
   }
 }
-

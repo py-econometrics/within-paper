@@ -37,21 +37,23 @@ def _raw_trial(
 
 
 class HeadlineFigureCollectionTests(unittest.TestCase):
-    def test_canonical_headline_uses_lambda2_schema(self) -> None:
+    def test_canonical_headline_uses_version_three_gap_schema(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
-        self.assertEqual(document["schema_version"], 2)
-        self.assertEqual(document["headline_figure"]["schema_version"], 2)
+        self.assertEqual(document["schema_version"], 3)
+        self.assertEqual(document["headline_figure"]["schema_version"], 3)
         self.assertTrue(
             all(
-                "lambda2" in point and "gap" not in point
+                "lambda2" in point
+                and "component_obs_share" in point
+                and "gap" not in point
                 for point in document["headline_figure"]["points"]
             )
         )
 
-    def test_headline_loader_rejects_schema_version_one(self) -> None:
+    def test_headline_loader_rejects_schema_version_two(self) -> None:
         document = {
-            "schema_version": 1,
-            "headline_figure": {"schema_version": 1, "points": [{"lambda2": 0.4}]},
+            "schema_version": 2,
+            "headline_figure": {"schema_version": 2, "points": [{"lambda2": 0.4}]},
         }
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "paper.json"
@@ -146,7 +148,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertEqual(records[("default", "fixest")]["status"], "missing")
 
     def test_absent_akm_file_preserves_collected_figure_records(self) -> None:
-        document = {"headline_figure": {"schema_version": 2, "points": [{"status": "complete"}]}}
+        document = {"headline_figure": {"schema_version": 3, "points": [{"status": "complete"}]}}
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(paper_results, "LATEST_RUN", Path(directory)):
                 changed = paper_results._synchronize_headline_figure(document, [])
@@ -161,6 +163,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
             view="default",
             backend="rust-map",
             lambda2=0.4,
+            component_obs_share=1.0,
         )
         self.assertEqual(point["status"], "partial")
         self.assertTrue(make_figures._visible_point(point))
@@ -172,7 +175,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
 
         self.assertEqual(
             rendered["header"][:2],
-            ["Move probability $delta$", "$lambda_2$ (share)"],
+            ["Move probability $delta$", "Gap $lambda_2$ (share)"],
         )
         self.assertEqual(
             rendered["header"][2:],

@@ -51,15 +51,14 @@
       markets, and time periods to remove variation that would otherwise enter the standard error on the
       treatment coefficient. The Method of Alternating Projections (MAP) performs this absorption by
       demeaning one factor at a time, and it converges slowly when the co-occurrence graph linking the
-      absorbed factors is sparse or close to disconnected. We show that several standard features of
-      platform experiments produce such graphs: sparse two-sided exposure in marketplaces, and cluster
-      randomization that partitions an interaction graph to limit interference. We propose a preconditioner
-      built from overlapping factor-pair subproblems. Each subproblem is a signed graph Laplacian and admits
-      sparse approximate Cholesky factorization, and we use the resulting operator inside a Krylov solver
+      absorbed factors is sparse or close to disconnected. Sparse two-sided exposure in marketplaces and
+      cluster randomization that partitions an interaction graph both produce such graphs. Our
+      preconditioner uses overlapping factor-pair subproblems. Each subproblem is a signed graph Laplacian
+      that admits sparse approximate Cholesky factorization; the resulting operator enters a Krylov solver
       for least squares. On a near-nested ten-million-observation design, the preconditioned solver
       completes in 4.63s against 62.2s for the fastest MAP implementation. In the one-million-observation
       Poisson benchmark, `within` takes 5.52s and `fixest` 439.3s. On dense, well-connected graphs MAP
-      remains faster, and the normalized-Laplacian gap $lambda_2$ is larger. Because the preconditioner depends on
+      remains faster, and the worker-item Gap $lambda_2$ is larger. Because the preconditioner depends on
       the fixed effects and the weights but not on the right-hand side, one factorization serves the many
       residualizations that randomization inference and multi-metric readouts require: measured cost per
       right-hand side falls from 0.137s to 0.047s between one and twenty-five columns.
@@ -130,7 +129,7 @@ that biases the estimate.
 
 Both the partition criterion and the links that slow MAP come from the same weighted graph. A partition
 that cuts little edge weight leaves the corresponding factor-pair block close to block diagonal, with thin
-bridges between the blocks. The normalized-Laplacian gap $lambda_2$ defined in Section 3 is then small. A
+bridges between the blocks. The Gap $lambda_2$ defined in Section 3 is then small. A
 cluster design that limits spillovers can therefore also leave MAP with a graph on which it converges
 slowly. We report this connection as a structural one; we have not benchmarked a
 cluster-randomized design directly, and the strength of the effect will depend on how the analysis panel
@@ -146,7 +145,7 @@ the design matrix $D$ and the weights $W$ are unchanged; only the vector being r
 factor-pair preconditioner depends on $D$ and $W$ alone, so one factorization serves every column, and
 Section 5 reports the measured decline in cost per right-hand side.
 
-= Why MAP slows down, and a connectivity measure
+= Why MAP slows down, and the Gap
 
 Let the factors be user, item, and period. The Gramian has the block form
 
@@ -163,11 +162,13 @@ the zig-zag algorithm, updates one factor at a time @guimaraes2010 @gaure2013: i
 mean of the current partial residual within each level of factor $q$ and subtracts it. A complete pass is
 cheap because every update divides by a diagonal count, and the cross-tabulations are never solved as
 coupled systems. When the graph is poorly connected, each pass transfers only a small amount of
-information across the narrow bridges, and many passes are required. Following @jochmans2019, we measure
-the connectivity of a connected factor-pair graph by $lambda_2$, the second-smallest eigenvalue of its
-normalized Laplacian. Smaller values indicate near nesting or weak cross-exposure. With three factors,
-$lambda_2$ describes one pair and does not bound convergence of the full model. Component size and setup
-cost also determine runtime, so we treat $lambda_2$ as a diagnostic rather than a solver-selection rule.
+information across the narrow bridges, and many passes are required. Following @jochmans2019fixed, we call
+the second-smallest eigenvalue of the normalized Laplacian the Gap. With degree matrix $Delta_(q r)$,
+$S_(q r)=Delta_(q r)^(-1/2)L_(q r)Delta_(q r)^(-1/2)$ and
+$"Gap"_(q r)=lambda_2(S_(q r))$. Edge weights are co-occurrence counts, and a smaller Gap indicates near
+nesting or weak cross-exposure. After singleton removal, a disconnected graph is represented by the
+component containing the most observations. With three factors, the Gap describes one pair and does not
+bound convergence of the full model, so we use it as a diagnostic rather than a solver-selection rule.
 
 = The factor-pair preconditioner
 
@@ -215,15 +216,15 @@ with 10 cores and 16 GB of memory.
       inset: (x: 4pt, y: 3pt),
       align: (left, right, right, right, right, right),
       table.hline(stroke: 0.75pt + rule),
-      table.header(th[Design], th[$lambda_2$], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
+      table.header(th[Design], th[Gap $lambda_2$ (share)], th[PyFixest MAP], th[fixest], th[FEM.jl], th[within]),
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[OLS, 10M observations]],
-      [simple (well-connected)], [0.622], [2.35s], [2.52s], [2.08s], [11.2s],
-      [difficult (near-nested)], [$8.35 times 10^(-8)$], [326.2s], [62.2s], [27.0s], [*4.63s*],
+      [simple (well-connected)], [0.622 (1.00)], [2.35s], [2.52s], [2.08s], [11.2s],
+      [difficult (near-nested)], [$8.35 times 10^(-8)$ (1.00)], [326.2s], [62.2s], [27.0s], [*4.63s*],
       table.hline(stroke: 0.4pt + rule),
       table.cell(colspan: 6, fill: rgb("#fbfcfd"))[#emph[Poisson, 1M observations]],
-      [simple (well-connected)], [-], [7.95s], [4.63s], [5.71s], [9.74s],
-      [difficult (near-nested)], [-], [capped], [439.3s], [129.8s], [*5.52s*],
+      [simple (well-connected)], [0.622 (1.00)], [7.95s], [4.63s], [5.71s], [9.74s],
+      [difficult (near-nested)], [$8.35 times 10^(-6)$ (1.00)], [capped], [439.3s], [129.8s], [*5.52s*],
       table.hline(stroke: 0.75pt + rule),
     )
   ]
@@ -231,7 +232,7 @@ with 10 cores and 16 GB of memory.
 
 On the simple design the graph is dense, MAP converges in few passes, and `within` is
 slowest because the preconditioner does not repay its setup cost. The ranking reverses
-on the difficult design, where $lambda_2$ falls to $8.35 times 10^(-8)$: unaccelerated
+on the difficult design, where the Gap falls to $8.35 times 10^(-8)$: unaccelerated
 MAP takes 326.2s and the fastest MAP backend 62.2s, while `within` completes in 4.63s.
 
 The Poisson rows matter for experiment readouts because platform outcomes are frequently counts of
@@ -287,7 +288,7 @@ MiB at one million observations.
 Accelerated MAP remains a good default for dense, well-connected graphs and for one-off fits where setup
 cannot amortize. The factor-pair preconditioner is intended for sparse two-sided exposure, cluster designs
 with thin bridges, count outcomes estimated by IRLS, and workloads that residualize many right-hand sides
-against one fixed-effect structure. A small $lambda_2$ identifies weakly connected pair graphs; pilot timings should decide
+against one fixed-effect structure. A small Gap identifies weakly connected pair graphs; pilot timings should decide
 whether setup is recovered.
 
 The method is available in the open-source `within` project @within. The computational core is written in
