@@ -18,8 +18,8 @@ if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")
 frame <- as.data.frame(read_parquet(data_path))
 formula <- if (specification == "intercepts") {
   as.formula(paste("y ~ x1 |", paste(fixed_effects, collapse = " + ")))
-} else if (specification == "worker-year-slope") {
-  y ~ x1 | indiv_id[year] + firm_id + year
+} else if (specification == "worker-firm-year-slopes") {
+  y ~ x1 | indiv_id[year] + firm_id[year] + year
 } else {
   stop(paste("unknown OLS specification", specification))
 }

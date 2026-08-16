@@ -56,10 +56,10 @@ isolate a solver choice.
 - **Factor order.** Worker, firm, year, in that order, for every experiment. MAP is
   sensitive to the cycling order, so it must not vary across tables.
 - **Varying-slope specification.** The varying-slope experiment replaces the ordinary
-  worker effect with a worker effect that contains an intercept and a numeric year
-  slope, followed by firm and categorical year effects. Every backend receives the
-  unchanged year values 1 through 10. The shared OLS pipeline applies this specification
-  to the simple, difficult, mobility, and sorting designs without running PyFixest MAP.
+  worker and firm effects with effects that each contain an intercept and a numeric year
+  slope, followed by categorical year effects. Every backend receives the unchanged year
+  values 1 through 10. The shared OLS pipeline applies this specification to the simple,
+  difficult, mobility, and sorting designs without running PyFixest MAP.
 - **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
   launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
   `check-external-runtimes` verifies the R and Julia settings before a production run.
@@ -253,8 +253,8 @@ Three comparisons are kept separate.
    and residual error measured on the returned fit.
 4. **Varying slopes.** PyFixest uses its `within` backend with diagonal or factor-pair
    Schwarz preconditioning. R `fixest` and `FixedEffectModels.jl` use their package
-   defaults. All four absorb worker intercepts, worker-specific year slopes, firm
-   effects, and categorical year effects.
+   defaults. All four absorb worker and firm intercepts, worker- and firm-specific year
+   slopes, and categorical year effects.
 
 The matched-accuracy label in Figure 1 refers to the settings calibrated in the separate
 achieved-precision benchmark. It does not mean that each plotted regression carries its
@@ -286,7 +286,7 @@ coefficient and residual errors separately.
 | AKM designs varying sorting | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
 | Large-scale simple/difficult | 10M | Six default OLS configurations | Headline total-runtime comparison |
 | Runtime and achieved precision | 1M selected AKM mobility designs | PyFixest MAP and LSMR variants, R `fixest`, and `FixedEffectModels.jl` | Wall time against coefficient and residual error |
-| Worker-specific year slopes | 10M simple/difficult; 1M AKM mobility and sorting designs | PyFixest diagonal and factor-pair Schwarz, R `fixest`, and `FixedEffectModels.jl` | Package-default runtime with one varying-slope effect |
+| Worker- and firm-specific year slopes | 10M simple/difficult; 1M AKM mobility and sorting designs | PyFixest diagonal and factor-pair Schwarz, R `fixest`, and `FixedEffectModels.jl` | Package-default runtime with two varying-slope effects |
 | Ten-regression reuse | 1M simple and difficult | Diagonal, rebuilt factor-pair, and cached factor-pair preconditioners | Setup reuse across fits |
 | Selected Correia designs | Existing sizes | Six default OLS configurations | Robustness across graph families |
 | PPML simple/difficult | 1M | PyFixest MAP and factor-pair reuse, plus external packages | Inner solver versus outer IRLS convergence |

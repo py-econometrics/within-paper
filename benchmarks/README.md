@@ -40,11 +40,11 @@ configuration runs in an isolated Python worker. The LSMR configurations in thes
 commands retain their package defaults. The matched-accuracy AKM rows are separate
 controls with explicit tolerances and iteration caps.
 
-`bench-main` and `bench-akm` also run a worker-specific year-slope specification on the
-same temporary sample used by their ordinary OLS cells. This specification covers the
-simple and difficult designs and all AKM mobility and sorting designs. PyFixest runs only
-the `within` backend, once with diagonal preconditioning and once with factor-pair
-Schwarz preconditioning; the other cells use R `fixest` and `FixedEffectModels.jl`.
+`bench-main` and `bench-akm` also run worker- and firm-specific year slopes on the same
+temporary sample used by their ordinary OLS cells. This specification covers the simple
+and difficult designs and all AKM mobility and sorting designs. PyFixest runs only the
+`within` backend, once with diagonal preconditioning and once with factor-pair Schwarz
+preconditioning; the other cells use R `fixest` and `FixedEffectModels.jl`.
 
 The OLS agreement check uses four backends. PPML, memory, iteration, setup-cost, and
 preconditioner-reuse benchmarks use the methods needed for their individual comparisons.

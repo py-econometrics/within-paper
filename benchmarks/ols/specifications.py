@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from benchmarks.data import FE_COLUMNS
 
 INTERCEPTS = "intercepts"
-WORKER_YEAR_SLOPE = "worker-year-slope"
+WORKER_FIRM_YEAR_SLOPES = "worker-firm-year-slopes"
 VARYING_SLOPE_BACKENDS = (
     "within-diagonal",
     "within-additive",
@@ -27,10 +27,10 @@ class OlsSpecification:
     varying_slope: str = ""
 
 
-WORKER_YEAR_SLOPE_SPECIFICATION = OlsSpecification(
-    name=WORKER_YEAR_SLOPE,
+WORKER_FIRM_YEAR_SLOPES_SPECIFICATION = OlsSpecification(
+    name=WORKER_FIRM_YEAR_SLOPES,
     fixed_effects=FE_COLUMNS,
     backends=VARYING_SLOPE_BACKENDS,
     repetitions=3,
-    varying_slope="indiv_id[year]",
+    varying_slope="indiv_id[year]+firm_id[year]",
 )

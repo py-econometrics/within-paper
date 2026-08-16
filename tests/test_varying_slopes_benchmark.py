@@ -1,4 +1,4 @@
-"""Checks for the worker-year-slope OLS specification."""
+"""Checks for the worker- and firm-specific year-slope OLS specification."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from benchmarks.ols.specifications import (
     INTERCEPTS,
     OlsSpecification,
     VARYING_SLOPE_BACKENDS,
-    WORKER_YEAR_SLOPE,
-    WORKER_YEAR_SLOPE_SPECIFICATION,
+    WORKER_FIRM_YEAR_SLOPES,
+    WORKER_FIRM_YEAR_SLOPES_SPECIFICATION,
 )
 from scripts import paper_results
 
@@ -38,9 +38,11 @@ class VaryingSlopeSpecificationTests(unittest.TestCase):
 
     def test_formula_and_supported_backends_are_fixed(self) -> None:
         formula = ols_pyfixest.formula_for_specification(
-            ("indiv_id", "firm_id", "year"), WORKER_YEAR_SLOPE
+            ("indiv_id", "firm_id", "year"), WORKER_FIRM_YEAR_SLOPES
         )
-        self.assertEqual(formula, "y ~ x1 | indiv_id[year] + firm_id + year")
+        self.assertEqual(
+            formula, "y ~ x1 | indiv_id[year] + firm_id[year] + year"
+        )
         self.assertEqual(
             VARYING_SLOPE_BACKENDS,
             ("within-diagonal", "within-additive", "fixest", "FEM.jl"),
@@ -72,6 +74,7 @@ class VaryingSlopeSpecificationTests(unittest.TestCase):
 
         self.assertEqual(returned.columns.tolist(), frame.columns.tolist())
         pd.testing.assert_series_equal(returned["year"], frame["year"])
+        self.assertTrue(returned.groupby("indiv_id")["year"].nunique().eq(10).all())
 
     def test_python_preconditioners_return_the_same_coefficient(self) -> None:
         frame = make_base_data(1_000, "simple", 22)
@@ -81,7 +84,7 @@ class VaryingSlopeSpecificationTests(unittest.TestCase):
                     frame,
                     backend,
                     ("indiv_id", "firm_id", "year"),
-                    specification=WORKER_YEAR_SLOPE,
+                    specification=WORKER_FIRM_YEAR_SLOPES,
                 )
                 .coef()
                 .loc["x1"]
@@ -122,7 +125,7 @@ class VaryingSlopePipelineTests(unittest.TestCase):
         main_call = run_main.call_args.kwargs
         self.assertEqual(
             main_call["additional_specifications"],
-            (WORKER_YEAR_SLOPE_SPECIFICATION,),
+            (WORKER_FIRM_YEAR_SLOPES_SPECIFICATION,),
         )
         self.assertEqual(
             [name for name, _generate in main_call["designs"]],
@@ -134,7 +137,7 @@ class VaryingSlopePipelineTests(unittest.TestCase):
         akm_call = run_akm.call_args.kwargs
         self.assertEqual(
             akm_call["additional_specifications"],
-            (WORKER_YEAR_SLOPE_SPECIFICATION,),
+            (WORKER_FIRM_YEAR_SLOPES_SPECIFICATION,),
         )
         self.assertEqual(
             [name for name, _generate in akm_call["designs"]], list(SCENARIOS)
@@ -159,11 +162,11 @@ class VaryingSlopePipelineTests(unittest.TestCase):
             return None
 
         varying = OlsSpecification(
-            name=WORKER_YEAR_SLOPE,
+            name=WORKER_FIRM_YEAR_SLOPES,
             fixed_effects=("indiv_id", "firm_id", "year"),
             backends=("within-diagonal", "within-additive"),
             repetitions=1,
-            varying_slope="indiv_id[year]",
+            varying_slope="indiv_id[year]+firm_id[year]",
         )
         with patch.object(ols_runner, "_run_process", side_effect=fake_process):
             result = ols_runner.run_experiment(
@@ -178,11 +181,11 @@ class VaryingSlopePipelineTests(unittest.TestCase):
         self.assertEqual(generated, 1)
         self.assertEqual(
             seen_specifications,
-            [INTERCEPTS, WORKER_YEAR_SLOPE, WORKER_YEAR_SLOPE],
+            [INTERCEPTS, WORKER_FIRM_YEAR_SLOPES, WORKER_FIRM_YEAR_SLOPES],
         )
         self.assertEqual(
             result.groupby("specification").size().to_dict(),
-            {INTERCEPTS: 1, WORKER_YEAR_SLOPE: 2},
+            {INTERCEPTS: 1, WORKER_FIRM_YEAR_SLOPES: 2},
         )
 
     def test_runner_records_a_crashed_varying_slope_cell(self) -> None:
@@ -191,17 +194,20 @@ class VaryingSlopePipelineTests(unittest.TestCase):
                 target(*args)
                 return None
             _, output, _fixed_effects, backend, repetitions, _, _, specification = args
-            if specification == WORKER_YEAR_SLOPE and backend == "within-diagonal":
+            if (
+                specification == WORKER_FIRM_YEAR_SLOPES
+                and backend == "within-diagonal"
+            ):
                 return "python estimator worker exited with status 1"
             self._successful_row(backend, repetitions).to_csv(output, index=False)
             return None
 
         varying = OlsSpecification(
-            name=WORKER_YEAR_SLOPE,
+            name=WORKER_FIRM_YEAR_SLOPES,
             fixed_effects=("indiv_id", "firm_id", "year"),
             backends=("within-diagonal", "within-additive"),
             repetitions=1,
-            varying_slope="indiv_id[year]",
+            varying_slope="indiv_id[year]+firm_id[year]",
         )
         with patch.object(ols_runner, "_run_process", side_effect=fake_process):
             result = ols_runner.run_experiment(
@@ -234,8 +240,8 @@ class VaryingSlopePaperTests(unittest.TestCase):
                 "n_obs": n_obs,
                 "n_fe": 3,
                 "view": "default",
-                "specification": WORKER_YEAR_SLOPE,
-                "varying_slope": "indiv_id[year]",
+                "specification": WORKER_FIRM_YEAR_SLOPES,
+                "varying_slope": "indiv_id[year]+firm_id[year]",
             }
             for repetition in range(3)
         ]

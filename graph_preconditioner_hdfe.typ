@@ -1022,23 +1022,30 @@ Our measure of connectivity is a pairwise description rather than a rule for cho
 runtime also depends on component size, factor dimensions, graph sparsity, acceleration,
 and the preconditioner's setup cost.
 
-== Worker-Specific Year Slopes
+== Worker- and Firm-Specific Year Slopes
 
 Applied work often allows a linear time trend to differ across observational units. We
-add one numeric year slope for every worker to the simple and difficult designs and to
-all twelve AKM mobility and sorting designs, while retaining firm and categorical year
-effects. In `fixest` formula syntax, the absorbed part is `indiv_id[year] + firm_id +
-year`: the bracketed term includes a worker intercept and a worker-specific slope on the
-existing year variable, while the final term absorbs unrestricted aggregate year
-shocks.
+add one numeric year slope for every worker and firm to the simple and difficult designs
+and to all twelve AKM mobility and sorting designs, while retaining categorical year
+effects. In `fixest` formula syntax, the absorbed part is `indiv_id[year] +
+firm_id[year] + year`. Each bracketed term includes a group intercept and a
+group-specific linear slope on the existing year variable, while the final term absorbs
+unrestricted aggregate year shocks.
+
+Bracket syntax treats `year` as numeric; it does not create a categorical worker-year or
+firm-year effect. Every worker in these balanced panels contributes ten observations
+with year values 1 through 10, so the worker slopes do not create singleton groups. A
+firm slope requires observations from at least two years. Firms without that support
+are handled by each package's usual identification and singleton rules. Worker-firm
+interactions are not included because they add categorical match effects rather than a
+slope on a numeric variable.
 
 The PyFixest cells use the `within` backend because its other demeaning backends do not
 support varying slopes. We compare diagonal and factor-pair Schwarz preconditioning
-with R `fixest` and FEM.jl. Worker-firm interactions are not included because they add
-categorical match effects rather than a slope on a numeric variable.
+with R `fixest` and FEM.jl.
 
 #block(breakable: false)[#text(size: 8.7pt)[
-#strong[Worker-specific year slopes on the simple and difficult designs.]
+#strong[Worker- and firm-specific year slopes on the simple and difficult designs.]
 #include "generated/tables/varying_slopes_base.typ"
   #v(0.25em)
   #table-note[Times are in seconds for OLS regressions with 10 million observations and
@@ -1046,30 +1053,22 @@ categorical match effects rather than a slope on a numeric variable.
 ]]
 
 #block(breakable: false)[#text(size: 8.7pt)[
-#strong[Worker-specific year slopes across AKM mobility designs.]
+#strong[Worker- and firm-specific year slopes across AKM mobility designs.]
 #include "generated/tables/varying_slopes_mobility.typ"
 ]]
 
 #block(breakable: false)[#text(size: 8.7pt)[
-#strong[Worker-specific year slopes across AKM sorting designs.]
+#strong[Worker- and firm-specific year slopes across AKM sorting designs.]
 #include "generated/tables/varying_slopes_sorting.typ"
   #v(0.25em)
   #table-note[The AKM regressions have 1 million observations. Every regression in the
-  three tables absorbs worker intercepts, worker-specific numeric year slopes, firm
-  effects, and categorical year effects. PyFixest uses LSMR with diagonal or factor-pair
-  Schwarz preconditioning through the `within` backend; R `fixest` and FEM.jl use their
-  package defaults. If only $k$ of the three runs return an estimate, $t (k/3)$ reports
-  the median time $t$. `capped (0/3)` means that no run finishes before its iteration
-  limit, while `failed (0/3)` marks another failure.]
+  three tables absorbs worker and firm intercepts, worker- and firm-specific numeric
+  year slopes, and categorical year effects. PyFixest uses LSMR with diagonal or
+  factor-pair Schwarz preconditioning through the `within` backend; R `fixest` and
+  FEM.jl use their package defaults. If only $k$ of the three runs return an estimate,
+  $t (k/3)$ reports the median time $t$. `capped (0/3)` means that no run finishes before
+  its iteration limit, while `failed (0/3)` marks another failure.]
 ]]
-
-In the three previously measured mobility designs, diagonal PyFixest is faster than
-Schwarz: 0.454 versus 4.50 seconds at $delta = 1$, 1.58 versus 5.80 seconds at $delta =
-0.05$, and 2.65 versus 6.23 seconds at $delta = 0.005$. It is also the fastest package
-in these rows, beating `fixest` by factors of 2.4, 10.7, and 7.6 and FEM.jl by factors
-of 1.9, 2.8, and 2.4. Schwarz is slower than both native packages at $delta = 1$. At
-lower mobility it beats `fixest`, and by $delta = 0.005$ its 6.23 seconds is close to
-FEM.jl's 6.39 seconds.
 
 == Runtime and Achieved Precision
 

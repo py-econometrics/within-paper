@@ -13,7 +13,7 @@ import pandas as pd
 
 from benchmarks.data import make_base_data
 from benchmarks.ols.pyfixest import fit_ols
-from benchmarks.ols.specifications import WORKER_YEAR_SLOPE
+from benchmarks.ols.specifications import WORKER_FIRM_YEAR_SLOPES
 
 ROOT = Path(__file__).absolute().parents[1]
 HAS_R = shutil.which("Rscript") is not None
@@ -48,7 +48,7 @@ def _run(language: str, model: str) -> pd.DataFrame:
                 str(output),
                 "indiv_id,firm_id,year",
                 "1",
-                WORKER_YEAR_SLOPE,
+                WORKER_FIRM_YEAR_SLOPES,
             ]
         else:
             script = ROOT / "benchmarks" / "tolerance" / (
@@ -120,7 +120,7 @@ class VaryingSlopeAgreementTests(unittest.TestCase):
                 frame,
                 backend,
                 ("indiv_id", "firm_id", "year"),
-                specification=WORKER_YEAR_SLOPE,
+                specification=WORKER_FIRM_YEAR_SLOPES,
             )
             for backend in ("within-diagonal", "within-additive")
         ]

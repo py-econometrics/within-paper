@@ -46,6 +46,6 @@ directly and writes one raw CSV under `results/runs/latest/`. Cross-language com
 share one temporary Parquet file per design. Small Python, R, and Julia calls are part of
 `pixi run test`.
 
-`bench-main` records the ordinary and worker-specific year-slope specifications for the
-simple and difficult designs in `ols.csv`. `bench-akm` records both specifications for
-all mobility and sorting designs in `akm.csv`.
+`bench-main` records the ordinary specification and the worker- and firm-specific
+year-slope specification for the simple and difficult designs in `ols.csv`. `bench-akm`
+records both specifications for all mobility and sorting designs in `akm.csv`.

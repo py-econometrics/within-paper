@@ -597,8 +597,8 @@ def _paper_runtime_target(
             {
                 "n_obs": n_obs,
                 "n_fe": 3,
-                "specification": "worker-year-slope",
-                "varying_slope": "indiv_id[year]",
+                "specification": "worker-firm-year-slopes",
+                "varying_slope": "indiv_id[year]+firm_id[year]",
             },
             source,
         )

@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from benchmarks.ols.specifications import INTERCEPTS, WORKER_YEAR_SLOPE
+from benchmarks.ols.specifications import INTERCEPTS, WORKER_FIRM_YEAR_SLOPES
 from benchmarks.runtime import failure_fields
 
 
@@ -50,12 +50,12 @@ def formula_for_specification(
     """Return the common formula represented by a benchmark specification."""
     if specification == INTERCEPTS:
         absorbed = " + ".join(fixed_effects)
-    elif specification == WORKER_YEAR_SLOPE:
+    elif specification == WORKER_FIRM_YEAR_SLOPES:
         if tuple(fixed_effects) != ("indiv_id", "firm_id", "year"):
             raise ValueError(
-                "worker-year-slope requires indiv_id, firm_id, and year effects"
+                "worker-firm-year-slopes requires indiv_id, firm_id, and year effects"
             )
-        absorbed = "indiv_id[year] + firm_id + year"
+        absorbed = "indiv_id[year] + firm_id[year] + year"
     else:
         raise ValueError(f"unknown OLS specification {specification!r}")
     return "y ~ x1 | " + absorbed

@@ -37,9 +37,10 @@ fixed_effects = split(fixed_text, ",")
 formula = if specification == "intercepts"
     fixed_terms = foldl(+, [fe(Symbol(name)) for name in fixed_effects])
     term(:y) ~ term(:x1) + fixed_terms
-elseif specification == "worker-year-slope"
+elseif specification == "worker-firm-year-slopes"
     term(:y) ~ term(:x1) + fe(:indiv_id) +
-        (fe(:indiv_id) & term(:year)) + fe(:firm_id) + fe(:year)
+        (fe(:indiv_id) & term(:year)) + fe(:firm_id) +
+        (fe(:firm_id) & term(:year)) + fe(:year)
 else
     error("unknown OLS specification $specification")
 end

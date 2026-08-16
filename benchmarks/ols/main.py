@@ -4,7 +4,7 @@ from functools import partial
 
 from benchmarks.data import BASE_DESIGNS, make_base_data
 from benchmarks.ols.run import LATEST, PACKAGE_RUNTIME_BACKENDS, run_experiment
-from benchmarks.ols.specifications import WORKER_YEAR_SLOPE_SPECIFICATION
+from benchmarks.ols.specifications import WORKER_FIRM_YEAR_SLOPES_SPECIFICATION
 
 N_OBS = 10_000_000
 
@@ -18,7 +18,7 @@ def main() -> None:
         ],
         output=LATEST / "ols.csv",
         backends=PACKAGE_RUNTIME_BACKENDS,
-        additional_specifications=(WORKER_YEAR_SLOPE_SPECIFICATION,),
+        additional_specifications=(WORKER_FIRM_YEAR_SLOPES_SPECIFICATION,),
     )
 
 

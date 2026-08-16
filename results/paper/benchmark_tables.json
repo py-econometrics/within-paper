@@ -1919,29 +1919,11 @@
         "`FEM.jl`"
       ],
       "rows": [
-        [
-          "`akm_mobility_1`",
-          "0.454s",
-          "4.50s",
-          "1.07s",
-          "0.878s"
-        ],
+        ["`akm_mobility_1`", "#miss", "#miss", "#miss", "#miss"],
         ["`akm_mobility_2`", "#miss", "#miss", "#miss", "#miss"],
-        [
-          "`akm_mobility_3`",
-          "1.58s",
-          "5.80s",
-          "17.0s",
-          "4.37s"
-        ],
+        ["`akm_mobility_3`", "#miss", "#miss", "#miss", "#miss"],
         ["`akm_mobility_4`", "#miss", "#miss", "#miss", "#miss"],
-        [
-          "`akm_mobility_5`",
-          "2.65s",
-          "6.23s",
-          "20.1s",
-          "6.39s"
-        ],
+        ["`akm_mobility_5`", "#miss", "#miss", "#miss", "#miss"],
         ["`akm_mobility_6`", "#miss", "#miss", "#miss", "#miss"]
       ]
     },
