@@ -795,10 +795,19 @@ def _synchronize_hardness(document: dict) -> int:
     # A partial collection must not erase an earlier Gap value.
     if rows is None:
         return 0
+    required_fields = {
+        "dataset_id",
+        "fe_a",
+        "fe_b",
+        "lambda2_qr",
+        "largest_component_obs_share",
+    }
     diagnostics = {
         row["dataset_id"]: row
         for row in rows
-        if {row["fe_a"], row["fe_b"]} in ({"indiv_id", "firm_id"}, {"id1", "id2"})
+        if required_fields <= row.keys()
+        and {row["fe_a"], row["fe_b"]}
+        in ({"indiv_id", "firm_id"}, {"id1", "id2"})
     }
 
     def update(source_id: str, target_row: list[str]) -> int:

@@ -630,6 +630,23 @@ class PaperResultTests(unittest.TestCase):
         self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][1], mobility_gap)
         self.assertEqual(document["tables"]["akm_sorting"]["rows"][0][1], "0.25 (1.00)")
 
+    def test_legacy_hardness_file_preserves_collected_lambda2_values(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        mobility_gap = document["tables"]["akm_mobility"]["rows"][0][1]
+        rows = [
+            {
+                "dataset_id": "akm_mobility_1",
+                "fe_a": "indiv_id",
+                "fe_b": "firm_id",
+                "one_minus_rho": "0.25",
+            }
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            changed = paper_results._synchronize_hardness(document)
+
+        self.assertEqual(changed, 0)
+        self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][1], mobility_gap)
+
     def test_render_does_not_collect_raw_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with (
