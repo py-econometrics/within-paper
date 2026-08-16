@@ -1050,8 +1050,12 @@ categorical match effects rather than a slope on a numeric variable.
   while `failed (0/3)` marks another failure.]
 ]]
 
-The table keeps the two PyFixest preconditioners separate so their setup and iteration
-costs can be compared with the native R and Julia implementations.
+Diagonal PyFixest is faster than Schwarz in all three designs: 0.454 versus 4.50 seconds
+at $delta = 1$, 1.58 versus 5.80 seconds at $delta = 0.05$, and 2.65 versus 6.23
+seconds at $delta = 0.005$. It is also the fastest package in every row, beating
+`fixest` by factors of 2.4, 10.7, and 7.6 and FEM.jl by factors of 1.9, 2.8, and 2.4.
+Schwarz is slower than both native packages at $delta = 1$. At lower mobility it beats
+`fixest`, and by $delta = 0.005$ its 6.23 seconds is close to FEM.jl's 6.39 seconds.
 
 == Runtime and Achieved Precision
 

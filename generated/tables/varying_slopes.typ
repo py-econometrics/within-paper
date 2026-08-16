@@ -12,8 +12,8 @@
   table.hline(stroke: 0.8pt + table-rule),
   table.header(th[Move probability $delta$], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair #linebreak() Schwarz], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [1], [#miss], [#miss], [#miss], [#miss],
-  [0.05], [#miss], [#miss], [#miss], [#miss],
-  [0.005], [#miss], [#miss], [#miss], [#miss],
+  [1], [0.454s], [4.50s], [1.07s], [0.878s],
+  [0.05], [1.58s], [5.80s], [17.0s], [4.37s],
+  [0.005], [2.65s], [6.23s], [20.1s], [6.39s],
   table.hline(stroke: 0.8pt + table-rule),
 )
