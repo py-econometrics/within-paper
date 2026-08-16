@@ -3,21 +3,21 @@
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
-#let miss = text(fill: rgb("#777777"))[--]
+#let miss = text(fill: rgb("#777777"))[-]
 #table(
   columns: (1.25fr, 1.0fr, 0.85fr, 0.85fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
+  table.header(th[Design], th[Gap $lambda_2$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() factor-pair]),
   table.hline(stroke: 0.45pt + table-rule),
   table.cell(colspan: 4, fill: table-head-fill)[#emph[100K observations]],
-  [simple (well-connected)], [0.857 (1.00)], [354 MiB], [411 MiB],
-  [difficult (near-nested)], [$1.30 times 10^(-3)$ (1.00)], [357 MiB], [383 MiB],
+  [simple (well-connected)], [0.622 (1.00)], [354 MiB], [411 MiB],
+  [difficult (near-nested)], [$6.51 times 10^(-4)$ (1.00)], [357 MiB], [383 MiB],
   table.hline(stroke: 0.35pt + table-light-rule),
   table.cell(colspan: 4, fill: table-head-fill)[#emph[1M observations]],
-  [simple (well-connected)], [0.857 (1.00)], [758 MiB], [1,000 MiB],
-  [difficult (near-nested)], [$1.67 times 10^(-5)$ (1.00)], [775 MiB], [953 MiB],
+  [simple (well-connected)], [0.622 (1.00)], [758 MiB], [1,000 MiB],
+  [difficult (near-nested)], [$8.35 times 10^(-6)$ (1.00)], [775 MiB], [953 MiB],
   table.hline(stroke: 0.8pt + table-rule),
 )

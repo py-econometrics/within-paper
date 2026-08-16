@@ -37,6 +37,33 @@ def _raw_trial(
 
 
 class HeadlineFigureCollectionTests(unittest.TestCase):
+    def test_canonical_headline_uses_version_three_gap_schema(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(document["schema_version"], 3)
+        self.assertEqual(document["headline_figure"]["schema_version"], 3)
+        self.assertTrue(
+            all(
+                "lambda2" in point
+                and "component_obs_share" in point
+                and "gap" not in point
+                for point in document["headline_figure"]["points"]
+            )
+        )
+
+    def test_headline_loader_rejects_schema_version_two(self) -> None:
+        document = {
+            "schema_version": 2,
+            "headline_figure": {"schema_version": 2, "points": [{"lambda2": 0.4}]},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "paper.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            with (
+                patch.object(make_figures, "PAPER_RESULTS", path),
+                self.assertRaisesRegex(SystemExit, "outdated schema"),
+            ):
+                make_figures._load_points()
+
     def test_registered_akm_designs_are_added_to_the_canonical_table(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         table = document["tables"]["akm_sorting"]
@@ -121,7 +148,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
         self.assertEqual(records[("default", "fixest")]["status"], "missing")
 
     def test_absent_akm_file_preserves_collected_figure_records(self) -> None:
-        document = {"headline_figure": {"schema_version": 1, "points": [{"status": "complete"}]}}
+        document = {"headline_figure": {"schema_version": 3, "points": [{"status": "complete"}]}}
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(paper_results, "LATEST_RUN", Path(directory)):
                 changed = paper_results._synchronize_headline_figure(document, [])
@@ -135,36 +162,54 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
             family="mobility",
             view="default",
             backend="rust-map",
-            gap=0.4,
+            lambda2=0.4,
+            component_obs_share=1.0,
         )
         self.assertEqual(point["status"], "partial")
         self.assertTrue(make_figures._visible_point(point))
 
-    def test_appendix_panels_use_default_lsmr_cells_and_generator_parameters(self) -> None:
+    def test_appendix_tables_use_all_runtime_cells_and_generator_parameters(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         table = document["tables"]["akm_mobility"]
-        defaults = paper_results._akm_appendix_panel(table, panel="defaults")
-        lsmr = paper_results._akm_appendix_panel(table, panel="lsmr")
+        rendered = paper_results._akm_appendix_table(table)
 
-        self.assertEqual(defaults["header"][:2], ["Move probability $delta$", "Gap (share)"])
-        self.assertEqual(lsmr["header"][2:], ["within-off", "within-diagonal", "within"])
-        self.assertEqual(defaults["rows"][0][0], "1")
-        self.assertEqual(defaults["rows"][-1][0], "0.001")
-        self.assertEqual(lsmr["rows"][0][-1], table["rows"][0][5])
-        self.assertEqual(lsmr["rows"][0][2:4], table["rows"][0][3:5])
+        self.assertEqual(
+            rendered["header"][:2],
+            ["Move probability $delta$", "Gap $lambda_2$ (share)"],
+        )
+        self.assertEqual(
+            rendered["header"][2:],
+            ["rust-map", "within-off", "within-diagonal", "within", "fixest", "FEM.jl"],
+        )
+        self.assertEqual(rendered["rows"][0][0], "1")
+        self.assertEqual(rendered["rows"][-1][0], "0.001")
+        self.assertEqual(rendered["rows"][0][2:], table["rows"][0][2:])
 
-    def test_render_writes_split_akm_panels_without_scenario_ids(self) -> None:
+    def test_render_writes_consolidated_akm_tables_without_scenario_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             generated = Path(directory) / "tables"
             with patch.object(paper_results, "GENERATED_DIR", generated):
                 paper_results.render(None)
-            default_panel = (generated / "akm_mobility_defaults.typ").read_text(encoding="utf-8")
-            lsmr_panel = (generated / "akm_sorting_lsmr.typ").read_text(encoding="utf-8")
+            mobility = (generated / "akm_mobility.typ").read_text(encoding="utf-8")
+            sorting = (generated / "akm_sorting.typ").read_text(encoding="utf-8")
 
-        self.assertIn("Move probability $delta$", default_panel)
-        self.assertIn("Sorting strength $rho$", lsmr_panel)
-        self.assertNotIn("akm_mobility_1", default_panel)
-        self.assertIn("0.543s", default_panel)
+        self.assertIn("Move probability $delta$", mobility)
+        self.assertIn("Sorting strength $rho$", sorting)
+        self.assertNotIn("akm_mobility_1", mobility)
+        self.assertIn("0.554s", mobility)
+        self.assertIn("LSMR #linebreak() diagonal", mobility)
+
+    def test_real_data_paper_table_omits_unfilled_ablation_columns(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        rendered = paper_results._correia_real_paper_table(
+            document["tables"]["correia_real"]
+        )
+
+        self.assertEqual(
+            rendered["header"][2:],
+            ["rust-map", "within", "fixest", "FEM.jl"],
+        )
+        self.assertTrue(all(len(row) == 6 for row in rendered["rows"]))
 
     def test_render_writes_only_manuscript_table_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -175,10 +220,8 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
                 paper_results.render(None)
             expected = {
                 *(f"{name}.typ" for name in paper_results.RENDERED_TABLES),
-                "akm_mobility_defaults.typ",
-                "akm_mobility_lsmr.typ",
-                "akm_sorting_defaults.typ",
-                "akm_sorting_lsmr.typ",
+                "akm_mobility.typ",
+                "akm_sorting.typ",
             }
 
             self.assertEqual({path.name for path in generated.glob("*.typ")}, expected)
@@ -188,21 +231,21 @@ class HeadlineFigurePlotTests(unittest.TestCase):
     @staticmethod
     def _points() -> list[dict[str, object]]:
         points = []
-        gaps = {"mobility": (0.4, 0.01), "sorting": (0.02, 0.002)}
-        for family, (high, low) in gaps.items():
+        lambda2_values = {"mobility": (0.4, 0.01), "sorting": (0.02, 0.002)}
+        for family, (high, low) in lambda2_values.items():
             for view, backends in (
                 ("default", make_figures.CROSS_PACKAGE_BACKENDS),
                 ("matched", make_figures.MECHANISM_BACKENDS),
             ):
                 for backend in backends:
-                    for index, gap in enumerate((high, low)):
+                    for index, lambda2 in enumerate((high, low)):
                         points.append(
                             {
                                 "design": f"akm_{family}_{index + 1}",
                                 "family": family,
                                 "view": view,
                                 "backend": backend,
-                                "gap": gap,
+                                "lambda2": lambda2,
                                 "median_time": index + 1.0,
                                 "n_trials": 3,
                                 "n_success": 3,
@@ -254,7 +297,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.4,
+                "lambda2": 0.4,
                 "median_time": 1.0,
                 "status": "complete",
             },
@@ -262,7 +305,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.1,
+                "lambda2": 0.1,
                 "median_time": 2.0,
                 "status": "partial",
             },
@@ -270,7 +313,7 @@ class HeadlineFigurePlotTests(unittest.TestCase):
                 "family": "mobility",
                 "view": "default",
                 "backend": "rust-map",
-                "gap": 0.01,
+                "lambda2": 0.01,
                 "median_time": 5.0,
                 "status": "capped",
             },

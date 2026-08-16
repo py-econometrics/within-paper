@@ -22,7 +22,7 @@ make-figures = { cmd = "python -m scripts.make_figures", depends-on = ["bench-to
 bench-amortization = { cmd = "python -m benchmarks.within.amortization", description = "Measure additive setup across AKM connectivity and reuse across ten regressions" }
 bench-tolerance = { cmd = "python -m benchmarks.tolerance.akm_frontier", depends-on = ["setup-julia-env"], description = "Runtime against achieved precision on the AKM mobility designs" }
 bench-correia = { cmd = "python -m benchmarks.ols.correia", depends-on = ["setup-julia-env", "check-correia-data"], description = "Run the local Correia comparisons after checksum verification" }
-compute-hardness = { cmd = "python -m scripts.compute_hardness", depends-on = ["check-correia-data"], description = "Compute pairwise spectral gaps after singleton pruning" }
+compute-hardness = { cmd = "python -m scripts.compute_hardness", depends-on = ["check-correia-data"], description = "Compute pairwise Jochmans-Weidner Gaps after singleton pruning" }
 collect-paper-results = { cmd = "python -m scripts.paper_results collect", description = "Fold existing benchmark CSVs into the paper tables without rerunning benchmarks" }
 reproduce-results = { cmd = "python -m scripts.paper_results collect && python -m scripts.make_figures", depends-on = ["check-external-runtimes", "agreement", "bench-memory", "within-preconditioners", "bench-amortization", "bench-tolerance", "compute-hardness", "bench-main", "bench-fepois", "bench-akm", "bench-correia"], description = "Run the full benchmark suite, collect canonical results, and generate figures" }
 render-paper-results = { cmd = "python -m scripts.paper_results render", description = "Write Typst tables from the paper result file" }

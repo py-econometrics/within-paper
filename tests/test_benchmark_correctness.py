@@ -172,25 +172,67 @@ class FailureLoggingTests(unittest.TestCase):
 class HardnessTests(unittest.TestCase):
     def test_complete_bipartite_graph_has_unit_gap(self) -> None:
         block = sp.csr_matrix(np.ones((3, 4)))
-        self.assertAlmostEqual(compute_hardness._component_rho(block), 0.0)
+        self.assertAlmostEqual(compute_hardness._component_lambda2(block), 1.0)
 
-    def test_sparse_calculation_falls_back_from_propack_to_arpack(self) -> None:
-        calls = []
+    def test_manuscript_graph_has_expected_lambda2(self) -> None:
+        block = sp.csr_matrix(np.array([[1, 1], [2, 0], [0, 2]]))
+        self.assertAlmostEqual(
+            compute_hardness._component_lambda2(block),
+            1.0 - np.sqrt(2.0 / 3.0),
+        )
 
-        def fake_svds(*args, solver, **kwargs):
-            calls.append(solver)
-            if solver == "propack":
-                raise RuntimeError("not available")
-            return np.array([0.5, 1.0])
+    def test_singular_value_formula_matches_normalized_laplacian(self) -> None:
+        block = sp.csr_matrix(np.array([[1, 1], [2, 0], [0, 2]]))
+        adjacency = sp.bmat([[None, block], [block.T, None]], format="csr")
+        degrees = np.asarray(adjacency.sum(axis=1)).ravel()
+        normalized_laplacian = (
+            sp.eye(adjacency.shape[0])
+            - sp.diags(1 / np.sqrt(degrees))
+            @ adjacency
+            @ sp.diags(1 / np.sqrt(degrees))
+        )
+        expected = np.linalg.eigvalsh(normalized_laplacian.toarray())[1]
+        self.assertAlmostEqual(compute_hardness._component_lambda2(block), expected)
 
-        block = sp.eye(100, format="csr")
-        with (
-            patch.object(compute_hardness, "DENSE_MAX_ENTRIES", 0),
-            patch.object(compute_hardness, "svds", side_effect=fake_svds),
-        ):
-            self.assertAlmostEqual(compute_hardness._component_rho(block), 0.25)
-        self.assertEqual(calls, ["propack", "arpack"])
+    def test_star_and_two_node_components_use_laplacian_values(self) -> None:
+        star = sp.csr_matrix(np.array([[2, 1, 3]]))
+        edge = sp.csr_matrix(np.array([[4]]))
+        self.assertEqual(compute_hardness._component_lambda2(star), 1.0)
+        self.assertEqual(compute_hardness._component_lambda2(edge), 2.0)
 
+    def test_multiple_components_select_the_largest_by_observations(self) -> None:
+        q = np.array([0] * 7 + [1, 1, 2, 2, 3, 3])
+        r = np.array([0, 0, 1, 1, 2, 2, 2, 3, 4, 3, 3, 4, 4])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertEqual(result.n_components, 2)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0)
+        self.assertAlmostEqual(result.largest_component_obs_share, 7.0 / 13.0)
+        self.assertEqual(result.largest_component_n_obs, 7)
+        self.assertEqual(result.largest_component_n_q_levels, 1)
+        self.assertEqual(result.largest_component_n_r_levels, 3)
+
+    def test_equal_size_components_select_the_smaller_gap(self) -> None:
+        q = np.array([0] * 6 + [1, 1, 2, 2, 3, 3])
+        r = np.array([0, 0, 1, 1, 2, 2, 3, 4, 3, 3, 4, 4])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0 - np.sqrt(2.0 / 3.0))
+        self.assertEqual(result.largest_component_n_q_levels, 3)
+        self.assertEqual(result.largest_component_n_r_levels, 2)
+
+    def test_equal_size_equal_gap_components_use_stable_component_order(self) -> None:
+        q = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+        r = np.array([0, 0, 1, 1, 2, 3, 4, 4])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertAlmostEqual(result.lambda2_qr, 1.0)
+        self.assertEqual(result.largest_component_n_q_levels, 1)
+        self.assertEqual(result.largest_component_n_r_levels, 2)
+
+    def test_connected_graph_reports_full_observation_share(self) -> None:
+        q = np.array([0, 0, 1, 1])
+        r = np.array([0, 1, 0, 1])
+        result = compute_hardness.pair_hardness(q, r)
+        self.assertEqual(result.n_components, 1)
+        self.assertEqual(result.largest_component_obs_share, 1.0)
 
 class PythonFitTests(unittest.TestCase):
     @classmethod
@@ -241,6 +283,17 @@ class PythonFitTests(unittest.TestCase):
             fit = fit_ppml(frame, backend)
             self.assertTrue(np.isfinite(float(fit.coef().loc["x1"])))
             self.assertFalse(hasattr(fit, "_Y"))
+
+    def test_ppml_rejects_a_returned_nonconverged_fit(self) -> None:
+        from pyfixest.errors import NonConvergenceError
+
+        returned = SimpleNamespace(convergence=False)
+        with (
+            patch.object(ppml_pyfixest, "_demeaner", return_value=object()),
+            patch("pyfixest.fepois", return_value=returned),
+            self.assertRaises(NonConvergenceError),
+        ):
+            fit_ppml(pd.DataFrame(), "rust-map", outer_maxiter=1)
 
     def test_ppml_measure_records_a_failed_warmup(self) -> None:
         error = ValueError("Demeaning failed after 10000 iterations.")
@@ -317,7 +370,6 @@ class PythonFitTests(unittest.TestCase):
                     "runtime_s": 0.01,
                     "n_retained": retained,
                     "beta_x1": 1.0,
-                    "max_eta": None,
                     "converged": True,
                     "error": "",
                 }]
@@ -353,7 +405,6 @@ class PythonFitTests(unittest.TestCase):
                         "runtime_s": 0.01,
                         "n_retained": 100,
                         "beta_x1": 1.0,
-                        "max_eta": None,
                         "converged": True,
                         "capped": False,
                         "error": "",
@@ -394,7 +445,6 @@ class PythonFitTests(unittest.TestCase):
                         "runtime_s": 0.01,
                         "n_retained": 99,
                         "beta_x1": 1.0,
-                        "max_eta": None,
                         "converged": True,
                         "capped": False,
                         "error": "",
@@ -563,7 +613,7 @@ class PaperResultTests(unittest.TestCase):
                 paper_results._synchronize_canonical_tables(document, write=False)
             self.assertEqual(document["tables"]["ols"]["rows"][0][2], "2.00s")
 
-    def test_partial_hardness_file_preserves_other_collected_gaps(self) -> None:
+    def test_partial_hardness_file_preserves_other_collected_lambda2_values(self) -> None:
         document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
         mobility_gap = document["tables"]["akm_mobility"]["rows"][0][1]
         rows = [
@@ -571,8 +621,8 @@ class PaperResultTests(unittest.TestCase):
                 "dataset_id": "akm_sorting_1",
                 "fe_a": "indiv_id",
                 "fe_b": "firm_id",
-                "one_minus_rho": "0.25",
-                "worst_component_obs_share": "1.0",
+                "lambda2_qr": "0.25",
+                "largest_component_obs_share": "1.0",
             }
         ]
         with patch.object(paper_results, "_latest_rows", return_value=rows):
@@ -593,7 +643,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "Gap (share)"],
+                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
                 },
                 "akm_setup_cost": {"rows": []},
@@ -626,6 +676,38 @@ class PaperResultTests(unittest.TestCase):
                 "0.400s",
             ],
         )
+
+    def test_akm_setup_table_marks_partially_successful_cells(self) -> None:
+        document = {
+            "tables": {
+                "akm_mobility": {
+                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
+                    "rows": [["`akm_mobility_1`", "0.41 (1.00)"]],
+                },
+                "akm_setup_cost": {"rows": []},
+            }
+        }
+        rows = []
+        for n_factors in (2, 3):
+            for repetition in range(5):
+                converged = repetition < 4
+                rows.append(
+                    {
+                        "design": "akm_mobility_1",
+                        "n_factors": str(n_factors),
+                        "setup_s": "0.1" if converged else "",
+                        "solve_s": "0.2" if converged else "",
+                        "converged": str(converged).lower(),
+                        "capped": "false",
+                        "repetition": str(repetition),
+                        "n_planned": "5",
+                    }
+                )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_akm_setup_cost(document)
+
+        rendered = document["tables"]["akm_setup_cost"]["rows"][0]
+        self.assertEqual(rendered[2:], ["0.100s (4/5)", "0.200s (4/5)"] * 2)
 
     def test_reuse_table_reports_speedup_against_diagonal(self) -> None:
         document = {"tables": {"regression_reuse": {"rows": []}}}
@@ -660,6 +742,39 @@ class PaperResultTests(unittest.TestCase):
         self.assertEqual(rendered[5][-1], "4.0x")
         self.assertEqual(rendered[0][0], "simple")
         self.assertEqual(rendered[3][0], "difficult")
+
+    def test_reuse_table_marks_partial_cells_and_omits_speedup(self) -> None:
+        document = {"tables": {"regression_reuse": {"rows": []}}}
+        rows = []
+        for design in ("simple", "difficult"):
+            for policy in ("diagonal", "additive_rebuilt", "additive_cached"):
+                for repetition in range(3):
+                    converged = not (
+                        design == "simple"
+                        and policy == "additive_cached"
+                        and repetition == 2
+                    )
+                    rows.append(
+                        {
+                            "design": design,
+                            "policy": policy,
+                            "setup_s": "1.0" if converged else "",
+                            "solve_s": "2.0" if converged else "",
+                            "total_s": "3.0" if converged else "",
+                            "converged": str(converged).lower(),
+                            "capped": "false",
+                            "repetition": str(repetition),
+                            "n_planned": "3",
+                        }
+                    )
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            paper_results._synchronize_regression_reuse(document)
+
+        partial = document["tables"]["regression_reuse"]["rows"][2]
+        self.assertEqual(
+            partial[2:5], ["1.00s (2/3)", "2.00s (2/3)", "3.00s (2/3)"]
+        )
+        self.assertEqual(partial[5], "--")
 
     def test_reuse_benchmark_runs_both_ten_regression_designs(self) -> None:
         self.assertEqual(amortization.N_REGRESSIONS, 10)

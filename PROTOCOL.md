@@ -3,8 +3,8 @@
 This file fixes the measurement rules for the paper's empirical claims before the
 production runs, so that no rule is chosen after seeing a result. It covers what each
 claim rests on, how samples and specifications are held fixed, where timing starts and
-stops, how many repetitions each cell needs, and which accuracy gate a headline number
-must clear.
+stops, how many repetitions each cell needs, and how numerical accuracy is calibrated
+for comparisons that hold it fixed.
 
 [REPRODUCING.md](REPRODUCING.md) says how to run the benchmarks. This file says what
 counts as a valid measurement.
@@ -15,24 +15,23 @@ Every claim the abstract or conclusion makes must appear here with the experimen
 supports it, the metric that decides it, and the accuracy condition under which the
 metric is read. A claim with no row is not a claim the paper may make.
 
-| # | Claim | Experiment | Deciding metric | Accuracy gate |
+| # | Claim | Experiment | Deciding metric | Accuracy check |
 |---|---|---|---|---|
-| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility designs at 1M | Median total wall time, all backends | Gate A on every reported cell |
-| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP sweeps and runtime against the worker-firm gap | Gate A, or explicit censoring |
-| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations and runtime for `off` vs `additive` | Gate A on all four arms |
-| 4 | Diagonal scaling removes them only partially | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations, `diagonal` vs `additive` | Gate A |
+| 1 | On near-nested and weakly connected designs, factor-pair preconditioning cuts total runtime by one to two orders of magnitude against MAP-based implementations | 10M simple/difficult; AKM mobility designs at 1M | Median total wall time, all backends | Package defaults are identified as such; the PyFixest comparison uses tolerances calibrated in the achieved-precision benchmark |
+| 2 | Weak connectivity can make factor-by-factor MAP converge slowly | AKM designs varying mobility and sorting | MAP passes and runtime against worker-firm normalized-Laplacian gap \(\lambda_2\) | Calibrated tolerances, or explicit censoring |
+| 3 | Switching to unpreconditioned LSMR does not by itself remove the slow directions | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations and runtime for `off` vs `additive` | Tolerances calibrated in the achieved-precision benchmark |
+| 4 | Diagonal scaling removes them only partially | Matched-accuracy AKM runs and the iteration-count benchmark | LSMR iterations, `diagonal` vs `additive` | Tolerances calibrated in the achieved-precision benchmark |
 | 5 | Factor-pair preconditioning reduces LSMR iterations relative to diagonal preconditioning where pair coupling matters | Simple and difficult iteration-count benchmark | Median iterations for `diagonal` vs `additive` | Gate A |
 | 6 | Factor-pair preconditioning reduces total runtime only when iteration savings exceed setup and application cost | AKM setup-cost and ten-regression reuse experiments | Setup, solve, and total time | Gate A |
-| 7 | Setup is most expensive on the dense graphs that need it least | Additive setup cost across AKM mobility designs | Construction time against the worker-firm gap | Gate A on the paired solve |
-| 8 | `within` runtime varies little and declines modestly as connectivity weakens | AKM designs varying mobility | Median and IQR of total time across the designs | Gate A; repetition rule R1 |
+| 7 | Setup is most expensive on the dense graphs that need it least | Additive setup cost across AKM mobility designs | Construction time against worker-firm normalized-Laplacian gap \(\lambda_2\) | Gate A on the paired solve |
+| 8 | `within` runtime varies little and declines modestly as connectivity weakens | AKM designs varying mobility | Median and IQR of total time across the designs | Calibrated tolerance; repetition rule R1 |
 | 9 | Setup amortizes across repeated fits with unchanged weights; PPML is a separate repeated-solve use case in which the weights change between IRLS steps | Ten-regression experiment on the simple and difficult designs; main PPML benchmark | Setup and solve time for repeated OLS fits; total PPML runtime | Gate A for every reported cell |
 | 10 | The method loses on well-connected designs at scale | 10M simple design | Total runtime | Gate A |
 
 Claims 3 through 7 cover the mechanism. Claims 1, 8, and 10 are the headline results.
 
-Any claim that cannot clear its gate is either dropped or reported with the failure
-stated in the same sentence. "Capped", "did not converge", and "did not reach the gate"
-are results, not omissions.
+When a claim relies on Gate A, a failure to clear the gate is either reported or the
+claim is dropped. Iteration caps and other failures are reported rather than omitted.
 
 ## 2. Sample and specification
 
@@ -48,7 +47,9 @@ isolate a solver choice.
   sample. Matched-solver exercises run through one package path on the same prepared sample.
 - **PPML outer iterations.** PyFixest, R `fixest`, and `GLFixedEffectModels.jl` each
   receive an outer IRLS limit of 100 iterations. This common cap replaces their package
-  defaults; their separation handling and other solver settings remain unchanged.
+  defaults; their separation handling and other solver settings remain unchanged. Each
+  package also retains its own inner demeaning limit, and reaching either limit marks the
+  run as capped.
 - **Weights.** Unweighted (`W = I`) in every benchmark. Weighted solves appear only
   inside PPML, where IRLS sets them.
 - **Covariates.** Every regression has one slope covariate, `x1`.
@@ -171,13 +172,17 @@ a different number from the externally recomputed `eta`. At the package default 
 | simple, achieved `eta` at tol `1e-8` | 3.7e-07 | 2.6e-08 | 2.4e-08 |
 | difficult, achieved `eta` at tol `1e-8` | 1.6e-06 | 1.2e-06 | 4.1e-07 |
 
-`1e-12` is the loosest tolerance at which all three clear Gate A on both designs, so:
+`1e-12` is the loosest tolerance at which all three clear Gate A on both pilot designs.
+The achieved-precision benchmark then compares coefficient and residual errors across
+requested tolerances on three one-million-observation mobility designs. These separate
+accuracy exercises calibrate the settings used in the right panels of Figure 1.
 
 - **Matched-accuracy arms** run `rust-map` at `1e-10` (`MECHANISM_MAP_TOL`) and `off`,
-  `diagonal`, `additive` at `1e-12` (`MECHANISM_LSMR_TOL`), so runtimes are compared at
-  matched achieved accuracy rather than matched nominal tolerance. They are measured in
-  the same pass as the package-default arms and carry distinct labels; which rows feed
-  which table is decided when the results are curated, not by running the designs twice.
+  `diagonal`, `additive` at `1e-12` (`MECHANISM_LSMR_TOL`). They are measured in the same
+  pass as the package-default arms and carry distinct labels; which rows feed which table
+  is decided when the results are curated, not by running the designs twice. Figure 1
+  applies the calibrated settings but does not repeat the accuracy measurements for each
+  plotted regression.
 - **All four matched arms share one iteration budget** of 10,000 (`MECHANISM_MAXITER`).
   The package defaults give MAP 10,000 and LSMR 1,000, and the first 1M run showed what
   that asymmetry does: `within-off` failed 30 of 33 trials, every one at its own lower
@@ -185,16 +190,9 @@ a different number from the externally recomputed `eta`. At the package default 
   the budget cannot support a claim about the preconditioner, so a run that still fails
   now fails on its own merits. The package-default arms keep each package's documented
   settings, including LSMR's 1,000.
-- **Cross-package tables** keep each package's documented default and annotate every cell
-  with its achieved `eta`. A default-settings cell is not expected to clear Gate A; it is
-  expected to report what it did achieve.
-
-Every design named in a headline sentence carries an accuracy record on the sample that
-produced the timing. Not at a smaller size, and not on a different draw. Each timed
-`feols` fit records `max_eta`, recomputed from the fit's own demeaned arrays and the
-input rows the model kept, outside the timing boundary. The projection error `delta`
-still requires a tight reference per sample and is recorded only by the standalone
-diagnostics, so a cross-package cell reports `eta` and not the full Gate A triple.
+- **Cross-package tables** keep each package's documented default. These tables answer
+  what happens under the settings a user receives from each package; they are not
+  described as matched-accuracy comparisons.
 
 ### Metric validation
 
@@ -217,9 +215,10 @@ Verified at every level that can cap:
 - The MAP diagnostics return `censoring="capped"` with `iterations` equal to the cap.
 - PyFixest raises `ValueError: Demeaning failed after N iterations.`, which the harness
   records as `converged=False` with the message retained.
-- R and Julia warnings or returned convergence flags are converted to the same row
-  fields. If an isolated estimator process exits before writing its rows, the parent
-  writes one failed row for each planned repetition.
+- For PPML, the harness checks PyFixest's returned convergence flag, R `fixest`'s outer
+  flag and inner-demeaning warnings, and Julia's inner and outer status. If an isolated
+  estimator process exits before writing its rows, the parent writes one failed row for
+  each planned repetition.
 
 No path silently reports a capped run as converged.
 
@@ -227,8 +226,8 @@ No path silently reports a capped run as converged.
 
 - **Small samples (100K).** An anchored direct or QR solve on the normal equations,
   built independently of the iterative solvers.
-- **Large samples (1M, 10M).** Two independent tight-tolerance procedures that agree to
-  within Gate A. Agreement between them is the check; neither alone is the reference.
+- **Large achieved-precision benchmark (1M).** Factor-pair LSMR at tolerance `1e-14`
+  supplies the reference coefficient and residual used in the error plots.
 - Default `rust-map` is never used as ground truth. It is one of the methods under test,
   and it reaches its iteration cap on exactly the designs where the reference matters
   most.
@@ -247,9 +246,10 @@ Three comparisons are kept separate.
    settings on three AKM mobility designs. The figure plots wall time against coefficient
    and residual error measured on the returned fit.
 
-Matched accuracy is restricted to the PyFixest methods, which can be assessed with the
-same external metric. `fixest` does not monitor `eta`; changing its stopping criterion
-until `eta` crosses a chosen threshold would not match the criterion the package uses.
+The matched-accuracy label in Figure 1 refers to the settings calibrated in the separate
+achieved-precision benchmark. It does not mean that each plotted regression carries its
+own accuracy diagnostic. The right panels are restricted to PyFixest so that they vary
+the solver and preconditioner within one package; the left panels retain package defaults.
 
 The package-runtime tables display all three default PyFixest LSMR configurations rather
 than selecting one after seeing the results. The matched controls appear only in the
@@ -263,8 +263,8 @@ iteration, and an LSMR iteration are different units and get separate panels.
 Every headline package result records: package and runtime versions; algorithm settings,
 tolerance, and iteration cap; thread counts; factor ordering, singleton treatment,
 weights, and retained sample size; which phases are inside the timing boundary; completed
-trials, convergence failures, and capped times; and the external residual and slope
-accuracy on that exact sample.
+trials, convergence failures, and capped times. The achieved-precision experiment stores
+coefficient and residual errors separately.
 
 ## 7. Experiment matrix
 

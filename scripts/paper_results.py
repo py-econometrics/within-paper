@@ -29,19 +29,19 @@ LATEST_RUN = ROOT / "results" / "runs" / "latest"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 EXPECTED_TRIALS = 3
+CONNECTIVITY_HEADER = "Gap $lambda_2$ (share)"
+LEGACY_CONNECTIVITY_HEADER = "$lambda_2$ (share)"
 
 # The headline figure is a presentation of the two controlled AKM benchmark
-# families.  The tables remain the canonical source of the gap calculation;
+# families.  The tables remain the canonical source of the lambda2 calculation;
 # this registry only fixes which package/runtime cells belong in each panel.
 HEADLINE_FIGURE_BACKENDS = {
     "default": ("rust-map", "within", "fixest", "FEM.jl"),
     "matched": ("rust-map", "within-off", "within-diagonal", "within-additive"),
 }
 RENDERED_TABLES = (
-    "agreement",
     "akm_setup_cost",
     "correia_real",
-    "correia_synthetic",
     "iterations",
     "memory",
     "ols",
@@ -131,7 +131,7 @@ def _table_fragment(name: str, table: dict) -> str:
         "#let table-light-rule = rgb(\"#d8dee8\")",
         "#let table-head-fill = rgb(\"#eef2f7\")",
         "#let th(body) = table.cell(fill: table-head-fill)[#strong(body)]",
-        "#let miss = text(fill: rgb(\"#777777\"))[--]",
+        "#let miss = text(fill: rgb(\"#777777\"))[-]",
         "#table(",
         f"  columns: {table['columns']},",
         "  stroke: 0.35pt + table-light-rule,",
@@ -163,7 +163,10 @@ def _table_fragment(name: str, table: dict) -> str:
             # The first grid slot is already occupied by the row-spanning
             # design cell, so omit the empty marker from subsequent rows.
             row = row[1:]
-        cells = [_display_method_cell(cell) if cell else "" for cell in row]
+        cells = [
+            "-" if cell == "--" else _display_method_cell(cell) if cell else ""
+            for cell in row
+        ]
         rendered_cells = [
             cell if index == 0 and cell.startswith("table.cell(") else f"[{cell}]"
             for index, cell in enumerate(cells)
@@ -188,24 +191,19 @@ def _akm_parameter_label(design: str) -> str:
     return f"{value:g}"
 
 
-def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
-    """Project one wide AKM table into a compact appendix panel.
-
-    The source table deliberately remains unchanged: it is the one
-    machine-readable location for the recorded package-default cells.  The
-    two rendered panels merely group those cells by the comparison they answer.
-    """
+def _akm_appendix_table(table: dict) -> dict:
+    """Render one controlled AKM family with all compared configurations."""
     source_name = _row_label(table, table["rows"][0])
     mobility = source_name.startswith("akm_mobility_")
     parameter = "Move probability $delta$" if mobility else "Sorting strength $rho$"
-    if panel == "defaults":
-        backends = ("rust-map", "fixest", "FEM.jl", "within")
-        columns = "(1.15fr, 0.95fr, 0.82fr, 0.70fr, 0.70fr, 0.95fr)"
-    elif panel == "lsmr":
-        backends = ("within-off", "within-diagonal", "within")
-        columns = "(1.20fr, 1.00fr, 0.90fr, 0.96fr, 1.00fr)"
-    else:
-        raise ValueError(f"Unknown AKM appendix panel {panel!r}")
+    backends = (
+        "rust-map",
+        "within-off",
+        "within-diagonal",
+        "within",
+        "fixest",
+        "FEM.jl",
+    )
 
     rows = []
     for source in table["rows"]:
@@ -213,17 +211,33 @@ def _akm_appendix_panel(table: dict, *, panel: str) -> dict:
         rows.append(
             [
                 _akm_parameter_label(design),
-                _table_cell(table, source, "Gap (share)"),
+                _table_cell(table, source, CONNECTIVITY_HEADER),
                 *(_table_cell(table, source, backend) for backend in backends),
             ]
         )
     return {
-        "columns": columns,
-        "align": "(right, right, right, right, right, right)"
-        if panel == "defaults"
-        else "(right, right, right, right, right)",
-        "header": [parameter, "Gap (share)", *backends],
+        "columns": "(1.12fr, 0.92fr, 0.72fr, 0.76fr, 0.78fr, 0.82fr, 0.64fr, 0.64fr)",
+        "align": "(right, right, right, right, right, right, right, right)",
+        "header": [parameter, CONNECTIVITY_HEADER, *backends],
         "rows": rows,
+    }
+
+
+def _correia_real_paper_table(table: dict) -> dict:
+    """Drop unfilled ablation columns from the paper's real-data table."""
+    backends = ("rust-map", "within", "fixest", "FEM.jl")
+    return {
+        "columns": "(1.05fr, 0.92fr, 0.80fr, 0.88fr, 0.68fr, 0.68fr)",
+        "align": "(left, right, right, right, right, right)",
+        "header": ["Dataset", CONNECTIVITY_HEADER, *backends],
+        "rows": [
+            [
+                source[0],
+                _table_cell(table, source, CONNECTIVITY_HEADER),
+                *(_table_cell(table, source, backend) for backend in backends),
+            ]
+            for source in table["rows"]
+        ],
     }
 
 
@@ -234,24 +248,23 @@ def render(_: argparse.Namespace) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     targets = {destination / f"{name}.typ" for name in RENDERED_TABLES}
     for family in ("mobility", "sorting"):
-        for panel in ("defaults", "lsmr"):
-            targets.add(destination / f"akm_{family}_{panel}.typ")
+        targets.add(destination / f"akm_{family}.typ")
     for path in destination.glob("*.typ"):
         if path not in targets:
             path.unlink()
     for name in RENDERED_TABLES:
         table = tables[name]
+        if name == "correia_real":
+            table = _correia_real_paper_table(table)
         (destination / f"{name}.typ").write_text(_table_fragment(name, table), encoding="utf-8")
     for family in ("mobility", "sorting"):
         table = tables[f"akm_{family}"]
-        for panel in ("defaults", "lsmr"):
-            target = destination / f"akm_{family}_{panel}.typ"
-            target.write_text(
-                _table_fragment(target.stem, _akm_appendix_panel(table, panel=panel)),
-                encoding="utf-8",
-            )
+        target = destination / f"akm_{family}.typ"
+        target.write_text(
+            _table_fragment(target.stem, _akm_appendix_table(table)),
+            encoding="utf-8",
+        )
     values = ["// Generated result values; do not edit by hand."]
-    agreement_table = tables["agreement"]
     memory_table = tables["memory"]
 
     def memory_overheads(rows: list[list[str]]) -> list[float]:
@@ -267,17 +280,9 @@ def render(_: argparse.Namespace) -> None:
     memory_1m_rows = _rows_after_marker(memory_table, "#memory-1m")
     memory_100k = memory_overheads(memory_100k_rows)
     memory_1m = memory_overheads(memory_1m_rows)
-    agreement_simple_rows = _rows_after_marker(agreement_table, "#agreement-simple")
-    agreement_difficult_rows = _rows_after_marker(agreement_table, "#agreement-difficult")
     prose_values = {
-        "result_agreement_simple_max": _largest_metric(
-            agreement_table, agreement_simple_rows, "Absolute difference"
-        ),
-        "result_agreement_difficult_max": _largest_metric(
-            agreement_table, agreement_difficult_rows, "Absolute difference"
-        ),
-        "result_memory_100k_overhead": f"{min(memory_100k):.0f}--{max(memory_100k):.0f} MiB" if memory_100k else "--",
-        "result_memory_1m_overhead": f"{min(memory_1m):.0f}--{max(memory_1m):.0f} MiB" if memory_1m else "--",
+        "result_memory_100k_overhead": f"{min(memory_100k):.0f}-{max(memory_100k):.0f} MiB" if memory_100k else "-",
+        "result_memory_1m_overhead": f"{min(memory_1m):.0f}-{max(memory_1m):.0f} MiB" if memory_1m else "-",
     }
     values.extend(f"#let {name} = [{_prose_cell(str(value))}]" for name, value in prose_values.items())
     (destination.parent / "paper_values.typ").write_text("\n".join(values) + "\n", encoding="utf-8")
@@ -390,13 +395,14 @@ def _headline_point(
     family: str,
     view: str,
     backend: str,
-    gap: float | None,
+    lambda2: float | None,
+    component_obs_share: float | None,
 ) -> dict[str, object]:
     """One structured record for the 2-by-2 headline figure.
 
     The plot must distinguish a returned median from an iteration cap.  A
     capped run has no successful fit, but its elapsed wall time is informative:
-    it is a lower bound on the time required to finish the requested solve.
+    it is a lower bound on the time required to finish the requested regression.
     Non-cap failures have no comparable timing and are left out of the plot.
     """
     if not candidates:
@@ -405,7 +411,8 @@ def _headline_point(
             "family": family,
             "view": view,
             "backend": backend,
-            "gap": gap,
+            "lambda2": lambda2,
+            "component_obs_share": component_obs_share,
             "median_time": None,
             "n_trials": 0,
             "n_success": 0,
@@ -446,7 +453,8 @@ def _headline_point(
         "family": family,
         "view": view,
         "backend": backend,
-        "gap": gap,
+        "lambda2": lambda2,
+        "component_obs_share": component_obs_share,
         "median_time": elapsed,
         "n_trials": len(candidates),
         "n_success": len(successful),
@@ -463,7 +471,34 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
     treating absence as a new set of failures would erase a valid paper figure.
     """
     if not _latest("akm.csv").exists():
-        return 0
+        figure = document.get("headline_figure", {})
+        changed = int(figure.get("schema_version") != 3)
+        figure["schema_version"] = 3
+        for point in figure.get("points", []):
+            table = document.get("tables", {}).get(f"akm_{point.get('family')}")
+            if table is None:
+                continue
+            source = next(
+                (
+                    row
+                    for row in table["rows"]
+                    if _row_label(table, row) == point.get("design")
+                ),
+                None,
+            )
+            if source is None:
+                continue
+            cell = _table_cell(table, source, CONNECTIVITY_HEADER)
+            values = {
+                "lambda2": _numeric_cell(cell),
+                "component_obs_share": _component_share_cell(cell),
+            }
+            for key, value in values.items():
+                if point.get(key) != value:
+                    point[key] = value
+                    changed += 1
+        document["headline_figure"] = figure
+        return changed
 
     points: list[dict[str, object]] = []
     for family in ("mobility", "sorting"):
@@ -471,7 +506,12 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
         for view in ("default", "matched"):
             for source in table["rows"]:
                 design = _row_label(table, source)
-                gap = _numeric_cell(_table_cell(table, source, "Gap (share)"))
+                lambda2 = _numeric_cell(
+                    _table_cell(table, source, CONNECTIVITY_HEADER)
+                )
+                component_obs_share = _component_share_cell(
+                    _table_cell(table, source, CONNECTIVITY_HEADER)
+                )
                 for backend in HEADLINE_FIGURE_BACKENDS[view]:
                     candidates = [
                         row
@@ -491,11 +531,12 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
                             family=family,
                             view=view,
                             backend=backend,
-                            gap=gap,
+                            lambda2=lambda2,
+                            component_obs_share=component_obs_share,
                         )
                     )
 
-    figure = {"schema_version": 1, "points": points}
+    figure = {"schema_version": 3, "points": points}
     if document.get("headline_figure") == figure:
         return 0
     document["headline_figure"] = figure
@@ -580,6 +621,12 @@ def _numeric_cell(value: str) -> float | None:
     return float(match.group().replace(",", ""))
 
 
+def _component_share_cell(value: str) -> float | None:
+    """Read the selected component's observation share from a Gap table cell."""
+    match = re.search(r"\((\d(?:\.\d+)?)\)\s*$", value)
+    return float(match.group(1)) if match is not None else None
+
+
 def _largest_metric(
     table: dict,
     rows: list[list[str]],
@@ -600,7 +647,7 @@ def _largest_metric(
         and _numeric_cell(_table_cell(table, row, column)) is not None
     ]
     if not candidates:
-        return "--"
+        return "-"
     return max(candidates, key=lambda value: _numeric_cell(value) or 0.0)
 
 
@@ -691,29 +738,40 @@ def _ensure_akm_runtime_rows(document: dict) -> int:
     return changed
 
 
+def _migrate_connectivity_headers(document: dict) -> int:
+    """Rename the paper-facing Gap column without changing its stored cells."""
+    changed = 0
+    for table in document["tables"].values():
+        for index, header in enumerate(table.get("header", [])):
+            if header == LEGACY_CONNECTIVITY_HEADER:
+                table["header"][index] = CONNECTIVITY_HEADER
+                changed += 1
+    return changed
+
+
 def _prose_cell(value: str) -> str:
     """Replace failure markers before inserting a value into Typst text."""
     if value == "#miss" or value == "--" or value.startswith(("failed", "capped")):
-        return "--"
+        return "-"
     return value
 
 
-def _format_hardness(gap: float, share: float) -> str:
-    """Format a gap and component share for Typst."""
-    if gap and abs(gap) < 1e-2:
-        exponent = int(f"{gap:.0e}".split("e")[1])
-        mantissa = gap / (10**exponent)
-        gap_text = f"${mantissa:.2f} times 10^({exponent})$"
-    elif gap >= 1.0:
-        gap_text = f"{gap:.2f}"
+def _format_lambda2(lambda2: float, share: float) -> str:
+    """Format the Gap and the selected component's observation share."""
+    if lambda2 and abs(lambda2) < 1e-2:
+        exponent = int(f"{lambda2:.0e}".split("e")[1])
+        mantissa = lambda2 / (10**exponent)
+        lambda2_text = f"${mantissa:.2f} times 10^({exponent})$"
+    elif lambda2 >= 1.0:
+        lambda2_text = f"{lambda2:.2f}"
     else:
-        gap_text = f"{gap:.3g}"
-    return f"{gap_text} ({share:.2f})"
+        lambda2_text = f"{lambda2:.3g}"
+    return f"{lambda2_text} ({share:.2f})"
 
 
 def _synchronize_hardness(document: dict) -> int:
     rows = _latest_rows("hardness.csv")
-    # A partial collection must not erase an earlier gap.
+    # A partial collection must not erase an earlier Gap value.
     if rows is None:
         return 0
     diagnostics = {
@@ -726,13 +784,13 @@ def _synchronize_hardness(document: dict) -> int:
         diagnostic = diagnostics.get(source_id)
         if diagnostic is None:
             return 0
-        rendered = _format_hardness(
-            float(diagnostic["one_minus_rho"]),
-            float(diagnostic["worst_component_obs_share"]),
+        rendered = _format_lambda2(
+            float(diagnostic["lambda2_qr"]),
+            float(diagnostic["largest_component_obs_share"]),
         )
-        if _table_cell(table, target_row, "Gap (share)") == rendered:
+        if _table_cell(table, target_row, CONNECTIVITY_HEADER) == rendered:
             return 0
-        _set_table_cell(table, target_row, "Gap (share)", rendered)
+        _set_table_cell(table, target_row, CONNECTIVITY_HEADER, rendered)
         return 1
 
     changed = 0
@@ -803,8 +861,10 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         return 0
 
     mobility_table = document["tables"]["akm_mobility"]
-    gap_by_design = {
-        _row_label(mobility_table, row): _table_cell(mobility_table, row, "Gap (share)")
+    lambda2_by_design = {
+        _row_label(mobility_table, row): _table_cell(
+            mobility_table, row, CONNECTIVITY_HEADER
+        )
         for row in mobility_table["rows"]
     }
 
@@ -823,9 +883,14 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         if not successful:
             status = "capped" if all(_row_capped(row) for row in group) else "failed"
             return [status, status]
+        suffix = (
+            f" ({len(successful)}/{len(group)})"
+            if len(successful) < len(group)
+            else ""
+        )
         return [
-            _format_seconds(median(float(row["setup_s"]) for row in successful)),
-            _format_seconds(median(float(row["solve_s"]) for row in successful)),
+            _format_seconds(median(float(row["setup_s"]) for row in successful)) + suffix,
+            _format_seconds(median(float(row["solve_s"]) for row in successful)) + suffix,
         ]
 
     rendered = []
@@ -834,7 +899,7 @@ def _synchronize_akm_setup_cost(document: dict) -> int:
         rendered.append(
             [
                 f"`{design}`",
-                gap_by_design[design],
+                lambda2_by_design[design],
                 *cells(design, 2),
                 *cells(design, 3),
             ]
@@ -858,7 +923,7 @@ def _synchronize_regression_reuse(document: dict) -> int:
         ("additive_cached", "Additive, cached"),
     )
     designs = ("simple", "difficult")
-    summaries: dict[tuple[str, str], tuple[float, float, float] | str] = {}
+    summaries: dict[tuple[str, str], tuple[float, float, float, int, int] | str] = {}
     for design in designs:
         for policy, _label in policies:
             group = [
@@ -877,15 +942,23 @@ def _synchronize_regression_reuse(document: dict) -> int:
                     "capped" if all(_row_capped(row) for row in group) else "failed"
                 )
             else:
-                summaries[key] = tuple(
-                    median(float(row[field]) for row in successful)
-                    for field in ("setup_s", "solve_s", "total_s")
+                summaries[key] = (
+                    *(
+                        median(float(row[field]) for row in successful)
+                        for field in ("setup_s", "solve_s", "total_s")
+                    ),
+                    len(successful),
+                    len(group),
                 )
 
     rendered = []
     for design in designs:
         baseline = summaries[(design, "diagonal")]
-        baseline_total = baseline[2] if isinstance(baseline, tuple) else None
+        baseline_total = (
+            baseline[2]
+            if isinstance(baseline, tuple) and baseline[3] == baseline[4]
+            else None
+        )
         for index, (policy, label) in enumerate(policies):
             summary = summaries[(design, policy)]
             design_cell = design if index == 0 else ""
@@ -894,15 +967,20 @@ def _synchronize_regression_reuse(document: dict) -> int:
                     [design_cell, label, summary, summary, summary, "--"]
                 )
                 continue
-            setup, solve, total = summary
-            speedup = f"{baseline_total / total:.1f}x" if baseline_total else "--"
+            setup, solve, total, n_success, n_total = summary
+            suffix = f" ({n_success}/{n_total})" if n_success < n_total else ""
+            speedup = (
+                f"{baseline_total / total:.1f}x"
+                if baseline_total and n_success == n_total
+                else "--"
+            )
             rendered.append(
                 [
                     design_cell,
                     label,
-                    _format_seconds(setup),
-                    _format_seconds(solve),
-                    _format_seconds(total),
+                    _format_seconds(setup) + suffix,
+                    _format_seconds(solve) + suffix,
+                    _format_seconds(total) + suffix,
                     speedup,
                 ]
             )
@@ -913,7 +991,7 @@ def _synchronize_regression_reuse(document: dict) -> int:
 
 
 ITERATION_COLUMNS = (
-    ("rust-map", "map-sweep"),
+    ("rust-map", "map-pass"),
     ("within-off", "lsmr-iteration"),
     ("within-diagonal", "lsmr-iteration"),
     ("within-additive", "lsmr-iteration"),
@@ -923,7 +1001,7 @@ ITERATION_COLUMNS = (
 def _synchronize_iterations(document: dict) -> int:
     """Fill the iteration-count table, in each solver's own unit.
 
-    A MAP sweep is a full pass over the absorbed factors; an LSMR iteration is
+    A complete MAP pass visits every absorbed factor; an LSMR iteration is
     one application of the operator and its transpose. The two are never added
     or plotted on one axis, so the table records which unit each column is in
     and the median is taken within a column only.
@@ -973,14 +1051,19 @@ def _synchronize_canonical_tables(
 ) -> int:
     """Update runtime cells from current raw CSV files.
 
-    Keep the separately computed gap and component-share values. Replace a runtime only
+    Keep the separately computed Gap and component-share values. Replace a runtime only
     when the new output records all expected trials.
     """
     raw = _rows_from_csvs()
     _validate_ppml_results(raw)
     if document is None:
         document = _read_json(TABLES_PATH)
-    changed = _ensure_akm_runtime_rows(document)
+    changed = 0
+    if document.get("schema_version") != 3:
+        document["schema_version"] = 3
+        changed += 1
+    changed += _migrate_connectivity_headers(document)
+    changed += _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
         "correia_synthetic", "correia_real",

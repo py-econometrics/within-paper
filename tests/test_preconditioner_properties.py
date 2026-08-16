@@ -3,10 +3,8 @@
 Section 6.4 of the paper states that the factor-pair Schwarz operator is
 symmetric, positive semidefinite on the whole coefficient space, and positive
 definite on the identified subspace only under a coverage condition on the
-local kernels. Section 5 states that for two absorbed factors the pairwise
-quantity rho_qr is the exact per-sweep contraction factor of MAP. Each test
-below checks one of those statements numerically rather than resting on the
-algebra as written.
+local kernels. Each test below checks one of those statements numerically
+rather than resting on the algebra as written.
 
 The designs are small enough that the local solver takes the dense Cholesky
 path, so the operator is deterministic and can be materialized column by
@@ -299,71 +297,6 @@ class PreconditionerPropertyTests(unittest.TestCase):
         self.assertLessEqual(
             np.abs(np.asarray(joint.demeaned) - expected).max(), 1e-8
         )
-
-
-class TwoFactorContractionTests(unittest.TestCase):
-    """Section 5's claim that rho_qr is exact for two absorbed factors."""
-
-    @staticmethod
-    def _rho(categories: np.ndarray) -> float:
-        design = _design_matrix(categories)
-        n_left = int(categories[:, 0].max()) + 1
-        left, right = design[:, :n_left], design[:, n_left:]
-        normalized = (
-            np.diag(1.0 / np.sqrt(np.diag(left.T @ left)))
-            @ (left.T @ right)
-            @ np.diag(1.0 / np.sqrt(np.diag(right.T @ right)))
-        )
-        singular_values = np.linalg.svd(normalized, compute_uv=False)
-        return float(singular_values[1] ** 2)
-
-    @staticmethod
-    def _observed_contraction(categories: np.ndarray, n_sweeps: int = 40) -> float:
-        """Per-sweep contraction of residual MAP, measured after transients decay."""
-        design = _design_matrix(categories)
-        n_left = int(categories[:, 0].max()) + 1
-        left, right = design[:, :n_left], design[:, n_left:]
-
-        def residual_projector(block: np.ndarray) -> np.ndarray:
-            return np.eye(block.shape[0]) - block @ np.linalg.pinv(block.T @ block) @ block.T
-
-        sweep = residual_projector(right) @ residual_projector(left)
-        limit = residual_projector(design)
-
-        rng = np.random.default_rng(3)
-        state = rng.standard_normal(design.shape[0])
-        previous = state - limit @ state
-        ratios = []
-        for _ in range(n_sweeps):
-            state = sweep @ state
-            error = state - limit @ state
-            if np.linalg.norm(previous) > 1e-12:
-                ratios.append(np.linalg.norm(error) / np.linalg.norm(previous))
-            previous = error
-        return float(np.median(ratios[-5:]))
-
-    def test_rho_is_the_exact_per_sweep_contraction(self) -> None:
-        """rho_qr is the squared cosine of the Friedrichs angle, so MAP contracts by it.
-
-        The paper uses this to say that a small two-factor gap means slow MAP in
-        a precise sense, and that no such statement is available for three or
-        more factors. Only the two-factor claim is testable here, which is the
-        point.
-        """
-        for name, design in TWO_FACTOR_DESIGNS.items():
-            if name != "connected":
-                # Disconnected designs mix component rates; the paper reports the
-                # smallest gap over components rather than one contraction factor.
-                continue
-            with self.subTest(design=name):
-                self.assertAlmostEqual(
-                    self._observed_contraction(design), self._rho(design), places=6
-                )
-
-    def test_paper_example_gap_is_one_third(self) -> None:
-        """The appendix's worked spectral-gap example reports 1/3."""
-        design = TWO_FACTOR_DESIGNS["connected"]
-        self.assertAlmostEqual(1.0 - self._rho(design), 1.0 / 3.0, places=12)
 
 
 if __name__ == "__main__":

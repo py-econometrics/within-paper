@@ -32,10 +32,11 @@ RESULTS = ROOT / "results" / "runs" / "latest"
 FIGURES = ROOT / "figures" / "results"
 PAPER_RESULTS = ROOT / "results" / "paper" / "benchmark_tables.json"
 
-# The left panel compares package defaults. The right panel holds package and
-# accuracy fixed, so it isolates the solver and preconditioner. These are the
-# backend names as the result files spell them; every colour, marker, dash and
-# label is derived from the registry, so nothing is restated here.
+# The left panel compares package defaults. The right panel holds the package,
+# calibrated tolerance, and iteration budget fixed so that it isolates the solver and
+# preconditioner. These are the backend names as the result files spell them; every
+# colour, marker, dash and label is derived from the registry, so nothing is restated
+# here.
 CROSS_PACKAGE_BACKENDS = ("rust-map", "fixest", "FEM.jl", "within")
 
 MECHANISM_BACKENDS = (
@@ -53,7 +54,13 @@ def _load_points() -> list[dict]:
             f"{path} is missing. Run `pixi run collect-paper-results` first."
         )
     document = json.loads(path.read_text(encoding="utf-8"))
-    records = document.get("headline_figure", {}).get("points", [])
+    figure = document.get("headline_figure", {})
+    if document.get("schema_version") != 3 or figure.get("schema_version") != 3:
+        raise SystemExit(
+            "The canonical paper results use an outdated schema. "
+            "Migrate the connectivity fields to the version 3 Gap schema before rendering."
+        )
+    records = figure.get("points", [])
     if not records:
         raise SystemExit(
             "The canonical paper results have no headline-figure records. "
@@ -66,23 +73,23 @@ def _visible_point(row: dict) -> bool:
     """Whether a record has a comparable runtime for the headline plot."""
     return (
         row.get("status") in {"complete", "partial", "incomplete", "capped"}
-        and isinstance(row.get("gap"), (int, float))
+        and isinstance(row.get("lambda2"), (int, float))
         and isinstance(row.get("median_time"), (int, float))
-        and row["gap"] > 0
+        and row["lambda2"] > 0
         and row["median_time"] > 0
     )
 
 
 def _headline_x_limits(points: list[dict]) -> tuple[float, float]:
     """One padded, reversed log scale shared by all headline panels."""
-    gaps = [
-        row["gap"]
+    lambda2_values = [
+        row["lambda2"]
         for row in points
         if _visible_point(row)
     ]
-    if not gaps:
+    if not lambda2_values:
         raise ValueError("No plottable headline-figure records")
-    return max(gaps) * 1.45, min(gaps) / 1.45
+    return max(lambda2_values) * 1.45, min(lambda2_values) / 1.45
 
 
 def _runtime_panel(
@@ -112,13 +119,15 @@ def _runtime_panel(
             row for row in usable if row["status"] in {"partial", "incomplete"}
         ]
         capped = [row for row in usable if row["status"] == "capped"]
-        returned = sorted(complete + partial, key=lambda row: row["gap"], reverse=True)
+        returned = sorted(
+            complete + partial, key=lambda row: row["lambda2"], reverse=True
+        )
 
         # Join observed medians within a configuration. Capped cells are lower
         # bounds rather than returned fits, so their markers remain unconnected.
         if len(returned) >= 2:
             ax.plot(
-                [row["gap"] for row in returned],
+                [row["lambda2"] for row in returned],
                 [row["median_time"] for row in returned],
                 color=colour,
                 linewidth=1.15,
@@ -129,7 +138,7 @@ def _runtime_panel(
 
         if complete:
             ax.scatter(
-                [row["gap"] for row in complete],
+                [row["lambda2"] for row in complete],
                 [row["median_time"] for row in complete],
                 s=34,
                 c=colour,
@@ -141,7 +150,7 @@ def _runtime_panel(
             )
         if partial:
             ax.scatter(
-                [row["gap"] for row in partial],
+                [row["lambda2"] for row in partial],
                 [row["median_time"] for row in partial],
                 s=41,
                 facecolors="none",
@@ -153,7 +162,7 @@ def _runtime_panel(
             )
         for row in capped:
             ax.scatter(
-                row["gap"],
+                row["lambda2"],
                 row["median_time"],
                 s=43,
                 facecolors="none",
@@ -167,8 +176,8 @@ def _runtime_panel(
             # the upward arrow marks it as a lower bound, not a returned fit.
             ax.annotate(
                 "",
-                xy=(row["gap"], row["median_time"] * 1.38),
-                xytext=(row["gap"], row["median_time"] * 1.03),
+                xy=(row["lambda2"], row["median_time"] * 1.38),
+                xytext=(row["lambda2"], row["median_time"] * 1.03),
                 arrowprops={"arrowstyle": "-|>", "color": colour, "lw": 0.85},
                 zorder=3,
             )
@@ -250,7 +259,7 @@ def headline_figure(points: list[dict], out: Path) -> None:
     fig.text(
         0.535,
         0.035,
-        "Worker-firm spectral gap  $1-\\rho_{WF}$  "
+        "Worker-firm Gap  $\\lambda_{2,WF}$  "
         "(weaker connectivity to the right)",
         ha="center",
         fontsize=9,

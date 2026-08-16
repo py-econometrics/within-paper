@@ -48,7 +48,7 @@ for (index in seq_len(repetitions)) {
       n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = nobs(fit), beta_x1 = unname(coef(fit)[["x1"]]),
-      max_eta = NA_real_, converged = TRUE, capped = FALSE, error = ""
+      converged = TRUE, capped = FALSE, error = ""
     )
   }, error = function(error) {
     message <- conditionMessage(error)
@@ -56,7 +56,7 @@ for (index in seq_len(repetitions)) {
       backend = "fixest", repetition = index - 1L,
       n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
-      n_retained = NA_integer_, beta_x1 = NA_real_, max_eta = NA_real_,
+      n_retained = NA_integer_, beta_x1 = NA_real_,
       converged = FALSE,
       capped = grepl("without convergence", message, fixed = TRUE),
       error = message

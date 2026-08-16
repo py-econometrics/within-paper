@@ -1,4 +1,4 @@
-# Graph-Preconditioned Estimation of High-Dimensional Fixed-Effect Models
+# Graph Preconditioning for High-Dimensional Fixed Effects Regression
 
 This repository contains the paper by Alexander Fischer and Kristof Schröder,
 along with the code used to produce its tables, figures, and benchmark results.
