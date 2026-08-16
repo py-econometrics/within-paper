@@ -12,6 +12,7 @@ benchmarks/julia-env/*
 !benchmarks/julia-env/Manifest.toml
 
 # generated benchmark data
+*.csv
 *.parquet
 benchmarks/data/*.hash
 

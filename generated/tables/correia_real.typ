@@ -3,22 +3,22 @@
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
-#let miss = text(fill: rgb("#777777"))[--]
+#let miss = text(fill: rgb("#777777"))[-]
 #table(
-  columns: (1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr),
+  columns: (1.05fr, 0.92fr, 0.80fr, 0.88fr, 0.68fr, 0.68fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Dataset], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`]),
+  table.header(th[Dataset], th[$lambda_2(cal(L))$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [`credit`], [0.402 (1.00)], [0.150s], [0.126s], [0.097s], [0.155s],
-  [`soccer`], [0.889 (1.00)], [0.018s], [0.014s], [0.013s], [0.037s],
-  [`enron`], [$7.04 times 10^(-3)$ (0.99)], [3.03s], [0.519s], [0.321s], [0.357s],
-  [`github`], [$6.30 times 10^(-4)$ (0.32)], [failed (0/3)], [1.42s], [1.48s], [0.223s],
-  [`patents`], [$5.18 times 10^(-4)$ (0.95)], [failed (0/3)], [1.05s], [0.623s], [0.321s],
-  [`workers`], [$2.74 times 10^(-4)$ (0.63)], [failed (0/3)], [2.02s], [1.52s], [0.177s],
-  [`schools`], [$2.21 times 10^(-3)$ (1.00)], [6.51s], [0.818s], [0.523s], [0.162s],
-  [`directors`], [$5.12 times 10^(-4)$ (0.30)], [failed (0/3)], [0.293s], [0.518s], [0.233s],
+  [`credit`], [0.227 (1.00)], [0.193s], [0.242s], [0.154s], [0.097s],
+  [`soccer`], [0.666 (1.00)], [0.026s], [0.065s], [0.014s], [0.010s],
+  [`enron`], [$3.53 times 10^(-3)$ (0.99)], [2.95s], [0.402s], [0.535s], [0.317s],
+  [`github`], [$3.15 times 10^(-4)$ (0.32)], [capped (0/3)], [0.310s], [1.43s], [1.44s],
+  [`patents`], [$2.59 times 10^(-4)$ (0.95)], [capped (0/3)], [0.388s], [1.05s], [0.576s],
+  [`workers`], [$1.37 times 10^(-4)$ (0.63)], [capped (0/3)], [0.279s], [2.00s], [1.45s],
+  [`schools`], [$1.11 times 10^(-3)$ (1.00)], [5.98s], [0.266s], [0.828s], [0.487s],
+  [`directors`], [$2.56 times 10^(-4)$ (0.30)], [capped (0/3)], [0.327s], [0.283s], [0.462s],
   table.hline(stroke: 0.8pt + table-rule),
 )

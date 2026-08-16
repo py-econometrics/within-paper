@@ -76,7 +76,7 @@
       "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
       "header": [
         "Scenario",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`fixest`",
         "`FEM.jl`",
@@ -138,7 +138,7 @@
       "columns": "(1.25fr, 1.05fr, 0.78fr, 0.78fr, 0.78fr, 0.78fr)",
       "header": [
         "Scenario",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`fixest`",
         "`FEM.jl`",
@@ -192,7 +192,7 @@
       "columns": "(1.15fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
       "header": [
         "Dataset",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`fixest`",
         "`FEM.jl`",
@@ -270,7 +270,7 @@
       "columns": "(1.5fr, 1.0fr, 0.75fr, 0.75fr, 0.85fr, 0.8fr)",
       "header": [
         "Dataset",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`fixest`",
         "`FEM.jl`",
@@ -324,7 +324,7 @@
       "columns": "(1.25fr, 1.0fr, 0.85fr, 0.85fr)",
       "header": [
         "Design",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within`"
       ],
@@ -372,7 +372,7 @@
       "columns": "(1.25fr, 1.05fr, 0.72fr, 0.72fr, 0.72fr, 0.78fr, 0.86fr)",
       "header": [
         "Design",
-        "Gap (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`fixest`",
         "`FEM.jl`",

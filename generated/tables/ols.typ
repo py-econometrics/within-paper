@@ -3,16 +3,16 @@
 #let table-light-rule = rgb("#d8dee8")
 #let table-head-fill = rgb("#eef2f7")
 #let th(body) = table.cell(fill: table-head-fill)[#strong(body)]
-#let miss = text(fill: rgb("#777777"))[--]
+#let miss = text(fill: rgb("#777777"))[-]
 #table(
-  columns: (1.25fr, 1.05fr, 0.72fr, 0.72fr, 0.72fr, 0.78fr, 0.86fr),
+  columns: (1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr),
   stroke: 0.35pt + table-light-rule,
   inset: (x: 5pt, y: 3.6pt),
-  align: (left, right, right, right, right, right, right),
+  align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap (share)], th[`rust-map`], th[`fixest`], th[`FEM.jl`], th[`within`], th[`torch-cuda`]),
+  table.header(th[Design], th[$lambda_2(cal(L))$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
-  [simple (well-connected)], [0.857 (1.00)], [2.29s], [2.65s], [2.20s], [12.0s], [4.73s],
-  [difficult (near-nested)], [$1.67 times 10^(-7)$ (1.00)], [347.9s], [71.8s], [28.8s], [4.37s], [8.73s],
+  [simple (well-connected)], [0.622 (1.00)], [2.35s], [2.72s], [2.16s], [11.2s], [2.52s], [2.08s],
+  [difficult (near-nested)], [$8.35 times 10^(-8)$ (1.00)], [326.2s], [10.2s], [capped (0/3)], [4.63s], [62.2s], [27.0s],
   table.hline(stroke: 0.8pt + table-rule),
 )
