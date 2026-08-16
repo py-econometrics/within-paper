@@ -29,8 +29,11 @@ LATEST_RUN = ROOT / "results" / "runs" / "latest"
 TABLES_PATH = ROOT / "results" / "paper" / "benchmark_tables.json"
 GENERATED_DIR = ROOT / "generated" / "tables"
 EXPECTED_TRIALS = 3
-CONNECTIVITY_HEADER = "Gap $lambda_2$ (share)"
-LEGACY_CONNECTIVITY_HEADER = "$lambda_2$ (share)"
+CONNECTIVITY_HEADER = "$lambda_2(cal(L))$ (share)"
+LEGACY_CONNECTIVITY_HEADERS = {
+    "Gap $lambda_2$ (share)",
+    "$lambda_2$ (share)",
+}
 
 # The headline figure is a presentation of the two controlled AKM benchmark
 # families.  The tables remain the canonical source of the lambda2 calculation;
@@ -739,11 +742,11 @@ def _ensure_akm_runtime_rows(document: dict) -> int:
 
 
 def _migrate_connectivity_headers(document: dict) -> int:
-    """Rename the paper-facing Gap column without changing its stored cells."""
+    """Rename legacy connectivity columns without changing their stored cells."""
     changed = 0
     for table in document["tables"].values():
         for index, header in enumerate(table.get("header", [])):
-            if header == LEGACY_CONNECTIVITY_HEADER:
+            if header in LEGACY_CONNECTIVITY_HEADERS:
                 table["header"][index] = CONNECTIVITY_HEADER
                 changed += 1
     return changed
@@ -757,7 +760,7 @@ def _prose_cell(value: str) -> str:
 
 
 def _format_lambda2(lambda2: float, share: float) -> str:
-    """Format the Gap and the selected component's observation share."""
+    """Format the connectivity measure and selected component's observation share."""
     if lambda2 and abs(lambda2) < 1e-2:
         exponent = int(f"{lambda2:.0e}".split("e")[1])
         mantissa = lambda2 / (10**exponent)
@@ -1051,8 +1054,8 @@ def _synchronize_canonical_tables(
 ) -> int:
     """Update runtime cells from current raw CSV files.
 
-    Keep the separately computed Gap and component-share values. Replace a runtime only
-    when the new output records all expected trials.
+    Keep the separately computed connectivity and component-share values. Replace a
+    runtime only when the new output records all expected trials.
     """
     raw = _rows_from_csvs()
     _validate_ppml_results(raw)

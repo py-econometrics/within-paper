@@ -175,7 +175,7 @@ class HeadlineFigureCollectionTests(unittest.TestCase):
 
         self.assertEqual(
             rendered["header"][:2],
-            ["Move probability $delta$", "Gap $lambda_2$ (share)"],
+            ["Move probability $delta$", paper_results.CONNECTIVITY_HEADER],
         )
         self.assertEqual(
             rendered["header"][2:],

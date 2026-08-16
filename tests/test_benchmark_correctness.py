@@ -639,11 +639,26 @@ class PaperResultTests(unittest.TestCase):
                 paper_results.render(None)
         synchronize.assert_not_called()
 
+    def test_migrate_connectivity_headers_accepts_both_legacy_labels(self) -> None:
+        document = {
+            "tables": {
+                "with_gap": {"header": ["Gap $lambda_2$ (share)"]},
+                "without_gap": {"header": ["$lambda_2$ (share)"]},
+                "current": {"header": [paper_results.CONNECTIVITY_HEADER]},
+            }
+        }
+
+        changed = paper_results._migrate_connectivity_headers(document)
+
+        self.assertEqual(changed, 2)
+        for table in document["tables"].values():
+            self.assertEqual(table["header"], [paper_results.CONNECTIVITY_HEADER])
+
     def test_akm_setup_table_separates_two_and_three_factors(self) -> None:
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
+                    "header": ["Scenario", paper_results.CONNECTIVITY_HEADER],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]]
                 },
                 "akm_setup_cost": {"rows": []},
@@ -681,7 +696,7 @@ class PaperResultTests(unittest.TestCase):
         document = {
             "tables": {
                 "akm_mobility": {
-                    "header": ["Scenario", "Gap $lambda_2$ (share)"],
+                    "header": ["Scenario", paper_results.CONNECTIVITY_HEADER],
                     "rows": [["`akm_mobility_1`", "0.41 (1.00)"]],
                 },
                 "akm_setup_cost": {"rows": []},

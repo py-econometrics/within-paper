@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (right, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Sorting strength $rho$], th[Gap $lambda_2$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
+  table.header(th[Sorting strength $rho$], th[$lambda_2(cal(L))$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
   [0], [0.222 (1.00)], [0.411s], [2.60s], [0.362s], [0.557s], [0.448s], [0.325s],
   [20], [0.0332 (1.00)], [1.35s], [2.04s], [0.427s], [0.950s], [0.857s], [0.525s],

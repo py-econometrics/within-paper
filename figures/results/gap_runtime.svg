@@ -5953,8 +5953,8 @@ z
     <use xlink:href="#DejaVuSans-48" transform="translate(4859.390625 0)"/>
    </g>
   </g>
-  <g id="text_32" style="display: none">
-   <!-- Our measure of connectivity, lambda_2,WF (weaker connectivity to the right) -->
+  <g id="text_32">
+   <!-- Worker-firm Gap  $\lambda_{2,WF}$  (weaker connectivity to the right) -->
    <g transform="translate(260.000781 476.006625) scale(0.09 -0.09)">
     <defs>
      <path id="DejaVuSans-3a" d="M 213 4666 
@@ -6128,7 +6128,6 @@ z
    </g>
   </g>
  </g>
- <text x="371.848391" y="478" text-anchor="middle" font-family="DejaVu Sans" font-size="9">Our measure of connectivity, λ₂,WF (weaker connectivity to the right)</text>
  <defs>
   <clipPath id="p58eeb03e25">
    <rect x="45.800781" y="19.886625" width="325.8" height="186.162162"/>
