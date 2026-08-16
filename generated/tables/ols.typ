@@ -10,7 +10,7 @@
   inset: (x: 5pt, y: 3.6pt),
   align: (left, right, right, right, right, right, right, right),
   table.hline(stroke: 0.8pt + table-rule),
-  table.header(th[Design], th[Gap $lambda_2$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
+  table.header(th[Design], th[$lambda_2(cal(L))$ (share)], th[PyFixest #linebreak() MAP], th[PyFixest #linebreak() LSMR #linebreak() none], th[PyFixest #linebreak() LSMR #linebreak() diagonal], th[PyFixest #linebreak() LSMR #linebreak() factor-pair], th[fixest], th[FEM.jl]),
   table.hline(stroke: 0.45pt + table-rule),
   [simple (well-connected)], [0.622 (1.00)], [2.35s], [2.72s], [2.16s], [11.2s], [2.52s], [2.08s],
   [difficult (near-nested)], [$8.35 times 10^(-8)$ (1.00)], [326.2s], [10.2s], [capped (0/3)], [4.63s], [62.2s], [27.0s],

@@ -1319,7 +1319,7 @@
       "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Scenario",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1395,7 +1395,7 @@
       "columns": "(1.25fr, 1.05fr, 0.8fr, 0.8fr, 0.8fr, 0.8fr)",
       "header": [
         "Scenario",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "2 FE setup",
         "2 FE LSMR",
         "3 FE setup",
@@ -1457,7 +1457,7 @@
       "columns": "(1.15fr, 0.95fr, 0.72fr, 0.72fr, 0.78fr, 0.82fr, 0.70fr, 0.70fr)",
       "header": [
         "Scenario",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1533,7 +1533,7 @@
       "columns": "(1.05fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1629,7 +1629,7 @@
       "columns": "(1.35fr, 0.90fr, 0.68fr, 0.68fr, 0.74fr, 0.78fr, 0.65fr, 0.65fr)",
       "header": [
         "Dataset",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
@@ -1722,7 +1722,7 @@
       "columns": "(1.25fr, 1.0fr, 0.85fr, 0.85fr)",
       "header": [
         "Design",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within`"
       ],
@@ -1770,7 +1770,7 @@
       "columns": "(1.35fr, 0.90fr, 0.70fr, 0.70fr, 0.75fr, 0.80fr, 0.65fr, 0.65fr)",
       "header": [
         "Design",
-        "Gap $lambda_2$ (share)",
+        "$lambda_2(cal(L))$ (share)",
         "`rust-map`",
         "`within-off`",
         "`within-diagonal`",
