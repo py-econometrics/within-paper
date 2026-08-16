@@ -1892,6 +1892,22 @@
           "33.6x"
         ]
       ]
+    },
+    "varying_slopes": {
+      "align": "(right, right, right, right, right)",
+      "columns": "(1.0fr, 1.05fr, 1.05fr, 0.72fr, 0.72fr)",
+      "header": [
+        "Scenario",
+        "`within-diagonal`",
+        "`within-additive`",
+        "`fixest`",
+        "`FEM.jl`"
+      ],
+      "rows": [
+        ["`akm_mobility_1`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_mobility_3`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_mobility_5`", "#miss", "#miss", "#miss", "#miss"]
+      ]
     }
   }
 }

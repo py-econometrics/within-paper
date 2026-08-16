@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from benchmarks.data import make_base_data
+from benchmarks.varying_slopes.pyfixest import fit_varying_slope
 
 ROOT = Path(__file__).absolute().parents[1]
 HAS_R = shutil.which("Rscript") is not None
@@ -37,6 +38,11 @@ def _run(language: str, model: str) -> pd.DataFrame:
                 "fixest.R" if language == "r" else "gl_fixed_effect_models.jl"
             )
             args = [str(data), str(output), "1", "100"]
+        elif model == "varying_slopes":
+            script = ROOT / "benchmarks" / "varying_slopes" / (
+                "fixest.R" if language == "r" else "fixed_effect_models.jl"
+            )
+            args = [str(data), str(output), "1"]
         else:
             script = ROOT / "benchmarks" / "tolerance" / (
                 "fixest.R" if language == "r" else "fixed_effect_models.jl"
@@ -94,6 +100,31 @@ class JuliaTests(unittest.TestCase):
         self.assertIn("converged", result)
         self.assertIn("capped", result)
         self.assertFalse(bool(result.loc[0, "converged"] and result.loc[0, "capped"]))
+
+
+@unittest.skipUnless(HAS_R and HAS_JULIA, "Rscript and Julia are required")
+class VaryingSlopeAgreementTests(unittest.TestCase):
+    def test_all_four_configurations_agree_on_x1(self) -> None:
+        os.environ.setdefault("BENCH_THREADS", "1")
+        os.environ.setdefault("RAYON_NUM_THREADS", "1")
+        frame = make_base_data(1_000, "simple", 22)
+        python_fits = [
+            fit_varying_slope(frame, backend)
+            for backend in ("within-diagonal", "within-additive")
+        ]
+        native = [_run(language, "varying_slopes") for language in ("r", "julia")]
+        estimates = [
+            *(float(fit.coef().loc["x1"]) for fit in python_fits),
+            *(float(result.loc[0, "beta_x1"]) for result in native),
+        ]
+        retained = [
+            *(int(fit._N) for fit in python_fits),
+            *(int(result.loc[0, "n_retained"]) for result in native),
+        ]
+
+        self.assertTrue(all(result.loc[0, "converged"] for result in native))
+        self.assertEqual(len(set(retained)), 1)
+        self.assertLess(max(estimates) - min(estimates), 1e-5)
 
 
 if __name__ == "__main__":

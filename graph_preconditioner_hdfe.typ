@@ -1022,6 +1022,37 @@ Our measure of connectivity is a pairwise description rather than a rule for cho
 runtime also depends on component size, factor dimensions, graph sparsity, acceleration,
 and the preconditioner's setup cost.
 
+== Worker-Specific Year Slopes
+
+Applied work often allows a linear time trend to differ across observational units. We
+add one numeric year slope for every worker to mobility designs 1, 3, and 5, while
+retaining firm and categorical year effects. In `fixest` formula syntax, the absorbed
+part is `indiv_id[year] + firm_id + year`: the bracketed term includes a worker
+intercept and a worker-specific slope on the existing year variable, while the final
+term absorbs unrestricted aggregate year shocks.
+
+The PyFixest cells use the `within` backend because its other demeaning backends do not
+support varying slopes. We compare diagonal and factor-pair Schwarz preconditioning
+with R `fixest` and FEM.jl. Worker-firm interactions are not included because they add
+categorical match effects rather than a slope on a numeric variable.
+
+#block(breakable: false)[#text(size: 8.7pt)[
+#strong[Worker-specific year slopes on selected AKM mobility designs.]
+#include "generated/tables/varying_slopes.typ"
+  #v(0.25em)
+  #table-note[Times are in seconds for OLS regressions with 1 million observations and
+  one covariate. Every regression absorbs worker intercepts, worker-specific numeric
+  year slopes, firm effects, and categorical year effects. PyFixest uses LSMR with
+  diagonal or factor-pair Schwarz preconditioning through the `within` backend; R
+  `fixest` and FEM.jl use their package defaults. Each cell has three planned runs after
+  one unreported warm-up. If only $k$ runs return an estimate, $t (k/3)$ reports their
+  median time $t$. `capped (0/3)` means that no run finishes before its iteration limit,
+  while `failed (0/3)` marks another failure.]
+]]
+
+The table keeps the two PyFixest preconditioners separate so their setup and iteration
+costs can be compared with the native R and Julia implementations.
+
 == Runtime and Achieved Precision
 
 Solver comparisons also depend on how packages define convergence. MAP implementations

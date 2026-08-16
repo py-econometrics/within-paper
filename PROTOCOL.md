@@ -55,6 +55,10 @@ isolate a solver choice.
 - **Covariates.** Every regression has one slope covariate, `x1`.
 - **Factor order.** Worker, firm, year, in that order, for every experiment. MAP is
   sensitive to the cycling order, so it must not vary across tables.
+- **Varying-slope specification.** The varying-slope experiment replaces the ordinary
+  worker effect with a worker effect that contains an intercept and a numeric year
+  slope, followed by firm and categorical year effects. Every backend receives the
+  unchanged year values 1 through 10.
 - **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
   launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
   `check-external-runtimes` verifies the R and Julia settings before a production run.
@@ -116,8 +120,9 @@ wherever it is used.
 
 The 10M main OLS comparison uses the adaptive R1/R2/R3 rule. The AKM and Correia OLS
 comparisons use three planned calls per cell. The PPML comparison also uses three calls;
-the AKM setup-cost experiment uses five, the ten-regression reuse experiment uses three,
-and memory and coefficient-agreement diagnostics use one isolated call per cell.
+the varying-slope comparison uses three, the AKM setup-cost experiment uses five, the
+ten-regression reuse experiment uses three, and memory and coefficient-agreement
+diagnostics use one isolated call per cell.
 
 ## 5. Accuracy metrics
 
@@ -245,6 +250,10 @@ Three comparisons are kept separate.
 3. **Runtime against achieved precision.** Each backend is tested at its own tolerance
    settings on three AKM mobility designs. The figure plots wall time against coefficient
    and residual error measured on the returned fit.
+4. **Varying slopes.** PyFixest uses its `within` backend with diagonal or factor-pair
+   Schwarz preconditioning. R `fixest` and `FixedEffectModels.jl` use their package
+   defaults. All four absorb worker intercepts, worker-specific year slopes, firm
+   effects, and categorical year effects.
 
 The matched-accuracy label in Figure 1 refers to the settings calibrated in the separate
 achieved-precision benchmark. It does not mean that each plotted regression carries its
@@ -276,6 +285,7 @@ coefficient and residual errors separately.
 | AKM designs varying sorting | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
 | Large-scale simple/difficult | 10M | Six default OLS configurations | Headline total-runtime comparison |
 | Runtime and achieved precision | 1M selected AKM mobility designs | PyFixest MAP and LSMR variants, R `fixest`, and `FixedEffectModels.jl` | Wall time against coefficient and residual error |
+| Worker-specific year slopes | 1M AKM mobility designs 1, 3, and 5 | PyFixest diagonal and factor-pair Schwarz, R `fixest`, and `FixedEffectModels.jl` | Package-default runtime with one varying-slope effect |
 | Ten-regression reuse | 1M simple and difficult | Diagonal, rebuilt factor-pair, and cached factor-pair preconditioners | Setup reuse across fits |
 | Selected Correia designs | Existing sizes | Six default OLS configurations | Robustness across graph families |
 | PPML simple/difficult | 1M | PyFixest MAP and factor-pair reuse, plus external packages | Inner solver versus outer IRLS convergence |

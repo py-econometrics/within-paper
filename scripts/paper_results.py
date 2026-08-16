@@ -50,6 +50,7 @@ RENDERED_TABLES = (
     "ols",
     "ppml",
     "regression_reuse",
+    "varying_slopes",
 )
 
 
@@ -95,7 +96,7 @@ def _method_header(key: str) -> str:
         "within-off": "none",
         "within-diagonal": "diagonal",
         "within": "factor-pair",
-        "within-additive": "factor-pair",
+        "within-additive": "factor-pair #linebreak() Schwarz",
     }
     if key in lsmr_preconditioners:
         return (
@@ -108,6 +109,7 @@ def _method_header(key: str) -> str:
 
 AKM_PARAMETER_TABLES = {
     "akm_setup_cost": ("Move probability $delta$", "akm_mobility_"),
+    "varying_slopes": ("Move probability $delta$", "akm_mobility_"),
 }
 
 
@@ -321,6 +323,7 @@ def _rows_from_csvs() -> list[dict[str, str]]:
         "ppml.csv",
         "akm.csv",
         "correia.csv",
+        "varying_slopes.csv",
     ):
         path = _latest(filename)
         if not path.exists():
@@ -571,11 +574,21 @@ def _validate_ppml_results(rows: list[dict[str, str]]) -> None:
 
 def _paper_runtime_target(
     table_name: str, table: dict, row: list[str]
-) -> tuple[str, dict[str, int], str]:
+) -> tuple[str, dict[str, int | str], str]:
     """Return the exact run specification represented by a paper timing cell."""
     dataset = _row_label(table, row).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
+    if table_name == "varying_slopes":
+        return (
+            dataset,
+            {
+                "n_obs": 1_000_000,
+                "n_fe": 3,
+                "varying_slope": "indiv_id[year]",
+            },
+            "varying_slopes.csv:default",
+        )
     if table_name in {"akm_mobility", "akm_sorting"}:
         return dataset, {"n_obs": 1_000_000, "n_fe": 3}, "akm.csv:default"
     if table_name == "ols":
@@ -593,7 +606,7 @@ def _matches_runtime_target(
     row: dict[str, str],
     dataset: str,
     backend: str,
-    requirements: dict[str, int],
+    requirements: dict[str, int | str],
     source_marker: str,
 ) -> bool:
     filename, view = source_marker.split(":", 1)
@@ -604,7 +617,12 @@ def _matches_runtime_target(
     raw_backend = row.get("backend", "")
     if raw_backend != backend:
         return False
-    return all(_integer_field(row, field) == value for field, value in requirements.items())
+    return all(
+        _integer_field(row, field) == value
+        if isinstance(value, int)
+        else row.get(field) == value
+        for field, value in requirements.items()
+    )
 
 
 def _numeric_cell(value: str) -> float | None:
@@ -1069,7 +1087,7 @@ def _synchronize_canonical_tables(
     changed += _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
-        "correia_synthetic", "correia_real",
+        "correia_synthetic", "correia_real", "varying_slopes",
     }
     for name, table in document["tables"].items():
         if name not in runtime_tables:
