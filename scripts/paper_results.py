@@ -50,7 +50,9 @@ RENDERED_TABLES = (
     "ols",
     "ppml",
     "regression_reuse",
-    "varying_slopes",
+    "varying_slopes_base",
+    "varying_slopes_mobility",
+    "varying_slopes_sorting",
 )
 
 
@@ -109,7 +111,8 @@ def _method_header(key: str) -> str:
 
 AKM_PARAMETER_TABLES = {
     "akm_setup_cost": ("Move probability $delta$", "akm_mobility_"),
-    "varying_slopes": ("Move probability $delta$", "akm_mobility_"),
+    "varying_slopes_mobility": ("Move probability $delta$", "akm_mobility_"),
+    "varying_slopes_sorting": ("Sorting strength $rho$", "akm_sorting_"),
 }
 
 
@@ -323,7 +326,6 @@ def _rows_from_csvs() -> list[dict[str, str]]:
         "ppml.csv",
         "akm.csv",
         "correia.csv",
-        "varying_slopes.csv",
     ):
         path = _latest(filename)
         if not path.exists():
@@ -526,7 +528,11 @@ def _synchronize_headline_figure(document: dict, raw: list[dict[str, str]]) -> i
                             row,
                             design,
                             backend,
-                            {"n_obs": 1_000_000, "n_fe": 3},
+                            {
+                                "n_obs": 1_000_000,
+                                "n_fe": 3,
+                                "specification": "intercepts",
+                            },
                             f"akm.csv:{view}",
                         )
                     ]
@@ -579,27 +585,42 @@ def _paper_runtime_target(
     dataset = _row_label(table, row).split(" ")[0]
     if table_name in {"ols", "ppml"}:
         dataset = dataset.split("(")[0]
-    if table_name == "varying_slopes":
+    if table_name.startswith("varying_slopes_"):
+        n_obs = 10_000_000 if table_name == "varying_slopes_base" else 1_000_000
+        source = (
+            "ols.csv:default"
+            if table_name == "varying_slopes_base"
+            else "akm.csv:default"
+        )
         return (
             dataset,
             {
-                "n_obs": 1_000_000,
+                "n_obs": n_obs,
                 "n_fe": 3,
+                "specification": "worker-year-slope",
                 "varying_slope": "indiv_id[year]",
             },
-            "varying_slopes.csv:default",
+            source,
         )
     if table_name in {"akm_mobility", "akm_sorting"}:
-        return dataset, {"n_obs": 1_000_000, "n_fe": 3}, "akm.csv:default"
+        return (
+            dataset,
+            {"n_obs": 1_000_000, "n_fe": 3, "specification": "intercepts"},
+            "akm.csv:default",
+        )
     if table_name == "ols":
-        return dataset, {"n_obs": 10_000_000, "n_fe": 3}, "ols.csv:default"
+        return (
+            dataset,
+            {"n_obs": 10_000_000, "n_fe": 3, "specification": "intercepts"},
+            "ols.csv:default",
+        )
     if table_name == "ppml":
         return (
             dataset,
             {"n_obs": 1_000_000, "n_fe": int(_table_cell(table, row, "FE"))},
             "ppml.csv:default",
         )
-    return dataset, {"n_fe": 2}, "correia.csv:default"
+    return dataset, {"n_fe": 2, "specification": "intercepts"}, "correia.csv:default"
 
 
 def _matches_runtime_target(
@@ -620,7 +641,11 @@ def _matches_runtime_target(
     return all(
         _integer_field(row, field) == value
         if isinstance(value, int)
-        else row.get(field) == value
+        else (
+            row.get(field, "intercepts") == value
+            if field == "specification"
+            else row.get(field) == value
+        )
         for field, value in requirements.items()
     )
 
@@ -743,19 +768,20 @@ def _ensure_akm_runtime_rows(document: dict) -> int:
     for family in ("mobility", "sorting"):
         prefix = f"akm_{family}_"
         expected = [name for name in SCENARIOS if name.startswith(prefix)]
-        table = document["tables"][f"akm_{family}"]
-        rows_by_design = {_row_label(table, row): row for row in table["rows"]}
-        synchronized = [
-            rows_by_design.get(
-                design,
-                [f"`{design}`", *("#miss" for _ in table["header"][1:])],
-            )
-            for design in expected
-        ]
-        if synchronized != table["rows"]:
-            old_designs = set(rows_by_design)
-            changed += max(1, len(old_designs ^ set(expected)))
-            table["rows"] = synchronized
+        for table_name in (f"akm_{family}", f"varying_slopes_{family}"):
+            table = document["tables"][table_name]
+            rows_by_design = {_row_label(table, row): row for row in table["rows"]}
+            synchronized = [
+                rows_by_design.get(
+                    design,
+                    [f"`{design}`", *("#miss" for _ in table["header"][1:])],
+                )
+                for design in expected
+            ]
+            if synchronized != table["rows"]:
+                old_designs = set(rows_by_design)
+                changed += max(1, len(old_designs ^ set(expected)))
+                table["rows"] = synchronized
     return changed
 
 
@@ -1096,7 +1122,8 @@ def _synchronize_canonical_tables(
     changed += _ensure_akm_runtime_rows(document)
     runtime_tables = {
         "ols", "ppml", "akm_mobility", "akm_sorting",
-        "correia_synthetic", "correia_real", "varying_slopes",
+        "correia_synthetic", "correia_real", "varying_slopes_base",
+        "varying_slopes_mobility", "varying_slopes_sorting",
     }
     for name, table in document["tables"].items():
         if name not in runtime_tables:
@@ -1108,6 +1135,13 @@ def _synchronize_canonical_tables(
             # the current run. It is different from a present file with no
             # matching row, which should continue to show as missing.
             if not _latest(filename).exists():
+                continue
+            specification = requirements.get("specification")
+            if specification != "intercepts" and not any(
+                source.get("_source_file") == filename
+                and source.get("specification") == specification
+                for source in raw
+            ):
                 continue
             for column, backend in _backend_columns(table):
                 backend_source = source_marker

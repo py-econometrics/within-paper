@@ -274,7 +274,10 @@ class PythonFitTests(unittest.TestCase):
 
         self.assertEqual(
             lsmr.call_args_list,
-            [call(preconditioner="off"), call(preconditioner="diagonal")],
+            [
+                call(backend="within", preconditioner="off"),
+                call(backend="within", preconditioner="diagonal"),
+            ],
         )
 
     def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
@@ -360,7 +363,7 @@ class PythonFitTests(unittest.TestCase):
             if target is ols_runner._write_sample:
                 target(*args)
                 return
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             retained = 100 if backend == "rust-map" else 99
             pd.DataFrame(
                 [{
@@ -394,7 +397,7 @@ class PythonFitTests(unittest.TestCase):
                 target(*args)
                 return None
             self.assertIs(target, ols_runner._python_rows)
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             worker_backends.append(backend)
             pd.DataFrame(
                 [
@@ -433,7 +436,7 @@ class PythonFitTests(unittest.TestCase):
             if target is ols_runner._write_sample:
                 target(*args)
                 return None
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             if backend == "rust-map":
                 return "python estimator worker exited with status 1"
             pd.DataFrame(

@@ -15,7 +15,6 @@ Pixi is the public interface. Benchmark scripts do not accept user options.
 pixi run bench-main
 pixi run bench-fepois
 pixi run bench-akm
-pixi run bench-varying-slopes
 pixi run bench-correia
 pixi run agreement
 pixi run bench-memory
@@ -41,9 +40,9 @@ configuration runs in an isolated Python worker. The LSMR configurations in thes
 commands retain their package defaults. The matched-accuracy AKM rows are separate
 controls with explicit tolerances and iteration caps.
 
-`bench-varying-slopes` is a separate package-runtime comparison on AKM mobility
-designs 1, 3, and 5. It absorbs worker intercepts and worker-specific linear slopes on
-the numeric year variable, along with firm and year fixed effects. PyFixest runs only
+`bench-main` and `bench-akm` also run a worker-specific year-slope specification on the
+same temporary sample used by their ordinary OLS cells. This specification covers the
+simple and difficult designs and all AKM mobility and sorting designs. PyFixest runs only
 the `within` backend, once with diagonal preconditioning and once with factor-pair
 Schwarz preconditioning; the other cells use R `fixest` and `FixedEffectModels.jl`.
 
@@ -73,7 +72,6 @@ The source tree is organized by model or experiment:
 | `ppml/` | Python, R, and Julia PPML fits |
 | `tolerance/` | Shared tolerance measurement and native siblings |
 | `within/` | Standalone solver diagnostics |
-| `varying_slopes/` | Worker-specific year slopes in Python, R, and Julia |
 | `accuracy.py` | External residual and projection-error calculations |
 | `memory.py` | Isolated-process memory measurements |
 | `runtime.py` | R and Julia process runner |

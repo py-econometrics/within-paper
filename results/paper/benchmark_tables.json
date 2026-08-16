@@ -1893,7 +1893,22 @@
         ]
       ]
     },
-    "varying_slopes": {
+    "varying_slopes_base": {
+      "align": "(left, right, right, right, right)",
+      "columns": "(1.0fr, 1.05fr, 1.05fr, 0.72fr, 0.72fr)",
+      "header": [
+        "Design",
+        "`within-diagonal`",
+        "`within-additive`",
+        "`fixest`",
+        "`FEM.jl`"
+      ],
+      "rows": [
+        ["simple", "#miss", "#miss", "#miss", "#miss"],
+        ["difficult", "#miss", "#miss", "#miss", "#miss"]
+      ]
+    },
+    "varying_slopes_mobility": {
       "align": "(right, right, right, right, right)",
       "columns": "(1.0fr, 1.05fr, 1.05fr, 0.72fr, 0.72fr)",
       "header": [
@@ -1911,6 +1926,7 @@
           "1.07s",
           "0.878s"
         ],
+        ["`akm_mobility_2`", "#miss", "#miss", "#miss", "#miss"],
         [
           "`akm_mobility_3`",
           "1.58s",
@@ -1918,13 +1934,34 @@
           "17.0s",
           "4.37s"
         ],
+        ["`akm_mobility_4`", "#miss", "#miss", "#miss", "#miss"],
         [
           "`akm_mobility_5`",
           "2.65s",
           "6.23s",
           "20.1s",
           "6.39s"
-        ]
+        ],
+        ["`akm_mobility_6`", "#miss", "#miss", "#miss", "#miss"]
+      ]
+    },
+    "varying_slopes_sorting": {
+      "align": "(right, right, right, right, right)",
+      "columns": "(1.0fr, 1.05fr, 1.05fr, 0.72fr, 0.72fr)",
+      "header": [
+        "Scenario",
+        "`within-diagonal`",
+        "`within-additive`",
+        "`fixest`",
+        "`FEM.jl`"
+      ],
+      "rows": [
+        ["`akm_sorting_1`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_sorting_2`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_sorting_3`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_sorting_4`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_sorting_5`", "#miss", "#miss", "#miss", "#miss"],
+        ["`akm_sorting_6`", "#miss", "#miss", "#miss", "#miss"]
       ]
     }
   }

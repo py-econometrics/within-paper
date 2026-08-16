@@ -12,7 +12,8 @@ from pathlib import Path
 import pandas as pd
 
 from benchmarks.data import make_base_data
-from benchmarks.varying_slopes.pyfixest import fit_varying_slope
+from benchmarks.ols.pyfixest import fit_ols
+from benchmarks.ols.specifications import WORKER_YEAR_SLOPE
 
 ROOT = Path(__file__).absolute().parents[1]
 HAS_R = shutil.which("Rscript") is not None
@@ -39,10 +40,16 @@ def _run(language: str, model: str) -> pd.DataFrame:
             )
             args = [str(data), str(output), "1", "100"]
         elif model == "varying_slopes":
-            script = ROOT / "benchmarks" / "varying_slopes" / (
+            script = ROOT / "benchmarks" / "ols" / (
                 "fixest.R" if language == "r" else "fixed_effect_models.jl"
             )
-            args = [str(data), str(output), "1"]
+            args = [
+                str(data),
+                str(output),
+                "indiv_id,firm_id,year",
+                "1",
+                WORKER_YEAR_SLOPE,
+            ]
         else:
             script = ROOT / "benchmarks" / "tolerance" / (
                 "fixest.R" if language == "r" else "fixed_effect_models.jl"
@@ -109,7 +116,12 @@ class VaryingSlopeAgreementTests(unittest.TestCase):
         os.environ.setdefault("RAYON_NUM_THREADS", "1")
         frame = make_base_data(1_000, "simple", 22)
         python_fits = [
-            fit_varying_slope(frame, backend)
+            fit_ols(
+                frame,
+                backend,
+                ("indiv_id", "firm_id", "year"),
+                specification=WORKER_YEAR_SLOPE,
+            )
             for backend in ("within-diagonal", "within-additive")
         ]
         native = [_run(language, "varying_slopes") for language in ("r", "julia")]

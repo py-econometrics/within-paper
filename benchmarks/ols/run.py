@@ -14,6 +14,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from benchmarks.ols.pyfixest import fit_ols, measure
+from benchmarks.ols.specifications import INTERCEPTS, OlsSpecification
 from benchmarks.runtime import failed_trials, run_native
 
 ROOT = Path(__file__).absolute().parents[2]
@@ -28,7 +29,13 @@ PACKAGE_RUNTIME_BACKENDS = (
     "fixest",
     "FEM.jl",
 )
-PYTHON_BACKENDS = ("rust-map", "within-off", "within-diagonal", "within")
+PYTHON_BACKENDS = (
+    "rust-map",
+    "within-off",
+    "within-diagonal",
+    "within",
+    "within-additive",
+)
 
 
 def repetitions_for_runtime(seconds: float) -> int:
@@ -51,10 +58,17 @@ def _native_rows(
     fixed_effects: Sequence[str],
     backend: str,
     repetitions: int | None,
+    specification: str,
 ) -> list[dict]:
     script = "fixest.R" if backend == "fixest" else "fixed_effect_models.jl"
     count = "adaptive" if repetitions is None else str(repetitions)
-    arguments = [str(data_path), str(output), ",".join(fixed_effects), count]
+    arguments = [
+        str(data_path),
+        str(output),
+        ",".join(fixed_effects),
+        count,
+        specification,
+    ]
     return run_native(
         Path(__file__).with_name(script),
         arguments,
@@ -90,13 +104,21 @@ def _python_rows(
     repetitions: int | None,
     tolerance: float | None = None,
     maxiter: int | None = None,
+    specification: str = INTERCEPTS,
 ) -> None:
     frame = pd.read_parquet(data_path)
     warm_up = True
     if repetitions is None:
         started = time.perf_counter()
         try:
-            fit_ols(frame, backend, fixed_effects, tolerance, maxiter)
+            fit_ols(
+                frame,
+                backend,
+                fixed_effects,
+                tolerance,
+                maxiter,
+                specification=specification,
+            )
         except Exception:
             # Use the failed package-default attempt only to choose a repetition count.
             # The measured calls below retain and report the actual failure.
@@ -113,6 +135,7 @@ def _python_rows(
         warm_up=warm_up,
         tolerance=tolerance,
         maxiter=maxiter,
+        specification=specification,
     )
     for row in rows:
         row["n_planned"] = planned
@@ -145,6 +168,7 @@ def run_experiment(
     backends: Sequence[str] = ("rust-map", "within", "fixest", "FEM.jl"),
     repetitions: int | None = None,
     extra_python_cells: Sequence[tuple[str, str, float, int]] = (),
+    additional_specifications: Sequence[OlsSpecification] = (),
 ) -> pd.DataFrame:
     """Generate one sample per design and measure each cell in a fresh process."""
     threads = benchmark_threads()
@@ -155,40 +179,63 @@ def run_experiment(
             data_path = work / "sample.parquet"
             _run_process(_write_sample, generate, data_path)
             n_obs = pq.read_metadata(data_path).num_rows
-            for backend in backends:
-                cell_output = work / f"{backend}.csv"
-                if backend in PYTHON_BACKENDS:
-                    process_error = _run_process(
-                        _python_rows,
-                        data_path,
-                        cell_output,
-                        tuple(fixed_effects),
+            base_specification = OlsSpecification(
+                name=INTERCEPTS,
+                fixed_effects=tuple(fixed_effects),
+                backends=tuple(backends),
+                repetitions=repetitions,
+            )
+            for specification in (base_specification, *additional_specifications):
+                for backend in specification.backends:
+                    cell_output = work / f"{specification.name}-{backend}.csv"
+                    if backend in PYTHON_BACKENDS:
+                        process_error = _run_process(
+                            _python_rows,
+                            data_path,
+                            cell_output,
+                            specification.fixed_effects,
+                            backend,
+                            specification.repetitions,
+                            None,
+                            None,
+                            specification.name,
+                            tolerate_failure=True,
+                        )
+                        measured = (
+                            failed_trials(
+                                backend, specification.repetitions or 3, process_error
+                            )
+                            if process_error
+                            else pd.read_csv(cell_output).to_dict("records")
+                        )
+                    else:
+                        measured = _native_rows(
+                            data_path,
+                            cell_output,
+                            specification.fixed_effects,
+                            backend,
+                            specification.repetitions,
+                            specification.name,
+                        )
+                    planned = int(measured[0]["n_planned"])
+                    for row in measured:
+                        row.update(
+                            design=design,
+                            n_obs=n_obs,
+                            n_fe=len(specification.fixed_effects),
+                            threads=threads,
+                            view="default",
+                            n_planned=planned,
+                            specification=specification.name,
+                            varying_slope=specification.varying_slope,
+                        )
+                    rows.extend(measured)
+                    _print_cell(
+                        f"{experiment} / {specification.name}",
+                        design,
                         backend,
-                        repetitions,
-                        tolerate_failure=True,
+                        measured,
                     )
-                    measured = (
-                        failed_trials(backend, repetitions or 3, process_error)
-                        if process_error
-                        else pd.read_csv(cell_output).to_dict("records")
-                    )
-                else:
-                    measured = _native_rows(
-                        data_path, cell_output,
-                        fixed_effects, backend, repetitions,
-                    )
-                planned = int(measured[0]["n_planned"])
-                for row in measured:
-                    row.update(
-                        design=design,
-                        n_obs=n_obs,
-                        n_fe=len(fixed_effects),
-                        threads=threads,
-                        view="default",
-                        n_planned=planned,
-                    )
-                rows.extend(measured)
-                _print_cell(experiment, design, backend, measured)
             for backend, view, tolerance, maxiter in extra_python_cells:
                 cell_output = work / f"{backend}-{view}.csv"
                 planned = repetitions or 3
@@ -201,6 +248,7 @@ def run_experiment(
                     planned,
                     tolerance,
                     maxiter,
+                    INTERCEPTS,
                     tolerate_failure=True,
                 )
                 measured = (
@@ -213,6 +261,7 @@ def run_experiment(
                         design=design, n_obs=n_obs,
                         n_fe=len(fixed_effects), threads=threads,
                         view=view, n_planned=planned,
+                        specification=INTERCEPTS, varying_slope="",
                     )
                 rows.extend(measured)
                 _print_cell(experiment, design, backend, measured)

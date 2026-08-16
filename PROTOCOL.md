@@ -58,7 +58,8 @@ isolate a solver choice.
 - **Varying-slope specification.** The varying-slope experiment replaces the ordinary
   worker effect with a worker effect that contains an intercept and a numeric year
   slope, followed by firm and categorical year effects. Every backend receives the
-  unchanged year values 1 through 10.
+  unchanged year values 1 through 10. The shared OLS pipeline applies this specification
+  to the simple, difficult, mobility, and sorting designs without running PyFixest MAP.
 - **Threads.** `BENCH_THREADS=10` on the ten-core reference machine. The benchmark
   launcher applies that value to R fixest, Julia, and the Rust solver's Rayon pool.
   `check-external-runtimes` verifies the R and Julia settings before a production run.
@@ -285,7 +286,7 @@ coefficient and residual errors separately.
 | AKM designs varying sorting | 1M | Six default OLS configurations; matched MAP + three LSMR configurations | Package runtime and mechanism comparison |
 | Large-scale simple/difficult | 10M | Six default OLS configurations | Headline total-runtime comparison |
 | Runtime and achieved precision | 1M selected AKM mobility designs | PyFixest MAP and LSMR variants, R `fixest`, and `FixedEffectModels.jl` | Wall time against coefficient and residual error |
-| Worker-specific year slopes | 1M AKM mobility designs 1, 3, and 5 | PyFixest diagonal and factor-pair Schwarz, R `fixest`, and `FixedEffectModels.jl` | Package-default runtime with one varying-slope effect |
+| Worker-specific year slopes | 10M simple/difficult; 1M AKM mobility and sorting designs | PyFixest diagonal and factor-pair Schwarz, R `fixest`, and `FixedEffectModels.jl` | Package-default runtime with one varying-slope effect |
 | Ten-regression reuse | 1M simple and difficult | Diagonal, rebuilt factor-pair, and cached factor-pair preconditioners | Setup reuse across fits |
 | Selected Correia designs | Existing sizes | Six default OLS configurations | Robustness across graph families |
 | PPML simple/difficult | 1M | PyFixest MAP and factor-pair reuse, plus external packages | Inner solver versus outer IRLS convergence |
