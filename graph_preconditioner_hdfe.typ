@@ -75,13 +75,12 @@
       fixed-effect graphs, such as matched employer-employee panels where worker-firm mobility
       links separate worker and firm effects. The convergence behavior of MAP depends on the
       mobility pattern linking workers to firms, yet MAP only indirectly makes use of this
-      information by iterating over one fixed effect at a time. That mobility pattern is,
-      however, directly encoded in the matrix of worker-firm match counts, which together
-      with the worker and firm count diagonals forms a graph Laplacian after a sign flip
-      and admits sparse approximate Cholesky factorization.
-      We propose a graph-preconditioned Krylov solver whose reusable preconditioner is
-      built from small, local factor-pair subproblems - worker-firm, worker-year, and
-      so on - that use the graph directly.
+      information by iterating over one fixed effect at a time. The worker-firm match-count
+      matrix records each observed link directly. Together with the worker and firm count
+      diagonals, it forms a graph Laplacian after a sign flip and admits sparse approximate
+      Cholesky factorization. We propose a graph-preconditioned Krylov solver with a reusable
+      preconditioner built from factor-pair subproblems, such as worker-firm and worker-year,
+      that retain these match counts.
       Benchmarks show that all methods are fast on well-connected designs. As
       connectivity weakens, MAP and diagonally preconditioned LSMR slow down, while
       factor-pair preconditioning remains fast and its runtime falls because the graph
@@ -112,9 +111,11 @@ heterogeneity from firm wage premia; health economists study physician practice 
 with individual, physician, and region fixed effects in mover designs; and education
 researchers use school, student, teacher, and student-teacher effects.
 
-The Frisch-Waugh-Lovell (FWL) theorem first removes the variation explained by the fixed
-effects from the outcome and regressors; a second, low-dimensional regression then
-relates the residualized outcome to the residualized covariates @frisch1933 @lovell1963.
+In each case, computation usually proceeds by absorbing the fixed effects before
+estimating the coefficients of interest. The Frisch-Waugh-Lovell (FWL) theorem first
+removes the variation explained by the fixed effects from the outcome and regressors; a
+second, low-dimensional regression then relates the residualized outcome to the
+residualized covariates @frisch1933 @lovell1963.
 With high-dimensional fixed effects, software usually performs the residualization with
 the Method of Alternating Projections (MAP), also known as iterative demeaning or the
 "Zig-Zag" algorithm @guimaraes2010 @gaure2013. Packages including Stata's
@@ -152,7 +153,7 @@ counts @correia2017. MAP accesses the match-count blocks only through successive
 residuals; our preconditioner instead groups them with the corresponding count blocks by
 factor pair. A sign change turns each pair block into a graph Laplacian, and sparse
 approximate Cholesky methods supply local corrections at low cost @spielman2014
-@gao2025. Their weighted sum preconditions LSMR.#footnote[
+@gao2025. A weighted sum of these local corrections preconditions LSMR.#footnote[
 `FixedEffectModels.jl` @fixedeffectmodels also uses LSMR @fong2011, with diagonal
 preconditioning based on fixed-effect counts, whereas the factor-pair preconditioner
 also uses links between fixed-effect dimensions.]
@@ -425,8 +426,8 @@ than a bound on the convergence rate of the full model.
 
 == LSMR and Preconditioners
 
-Factor-pair preconditioning brings the pair graphs into the update without altering the
-regression.
+Factor-pair preconditioning incorporates cross-factor links into each LSMR iteration
+without changing the least-squares problem.
 
 LSMR solves the fixed-effect least-squares problem in @eq:demean-ls by multiplying
 vectors by $D$ and $D'$ rather than forming the Gramian, while a preconditioner uses a
@@ -440,8 +441,8 @@ preconditioned normal equation is the identity,#footnote[As in any model with se
 effects, the level effects are pinned down only up to a normalization: we can add a
 constant to every worker effect and subtract it from every firm effect without changing
 the fitted values $D alpha$, and likewise for years. The dummy-coded $G = D' W D$ and the
-smaller blocks inverted below are therefore not invertible until this ambiguity is
-removed - one normalization for the worker-firm pair, and a second once year effects are
+smaller blocks inverted below are therefore singular until we impose a normalization.
+We impose one normalization for the worker-firm pair and a second when year effects are
 added, as in the Section 4 example. We adopt the standard normalization within each
 connected set and read every inverse below as that of the resulting system. The estimated
 effects depend on the normalization; the residualized outcome and regressors, which are
@@ -475,7 +476,7 @@ diagonal approximation therefore increases the number of outer iterations withou
 changing the least-squares target.
 
 #figure(
-  image(solver-img("diagonal_lsmr_strategy.svg"), width: 70%),
+  image(solver-img("diagonal_lsmr_strategy.svg"), width: 65%),
   caption: [Diagonal preconditioning within LSMR. Worker, firm, and year counts are
   computed once and reused for the outcome and covariates; at each iteration, the
   preconditioner divides factor-level entries by their total observation weights. Because
@@ -486,9 +487,9 @@ changing the least-squares target.
 
 == What Diagonal Scaling Omits
 
-The block inverse makes the omitted terms explicit: #dg[blue] marks the count-only terms
-used by diagonal preconditioning, whereas #cr[orange] marks terms that depend on
-cross-factor links. For the worker-firm-year model,
+The worker-firm block inverse makes the omitted terms explicit: #dg[blue] marks the
+count-only terms used by diagonal preconditioning, whereas #cr[orange] marks terms that
+depend on cross-factor links. For the worker-firm-year model,
 
 $ G = mat(
   dg(G_(W W)), cr(C_(W F)), cr(C_(W Y));
@@ -568,9 +569,10 @@ joint three-factor coupling and the error from splitting shared levels across pa
 
 == Approximating Pair Systems via Graph Laplacians
 
-The normalized pair block in Section 4 is only a $4 times 4$ system, but register data
-can contain hundreds of thousands of workers and firms, making direct inversion
-impractical. We therefore approximate large blocks using their graph-Laplacian structure.
+After one normalization, the five-level worker-firm block in Section 4 becomes a
+$4 times 4$ system, but register data can contain hundreds of thousands of workers and
+firms, making direct inversion impractical. We approximate large blocks using their
+graph-Laplacian structure.
 
 For a worker-firm pair, the local pair step solves the pair-Gramian system
 
@@ -625,7 +627,7 @@ twice.
 LSMR applies this sum while solving the original least-squares problem @fong2011
 @arridge2014 @yang2024flexible. When observations, weights, and fixed-effect identifiers
 are unchanged, the pair factorizations can be reused for the outcome and every covariate.
-The `within` source implements this setup-and-apply sequence @within.
+The `within` implementation follows this setup-and-apply sequence @within.
 
 #figure(
   image(solver-img("factor_pair_strategy.svg"), width: 70%),
@@ -704,12 +706,12 @@ last because the local worker-firm graphs become cheaper to factorize.
 
 === Sorting Among Movers
 
-Increasing $rho$ concentrates moves within groups even though every worker moves between
-periods. The Gap falls from $0.222$ to $2.13 times 10^(-4)$. PyFixest MAP rises from
+Although every worker moves between periods, increasing $rho$ concentrates moves within
+groups, and the Gap falls from $0.222$ to $2.13 times 10^(-4)$. PyFixest MAP rises from
 0.411 seconds to 53.9 seconds before reaching its cap in the final design;
-unpreconditioned LSMR reaches its cap in the last four. Diagonal LSMR rises from 0.362 to
-1.58 seconds. Factor-pair LSMR stays below one second and is faster than diagonal LSMR in
-the three designs with the smallest Gap.
+unpreconditioned LSMR reaches its cap in the last four. Over the same designs, diagonal
+LSMR rises from 0.362 to 1.58 seconds, while factor-pair LSMR stays below one second and
+is faster than diagonal LSMR at the three smallest Gap values.
 
 === When Preconditioner Setup Dominates
 
@@ -743,8 +745,8 @@ reaches its default cap.
 
 === Iterations After Setup
 
-The iteration-count diagnostic removes setup time and uses 100,000-observation versions
-of the same designs.
+To separate iteration counts from setup time, we use 100,000-observation versions of the
+same designs.
 
 #block(breakable: false)[#text(size: 8.9pt)[
 #strong[Iterations on the simple and difficult designs (100,000 observations).]
@@ -786,16 +788,16 @@ check whether the controlled comparisons carry over to these less regular graphs
 
 On `credit` and `soccer`, PyFixest MAP takes 0.193 and 0.026 seconds, compared with 0.242
 and 0.065 seconds for factor-pair LSMR, so the preconditioner's setup cost does not pay
-on these easy datasets. On the more difficult graphs, factor-pair LSMR takes 0.402
-seconds on `enron` and 0.266 seconds on `schools`, compared with 2.95 and 5.98 seconds
-for PyFixest MAP. On `github`, `patents`, `workers`, and
-`directors`, PyFixest MAP reaches its iteration cap while factor-pair LSMR finishes in
-0.279 to 0.388 seconds. Accelerated MAP can still be competitive, however; `fixest`
-takes 0.283 seconds on `directors`, slightly less than factor-pair LSMR's 0.327 seconds.
+on these easy datasets. Factor-pair LSMR is faster on the more difficult `enron` and
+`schools` graphs, taking 0.402 and 0.266 seconds compared with 2.95 and 5.98 seconds for
+PyFixest MAP. PyFixest MAP reaches its iteration cap on `github`, `patents`, `workers`,
+and `directors`, while factor-pair LSMR finishes in 0.279 to 0.388 seconds. Accelerated
+MAP can still be competitive, however; `fixest` takes 0.283 seconds on `directors`,
+slightly less than factor-pair LSMR's 0.327 seconds.
 
-The Gap is a pairwise description, not a rule for choosing a solver. Runtime also
-depends on component size, factor dimensions, graph sparsity, acceleration, and the
-preconditioner's setup cost.
+The Gap is a pairwise description rather than a rule for choosing a solver because
+runtime also depends on component size, factor dimensions, graph sparsity, acceleration,
+and the preconditioner's setup cost.
 
 == Runtime and Achieved Precision
 
@@ -892,8 +894,8 @@ when the factor-pair preconditioner is rebuilt, and 1.30 seconds when it is reta
 Reuse also matters within a single nonlinear fit because Poisson fixed-effect models
 repeat the absorption step at every iteratively reweighted least-squares (IRLS) iteration
 @stammann2018. Their fixed-effect identifiers remain fixed while the weights and working
-response change, so residualization time accumulates over the fit; `ppmlhdfe`
-@correia2020ppmlhdfe and related estimators use this structure.
+response change, so `ppmlhdfe` @correia2020ppmlhdfe and related estimators repeatedly
+residualize the data with the same identifiers and accumulate this cost over the fit.
 
 PyFixest currently retains the preconditioner from the first weighted demeaning call as
 the IRLS weights change. The benchmark reports that policy; it does not isolate reuse as
@@ -925,7 +927,7 @@ The comparison uses the one-million-observation simple and difficult `fixest` de
   ]
 
 #block(breakable: false)[All four implementations finish the simple design in less than
-ten seconds. The difficult design separates them: PyFixest MAP reaches its iteration cap,
+ten seconds. On the difficult design, PyFixest MAP reaches its iteration cap,
 `GLFEM.jl` takes 129.8 seconds, `fixest` takes 439.3 seconds, and factor-pair LSMR takes
 5.52 seconds. Repeated absorption magnifies the cost of slow propagation across the
 worker-firm graph.]
@@ -989,21 +991,23 @@ which the last line runs the low-dimensional FWL regression from Section 2.
 
 = Conclusion
 
-MAP's low cost per pass makes it the right default for many well-connected fixed-effect
-models, but successive mean updates move information slowly when mobility is sparse,
-sorting is strong, or one effect is nearly nested in another.
+MAP's low cost per pass makes it effective for many well-connected fixed-effect models,
+but successive mean updates move information slowly when mobility is sparse, sorting is
+strong, or one effect is nearly nested in another.
 
 Factor-pair preconditioning uses observed co-occurrences to correct worker-firm and other
 pair blocks jointly, changing the numerical update while preserving the original
-least-squares target. The benchmarks show that this setup cost is unnecessary on easy
-graphs but can replace hundreds of MAP passes or LSMR iterations on difficult ones;
+least-squares target. Its setup cost can outweigh the reduction in iterations on easy
+graphs, but on difficult graphs it can avoid hundreds of MAP passes or LSMR iterations;
 sparse pair graphs can also be cheaper to factorize than dense ones.
 
-The practical case is strongest when the factor-pair Gap is small or when the same fixed
-effects are absorbed repeatedly. Specification searches can reuse one preconditioner
-across outcomes and covariates, and IRLS estimators call the demeaning routine at every
-outer iteration. In these settings, graph structure becomes computational information as
-well as an identification diagnostic.
+The setup cost is most likely to be worthwhile when the factor-pair Gap is small or the
+same fixed effects are absorbed repeatedly. Specification searches can reuse one
+preconditioner across outcomes and covariates, while IRLS estimators call the demeaning
+routine at every outer iteration. In both cases, reuse spreads the setup cost across
+several residualizations. The Gap remains a pairwise connectivity diagnostic rather than
+a solver-selection rule, but a small value signals the weak connectivity that can slow
+MAP.
 
 #set heading(numbering: none)
 #show heading.where(level: 1): it => block(
