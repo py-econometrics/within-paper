@@ -6,6 +6,9 @@ Install the Pixi-managed Python and Typst environment:
 pixi install --locked
 ```
 
+The lockfile installs PyFixest from the exact Git revision used for the varying-slope
+benchmark. A floating development branch is not used.
+
 R and Julia run natively rather than through Pixi. Install them separately, then set the
 thread count used by every benchmark process:
 
@@ -42,3 +45,7 @@ Each public benchmark task names one paper experiment. The task generates its in
 directly and writes one raw CSV under `results/runs/latest/`. Cross-language comparisons
 share one temporary Parquet file per design. Small Python, R, and Julia calls are part of
 `pixi run test`.
+
+`bench-main` records the ordinary specification and the worker- and firm-specific
+year-slope specification for the simple and difficult designs in `ols.csv`. `bench-akm`
+records both specifications for all mobility and sorting designs in `akm.csv`.

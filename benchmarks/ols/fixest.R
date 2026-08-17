@@ -10,12 +10,19 @@ data_path <- args[[1]]
 output_path <- args[[2]]
 fixed_effects <- strsplit(args[[3]], ",", fixed = TRUE)[[1]]
 requested <- args[[4]]
+specification <- if (length(args) >= 5) args[[5]] else "intercepts"
 threads <- as.integer(Sys.getenv("BENCH_THREADS"))
 setFixest_nthreads(threads)
 if (getFixest_nthreads() != threads) stop("fixest did not accept BENCH_THREADS")
 
 frame <- as.data.frame(read_parquet(data_path))
-formula <- as.formula(paste("y ~ x1 |", paste(fixed_effects, collapse = " + ")))
+formula <- if (specification == "intercepts") {
+  as.formula(paste("y ~ x1 |", paste(fixed_effects, collapse = " + ")))
+} else if (specification == "worker-firm-year-slopes") {
+  y ~ x1 | indiv_id[year] + firm_id[year] + year
+} else {
+  stop(paste("unknown OLS specification", specification))
+}
 fit_once <- function() {
   capped <- FALSE
   fit <- withCallingHandlers(
@@ -44,7 +51,9 @@ for (index in seq_len(repetitions)) {
   rows[[index]] <- tryCatch({
     fit <- fit_once()
     data.frame(
-      backend = "fixest", repetition = index - 1L,
+      backend = "fixest", preconditioner = "",
+      package_version = as.character(packageVersion("fixest")),
+      repetition = index - 1L,
       n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = nobs(fit), beta_x1 = unname(coef(fit)[["x1"]]),
@@ -53,7 +62,9 @@ for (index in seq_len(repetitions)) {
   }, error = function(error) {
     message <- conditionMessage(error)
     data.frame(
-      backend = "fixest", repetition = index - 1L,
+      backend = "fixest", preconditioner = "",
+      package_version = as.character(packageVersion("fixest")),
+      repetition = index - 1L,
       n_planned = repetitions,
       runtime_s = proc.time()[["elapsed"]] - started,
       n_retained = NA_integer_, beta_x1 = NA_real_,

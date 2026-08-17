@@ -28,13 +28,22 @@ function Logging.handle_message(
     )
 end
 
-data_path, output_path, fixed_text, requested = ARGS
+data_path, output_path, fixed_text, requested = ARGS[1:4]
+specification = length(ARGS) >= 5 ? ARGS[5] : "intercepts"
 threads = parse(Int, ENV["BENCH_THREADS"])
 Threads.nthreads() == threads || error("Julia thread count does not match BENCH_THREADS")
 frame = DataFrame(Parquet2.Dataset(data_path))
 fixed_effects = split(fixed_text, ",")
-fixed_terms = foldl(+, [fe(Symbol(name)) for name in fixed_effects])
-formula = term(:y) ~ term(:x1) + fixed_terms
+formula = if specification == "intercepts"
+    fixed_terms = foldl(+, [fe(Symbol(name)) for name in fixed_effects])
+    term(:y) ~ term(:x1) + fixed_terms
+elseif specification == "worker-firm-year-slopes"
+    term(:y) ~ term(:x1) + fe(:indiv_id) +
+        (fe(:indiv_id) & term(:year)) + fe(:firm_id) +
+        (fe(:firm_id) & term(:year)) + fe(:year)
+else
+    error("unknown OLS specification $specification")
+end
 
 function fit_once()
     logger = ConvergenceLogger(current_logger(), false)
@@ -58,7 +67,9 @@ for repetition in 0:(repetitions - 1)
     try
         fit = fit_once()
         push!(rows, (
-            backend="FEM.jl", repetition=repetition,
+            backend="FEM.jl", preconditioner="",
+            package_version=string(Base.pkgversion(FixedEffectModels)),
+            repetition=repetition,
             n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=nobs(fit),
             beta_x1=Float64(coef(fit)[1]),
@@ -66,7 +77,9 @@ for repetition in 0:(repetitions - 1)
         ))
     catch error_value
         push!(rows, (
-            backend="FEM.jl", repetition=repetition,
+            backend="FEM.jl", preconditioner="",
+            package_version=string(Base.pkgversion(FixedEffectModels)),
+            repetition=repetition,
             n_planned=repetitions,
             runtime_s=(time_ns() - trial_started) / 1e9, n_retained=missing,
             beta_x1=missing, converged=false,

@@ -274,7 +274,10 @@ class PythonFitTests(unittest.TestCase):
 
         self.assertEqual(
             lsmr.call_args_list,
-            [call(preconditioner="off"), call(preconditioner="diagonal")],
+            [
+                call(backend="within", preconditioner="off"),
+                call(backend="within", preconditioner="diagonal"),
+            ],
         )
 
     def test_direct_ppml_fit_uses_three_fixed_effects(self) -> None:
@@ -360,7 +363,7 @@ class PythonFitTests(unittest.TestCase):
             if target is ols_runner._write_sample:
                 target(*args)
                 return
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             retained = 100 if backend == "rust-map" else 99
             pd.DataFrame(
                 [{
@@ -394,7 +397,7 @@ class PythonFitTests(unittest.TestCase):
                 target(*args)
                 return None
             self.assertIs(target, ols_runner._python_rows)
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             worker_backends.append(backend)
             pd.DataFrame(
                 [
@@ -433,7 +436,7 @@ class PythonFitTests(unittest.TestCase):
             if target is ols_runner._write_sample:
                 target(*args)
                 return None
-            _, output, _, backend, repetitions = args
+            _, output, _, backend, repetitions, *_ = args
             if backend == "rust-map":
                 return "python estimator worker exited with status 1"
             pd.DataFrame(
@@ -629,6 +632,23 @@ class PaperResultTests(unittest.TestCase):
             paper_results._synchronize_hardness(document)
         self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][1], mobility_gap)
         self.assertEqual(document["tables"]["akm_sorting"]["rows"][0][1], "0.25 (1.00)")
+
+    def test_legacy_hardness_file_preserves_collected_lambda2_values(self) -> None:
+        document = json.loads(paper_results.TABLES_PATH.read_text(encoding="utf-8"))
+        mobility_gap = document["tables"]["akm_mobility"]["rows"][0][1]
+        rows = [
+            {
+                "dataset_id": "akm_mobility_1",
+                "fe_a": "indiv_id",
+                "fe_b": "firm_id",
+                "one_minus_rho": "0.25",
+            }
+        ]
+        with patch.object(paper_results, "_latest_rows", return_value=rows):
+            changed = paper_results._synchronize_hardness(document)
+
+        self.assertEqual(changed, 0)
+        self.assertEqual(document["tables"]["akm_mobility"]["rows"][0][1], mobility_gap)
 
     def test_render_does_not_collect_raw_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

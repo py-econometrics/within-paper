@@ -16,7 +16,7 @@ test = { cmd = "python -m unittest discover -s tests -t . -v", description = "Ru
 bench-memory = { cmd = "python -m benchmarks.memory", description = "Measure peak RSS and runtime for PyFixest MAP and within (100K, 1M)" }
 bench-main = { cmd = "python -m benchmarks.ols.main", depends-on = ["setup-julia-env"], description = "Run the headline OLS comparison" }
 bench-fepois = { cmd = "python -m benchmarks.ppml.run", depends-on = ["setup-julia-env"], description = "Run the headline PPML comparison" }
-bench-akm = { cmd = "python -m benchmarks.ols.akm", depends-on = ["setup-julia-env"], description = "Run the AKM package and mechanism comparisons" }
+bench-akm = { cmd = "python -m benchmarks.ols.akm", depends-on = ["setup-julia-env"], description = "Run the AKM package, mechanism, and varying-slope comparisons" }
 within-preconditioners = { cmd = "python -m benchmarks.within.preconditioners", description = "Standalone within setup/solve/iteration/residual diagnostics for off/diagonal/additive" }
 make-figures = { cmd = "python -m scripts.make_figures", depends-on = ["bench-tolerance"], description = "Generate paper figures from collected canonical results and recorded tolerance results" }
 bench-amortization = { cmd = "python -m benchmarks.within.amortization", description = "Measure additive setup across AKM connectivity and reuse across ten regressions" }
@@ -39,7 +39,7 @@ python = ">=3.14.4,<3.15"
 scipy = ">=1.11"
 
 [pypi-dependencies]
-pyfixest = ">=0.60.0"
+pyfixest = { git = "https://github.com/py-econometrics/pyfixest.git", rev = "54246ef068e3f434018b71e37c03e3ddabfc03a2" }
 pyarrow = ">=19.0.0"
 # Pinned to the version that produced the tracked SVGs. A PyPI matplotlib
 # arrives transitively via seaborn and shadows the conda matplotlib-base, so
